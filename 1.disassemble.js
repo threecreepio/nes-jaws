@@ -1,10 +1,10 @@
-const PAGESIZE = 0x4000;
+const PAGESIZE = 0x8000;
 const HEADERSIZE = 16;
 const fs = require('fs');
 const cproc = require('child_process');
 const nes = fs.readFileSync('./files/original.nes');
 const cdl = fs.existsSync('./files/original.cdl') && fs.readFileSync('./files/original.cdl');
-const pageCount = nes[4];
+const pageCount = nes[4] / 2;
 const suffix = (pageCount * PAGESIZE) + HEADERSIZE;
 try { fs.mkdirSync('src'); } catch(ex) {}
 fs.writeFileSync('./src/prefix.bin', nes.slice(0, HEADERSIZE));
@@ -22,7 +22,8 @@ for (var i=0; i<pageCount; ++i) {
     if (cdl) {
         const cdlSlice = cdl.slice(start, end);
         cdlRanges = Array.from(cdlSlice).map((byte, i) => {
-            const type = (byte & 0b00100010) ? 'BYTETABLE' : 'CODE';
+            // const type = (byte & 0b00100010) ? 'BYTETABLE' : 'CODE';
+            const type = (byte & 0b00000001) ? 'CODE' : 'BYTETABLE';
             return `RANGE { START \$${(0x8000 + i).toString(16)}; END \$${(0x8000 + i).toString(16)}; TYPE ${type}; };`
         }).join('\n');
     }
@@ -37,7 +38,7 @@ GLOBAL {
 SEGMENT { START $${ startAddr }; END $FFFF; NAME "game"; };
 ${cdlRanges}
 `);
-    cproc.execFileSync('./files/bin/da65.exe', ['-i', 'TMP.infofile', '-v', '--comments', '4']);
+    cproc.execFileSync('./files/bin/da65.exe', ['-i', 'TMP.infofile', '-v', '--label-break', '1', '--comments', '4']);
 }
 fs.unlinkSync('TMP.infofile');
 fs.unlinkSync('TMP.prg.bin');
