@@ -49,45 +49,51 @@ L80B1:
         .byte   $FF,$0F,$01,$40,$AB,$7F,$FF     ; 80F9 FF 0F 01 40 AB 7F FF     ...@...
 ; ----------------------------------------------------------------------------
 VBOOT:
-        sei                                     ; 8100 78                       x
-        cld                                     ; 8101 D8                       .
-        ldx     #$FF                            ; 8102 A2 FF                    ..
-        txs                                     ; 8104 9A                       .
-        lda     #$00                            ; 8105 A9 00                    ..
-        sta     $0300                           ; 8107 8D 00 03                 ...
-        lda     #$10                            ; 810A A9 10                    ..
-        sta     $2000                           ; 810C 8D 00 20                 .. 
-L810F:
-        lda     $2002                           ; 810F AD 02 20                 .. 
-        bpl     L810F                           ; 8112 10 FB                    ..
-L8114:
-        lda     $2002                           ; 8114 AD 02 20                 .. 
-        bpl     L8114                           ; 8117 10 FB                    ..
-        lda     #$00                            ; 8119 A9 00                    ..
-        tax                                     ; 811B AA                       .
-L811C:
-        sta     $00,x                           ; 811C 95 00                    ..
-        inx                                     ; 811E E8                       .
-        bne     L811C                           ; 811F D0 FB                    ..
-        ldx     #$06                            ; 8121 A2 06                    ..
-        lda     #$01                            ; 8123 A9 01                    ..
-        sta     $01                             ; 8125 85 01                    ..
-        lda     #$00                            ; 8127 A9 00                    ..
-        tay                                     ; 8129 A8                       .
-L812A:
-        sta     ($00),y                         ; 812A 91 00                    ..
-        iny                                     ; 812C C8                       .
-        bne     L812A                           ; 812D D0 FB                    ..
-        inc     $01                             ; 812F E6 01                    ..
-        dex                                     ; 8131 CA                       .
-        bne     L812A                           ; 8132 D0 F6                    ..
-        lda     #$01                            ; 8134 A9 01                    ..
-        sta     $0352                           ; 8136 8D 52 03                 .R.
-        jsr     L8C87                           ; 8139 20 87 8C                  ..
-        lda     $0331                           ; 813C AD 31 03                 .1.
-        cmp     #$52                            ; 813F C9 52                    .R
-        bne     L8148                           ; 8141 D0 05                    ..
-        .byte   $A9,$80,$8D,$08,$03             ; 8143 A9 80 8D 08 03           .....
+        sei
+        cld
+        ldx #$FF
+        txs
+        lda #$00
+        sta $0300
+        lda #%00010000                      ; clear ppuctrl, set background pattern table to $1000
+        sta PPUCTRL                         ; update ppuctrl
+@WaitVBlank1:
+        lda PPUSTATUS
+        bpl @WaitVBlank1
+@WaitVBlank2:
+        lda PPUSTATUS
+        bpl @WaitVBlank2
+
+; Clear ZP memory
+        lda #$00
+        tax
+@ClearMemoryZP:
+        sta $00,x
+        inx
+        bne @ClearMemoryZP
+
+; Clear ram
+        ldx #$06
+        lda #$01
+        sta $01
+        lda #$00
+        tay
+@ClearMemory:
+        sta ($00),y
+        iny
+        bne @ClearMemory
+        inc $01
+        dex
+        bne @ClearMemory
+
+        lda #$01                            ; 8134 A9 01                    ..
+        sta $0352                           ; 8136 8D 52 03                 .R.
+        jsr L8C87                           ; 8139 20 87 8C                  ..
+        lda $0331                           ; 813C AD 31 03                 .1.
+        cmp #$52                            ; 813F C9 52                    .R
+        bne L8148                           ; 8141 D0 05                    ..
+        lda #$80
+        sta $0308
 ; ----------------------------------------------------------------------------
 L8148:
         ldx     #$FF                            ; 8148 A2 FF                    ..
