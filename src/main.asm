@@ -15,14 +15,23 @@ OAMDATA               = $2004
 PPUSCROLL             = $2005
 PPUADDR               = $2006
 PPUDATA               = $2007
-OAMDMA                = $4014
 
-SND_REGISTER          = $4000
-SND_SQUARE1_REG       = $4000
-SND_SQUARE2_REG       = $4004
-SND_TRIANGLE_REG      = $4008
-SND_NOISE_REG         = $400C
-SND_MASTERCTRL_REG    = $4015
+ActiveCHR             = $0307
+PPUCTRL_MIRROR        = $030E
+PPUMASK_MIRROR        = $030F
+SCROLL_X              = $0320
+SCROLL_Y              = $0322
+
+SND_SQUARE1_TIMER     = $4000
+SND_SQUARE1_LENGTH    = $4001
+SND_SQUARE2_TIMER     = $4004
+SND_SQUARE2_LENGTH    = $4005
+SND_TRIANGLE_TIMER    = $4008
+SND_TRIANGLE_LENGTH   = $4009
+SND_NOISE_TIMER       = $400C
+
+OAMDMA                = $4014
+SND_MASTERCTRL        = $4015
 
 JOYPAD_PORT1          = $4016
 JOYPAD_PORT2          = $4017
@@ -35,18 +44,43 @@ PressedInputs2        = $0333
 
 CurrentScore          = $0380
 
+Jaws_HP_Lo            = $0388
+Jaws_HP_Hi            = $0389
+Jaws_X_Lo             = $0702
+Jaws_X_Hi             = $0703
+Jaws_Y_Lo             = $0704
+Jaws_Y_Hi             = $0705
+
+Camera_X_Lo           = $0338
+Camera_X_Hi           = $0339
+Camera_Y_Lo           = $033A
+Camera_Y_Hi           = $033B
+
+Boat_X_Lo             = $0682
+Boat_X_Hi             = $0683
+Boat_Y_Lo             = $0684
+Boat_Y_Hi             = $0685
+
+
+Sprite_PosY     = $200
+Sprite_Tile     = $201
+Sprite_Attr     = $202
+Sprite_PosX     = $203
+SPR             = 4
+
+
 
 
 ; ---
 
 JOY_A                 = %10000000
 JOY_B                 = %01000000
-JOY_Select            = %00100000
-JOY_Start             = %00010000
-JOY_Up                = %00001000
-JOY_Down              = %00000100
-JOY_Left              = %00000010
-JOY_Right             = %00000001
+JOY_SELECT            = %00100000
+JOY_START             = %00010000
+JOY_UP                = %00001000
+JOY_DOWN              = %00000100
+JOY_LEFT              = %00000010
+JOY_RIGHT             = %00000001
 
 ; ----------------------------------------------------------------------------
 
@@ -59,17 +93,18 @@ JOY_Right             = %00000001
 .byte "LICENSED BY MERCHANDISING CORPORATION OF AMERICA,INC.",$0D,$0A
 .byte "LICENSED BY NINTENDO OF AMERICA,INC.",$0D,$0A
 
-L80B1:
-        .byte   $00,$01,$02,$03,$FF,$FF,$FF,$FF ; 80B1 00 01 02 03 FF FF FF FF  ........
-        .byte   $E0,$00,$00,$00,$A0,$55,$AA,$00 ; 80B9 E0 00 00 00 A0 55 AA 00  .....U..
-        .byte   $FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF ; 80C1 FF FF FF FF FF FF FF FF  ........
-        .byte   $00,$00,$00,$12,$A9,$54,$80,$00 ; 80C9 00 00 00 12 A9 54 80 00  .....T..
-        .byte   $FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF ; 80D1 FF FF FF FF FF FF FF FF  ........
-        .byte   $00,$00,$00,$A0,$4A,$15,$02,$00 ; 80D9 00 00 00 A0 4A 15 02 00  ....J...
-        .byte   $C0,$FF,$FF,$FF,$FF,$FF,$F8,$FF ; 80E1 C0 FF FF FF FF FF F8 FF  ........
-        .byte   $3F,$00,$00,$10,$2A,$55,$AF,$00 ; 80E9 3F 00 00 10 2A 55 AF 00  ?...*U..
-        .byte   $00,$F0,$FE,$FF,$FC,$C0,$00,$FF ; 80F1 00 F0 FE FF FC C0 00 FF  ........
-        .byte   $FF,$0F,$01,$40,$AB,$7F,$FF     ; 80F9 FF 0F 01 40 AB 7F FF     ...@...
+CHRBANKS:
+.byte   $00,$01,$02,$03,$FF,$FF,$FF,$FF ; 80B1 00 01 02 03 FF FF FF FF  ........
+.byte   $E0,$00,$00,$00,$A0,$55,$AA,$00 ; 80B9 E0 00 00 00 A0 55 AA 00  .....U..
+.byte   $FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF ; 80C1 FF FF FF FF FF FF FF FF  ........
+.byte   $00,$00,$00,$12,$A9,$54,$80,$00 ; 80C9 00 00 00 12 A9 54 80 00  .....T..
+.byte   $FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF ; 80D1 FF FF FF FF FF FF FF FF  ........
+.byte   $00,$00,$00,$A0,$4A,$15,$02,$00 ; 80D9 00 00 00 A0 4A 15 02 00  ....J...
+.byte   $C0,$FF,$FF,$FF,$FF,$FF,$F8,$FF ; 80E1 C0 FF FF FF FF FF F8 FF  ........
+.byte   $3F,$00,$00,$10,$2A,$55,$AF,$00 ; 80E9 3F 00 00 10 2A 55 AF 00  ?...*U..
+.byte   $00,$F0,$FE,$FF,$FC,$C0,$00,$FF ; 80F1 00 F0 FE FF FC C0 00 FF  ........
+.byte   $FF,$0F,$01,$40,$AB,$7F,$FF     ; 80F9 FF 0F 01 40 AB 7F FF     ...@...
+
 ; ----------------------------------------------------------------------------
 VBOOT:
         sei
@@ -85,7 +120,7 @@ VBOOT:
 :       lda PPUSTATUS
         bpl :-
 
-; Clear ZP memory
+        ; Clear ZP
         lda #$00
         tax
 @ClearMemoryZP:
@@ -93,7 +128,7 @@ VBOOT:
         inx
         bne @ClearMemoryZP
 
-; Clear ram
+        ; Clear memory
         ldx #$06
         lda #$01
         sta $01
@@ -107,47 +142,53 @@ VBOOT:
         dex
         bne @ClearMemory
 
-        lda #$01                            ; 8134 A9 01                    ..
-        sta $0352                           ; 8136 8D 52 03                 .R.
-        jsr ReadJoypads                           ; 8139 20 87 8C                  ..
-        lda HeldInputs2                           ; 813C AD 31 03                 .1.
-        cmp #$52                            ; 813F C9 52                    .R
-        bne L8148                           ; 8141 D0 05                    ..
+        ; initialize 352, probably does something!
+        lda #$01
+        sta $0352
+
+        ; check if controller 2 has B + Start + Left held
+        ; and initialize some value
+        jsr ReadJoypads
+        lda HeldInputs2
+        cmp #(JOY_B | JOY_START | JOY_LEFT)
+        bne @ContinueStartup
         lda #$80
         sta $0308
-; ----------------------------------------------------------------------------
-L8148:
-        ldx     #$FF                            ; 8148 A2 FF                    ..
-        txs                                     ; 814A 9A                       .
-        jsr     LE299                           ; 814B 20 99 E2                  ..
+
+@ContinueStartup:
+        ; clear stack
+        ldx #$FF
+        txs
+
+        jsr     SoundSystemInit                           ; 814B 20 99 E2                  ..
         lda     #$FF                            ; 814E A9 FF                    ..
         jsr     LE2CD                           ; 8150 20 CD E2                  ..
         lda     #$10                            ; 8153 A9 10                    ..
-        sta     $030E                           ; 8155 8D 0E 03                 ...
+        sta     PPUCTRL_MIRROR                           ; 8155 8D 0E 03                 ...
         sta     PPUCTRL                           ; 8158 8D 00 20                 .. 
         lda     #$00                            ; 815B A9 00                    ..
-        sta     $030F                           ; 815D 8D 0F 03                 ...
+        sta     PPUMASK_MIRROR                           ; 815D 8D 0F 03                 ...
         jsr     L8166                           ; 8160 20 66 81                  f.
         jmp     L8277                           ; 8163 4C 77 82                 Lw.
 
 ; ----------------------------------------------------------------------------
 L8166:
-        jsr     L8BEA                           ; 8166 20 EA 8B                  ..
-        jsr     L8BB6                           ; 8169 20 B6 8B                  ..
+        jsr     PPUDisableNMI                           ; 8166 20 EA 8B                  ..
+        jsr     PPUDisableRendering                           ; 8169 20 B6 8B                  ..
         jsr     L8E12                           ; 816C 20 12 8E                  ..
         lda     #$00                            ; 816F A9 00                    ..
-        sta     $0307                           ; 8171 8D 07 03                 ...
+        sta     ActiveCHR                           ; 8171 8D 07 03                 ...
         jsr     L8EBD                           ; 8174 20 BD 8E                  ..
         lda     #RomGraphicsTitleScreen                            ; 8177 A9 00                    ..
         jsr     DrawROMGraphics                           ; 8179 20 69 8D                  i.
         lda     #$00                            ; 817C A9 00                    ..
-        sta     $0320                           ; 817E 8D 20 03                 . .
-        sta     $0338                           ; 8181 8D 38 03                 .8.
-        sta     $0339                           ; 8184 8D 39 03                 .9.
-        sta     $0322                           ; 8187 8D 22 03                 .".
+        sta     SCROLL_X                           ; 817E 8D 20 03                 . .
+        sta     Camera_X_Lo                           ; 8181 8D 38 03                 .8.
+        sta     Camera_X_Hi                           ; 8184 8D 39 03                 .9.
+        sta     SCROLL_Y                           ; 8187 8D 22 03                 .".
         sta     $0323                           ; 818A 8D 23 03                 .#.
-        sta     $033A                           ; 818D 8D 3A 03                 .:.
-        sta     $033B                           ; 8190 8D 3B 03                 .;.
+        sta     Camera_Y_Lo                           ; 818D 8D 3A 03                 .:.
+        sta     Camera_Y_Hi                           ; 8190 8D 3B 03                 .;.
         jsr     L977C                           ; 8193 20 7C 97                  |.
         jsr     L974C                           ; 8196 20 4C 97                  L.
         lda     #$C0                            ; 8199 A9 C0                    ..
@@ -160,7 +201,7 @@ L8166:
         sta     $24                             ; 81A8 85 24                    .$
         jsr     StoreDataFromZP                           ; 81AA 20 61 97                  a.
         jsr     L9A37                           ; 81AD 20 37 9A                  7.
-        jsr     L8BDE                           ; 81B0 20 DE 8B                  ..
+        jsr     PPUEnableNMI                           ; 81B0 20 DE 8B                  ..
         jsr     L8BC2                           ; 81B3 20 C2 8B                  ..
         lda     #$06                            ; 81B6 A9 06                    ..
         jsr     LE2CD                           ; 81B8 20 CD E2                  ..
@@ -209,12 +250,13 @@ L8221:
         .byte   $10,$8D,$04,$03,$60             ; 8272 10 8D 04 03 60           ....`
 ; ----------------------------------------------------------------------------
 L8277:
-        ldx     #$FF                            ; 8277 A2 FF                    ..
-        txs                                     ; 8279 9A                       .
-        jsr     L8BEA                           ; 827A 20 EA 8B                  ..
+        ; clear stack
+        ldx     #$FF
+        txs
+        jsr     PPUDisableNMI                           ; 827A 20 EA 8B                  ..
         lda     #$FF                            ; 827D A9 FF                    ..
         jsr     LE2CD                           ; 827F 20 CD E2                  ..
-        jsr     L8BB6                           ; 8282 20 B6 8B                  ..
+        jsr     PPUDisableRendering                           ; 8282 20 B6 8B                  ..
         jsr     L8E12                           ; 8285 20 12 8E                  ..
         lda     #$00                            ; 8288 A9 00                    ..
         tax                                     ; 828A AA                       .
@@ -250,17 +292,17 @@ L82C3:
         lda     #$03                            ; 82D1 A9 03                    ..
         sta     $0393                           ; 82D3 8D 93 03                 ...
         lda     #$00                            ; 82D6 A9 00                    ..
-        sta     $0388                           ; 82D8 8D 88 03                 ...
+        sta     Jaws_HP_Lo                           ; 82D8 8D 88 03                 ...
         lda     #$14                            ; 82DB A9 14                    ..
-        sta     $0389                           ; 82DD 8D 89 03                 ...
+        sta     Jaws_HP_Hi                           ; 82DD 8D 89 03                 ...
         lda     #$04                            ; 82E0 A9 04                    ..
         sta     $038C                           ; 82E2 8D 8C 03                 ...
         lda     #$04                            ; 82E5 A9 04                    ..
         sta     $038D                           ; 82E7 8D 8D 03                 ...
         jsr     L86E1                           ; 82EA 20 E1 86                  ..
 L82ED:
-        jsr     L8BEA                           ; 82ED 20 EA 8B                  ..
-        jsr     L8BB6                           ; 82F0 20 B6 8B                  ..
+        jsr     PPUDisableNMI                           ; 82ED 20 EA 8B                  ..
+        jsr     PPUDisableRendering                           ; 82F0 20 B6 8B                  ..
         jsr     L8E2D                           ; 82F3 20 2D 8E                  -.
         jsr     DrawStatusLine                           ; 82F6 20 8F A7                  ..
         bit     $0341                           ; 82F9 2C 41 03                 ,A.
@@ -285,13 +327,13 @@ L8314:
         lda     #$01                            ; 8322 A9 01                    ..
         jsr     L8EBD                           ; 8324 20 BD 8E                  ..
         lda     #$01                            ; 8327 A9 01                    ..
-        sta     $0307                           ; 8329 8D 07 03                 ...
+        sta     ActiveCHR                           ; 8329 8D 07 03                 ...
         jsr     L966E                           ; 832C 20 6E 96                  n.
         jsr     LAAB3                           ; 832F 20 B3 AA                  ..
         lda     #$01                            ; 8332 A9 01                    ..
         sta     $0302                           ; 8334 8D 02 03                 ...
         sta     $0305                           ; 8337 8D 05 03                 ...
-        jsr     L8BDE                           ; 833A 20 DE 8B                  ..
+        jsr     PPUEnableNMI                           ; 833A 20 DE 8B                  ..
         jsr     L8BC2                           ; 833D 20 C2 8B                  ..
         lda     #$00                            ; 8340 A9 00                    ..
         jsr     LE2CD                           ; 8342 20 CD E2                  ..
@@ -388,10 +430,10 @@ L8419:
         bmi     L8419                           ; 842A 30 ED                    0.
         lda     #$01                            ; 842C A9 01                    ..
         sta     $0305                           ; 842E 8D 05 03                 ...
-        jsr     L8BEA                           ; 8431 20 EA 8B                  ..
+        jsr     PPUDisableNMI                           ; 8431 20 EA 8B                  ..
         lda     #$FF                            ; 8434 A9 FF                    ..
         jsr     LE2CD                           ; 8436 20 CD E2                  ..
-        jsr     L8BB6                           ; 8439 20 B6 8B                  ..
+        jsr     PPUDisableRendering                           ; 8439 20 B6 8B                  ..
         jsr     L8A41                           ; 843C 20 41 8A                  A.
         jsr     L8A5E                           ; 843F 20 5E 8A                  ^.
         jsr     L977C                           ; 8442 20 7C 97                  |.
@@ -399,14 +441,14 @@ L8419:
         sta     $0306                           ; 8447 8D 06 03                 ...
         jsr     LAC82                           ; 844A 20 82 AC                  ..
         lda     #$00                            ; 844D A9 00                    ..
-        sta     $0320                           ; 844F 8D 20 03                 . .
+        sta     SCROLL_X                           ; 844F 8D 20 03                 . .
         lda     #$00                            ; 8452 A9 00                    ..
-        sta     $0338                           ; 8454 8D 38 03                 .8.
+        sta     Camera_X_Lo                           ; 8454 8D 38 03                 .8.
         lda     #$10                            ; 8457 A9 10                    ..
-        sta     $0339                           ; 8459 8D 39 03                 .9.
+        sta     Camera_X_Hi                           ; 8459 8D 39 03                 .9.
         jsr     LA749                           ; 845C 20 49 A7                  I.
         jsr     L96F1                           ; 845F 20 F1 96                  ..
-        jsr     L8BDE                           ; 8462 20 DE 8B                  ..
+        jsr     PPUEnableNMI                           ; 8462 20 DE 8B                  ..
         jsr     L8BC2                           ; 8465 20 C2 8B                  ..
         ldx     $038A                           ; 8468 AE 8A 03                 ...
         lda     L8697,x                         ; 846B BD 97 86                 ...
@@ -475,16 +517,16 @@ L8525:
         and     #$07                            ; 8537 29 07                    ).
         sta     $038B                           ; 8539 8D 8B 03                 ...
 L853C:
-        lda     $0389                           ; 853C AD 89 03                 ...
+        lda     Jaws_HP_Hi                           ; 853C AD 89 03                 ...
         clc                                     ; 853F 18                       .
         adc     #$04                            ; 8540 69 04                    i.
         cmp     #$14                            ; 8542 C9 14                    ..
         bcc     L854D                           ; 8544 90 07                    ..
         lda     #$00                            ; 8546 A9 00                    ..
-        sta     $0388                           ; 8548 8D 88 03                 ...
+        sta     Jaws_HP_Lo                           ; 8548 8D 88 03                 ...
         lda     #$14                            ; 854B A9 14                    ..
 L854D:
-        sta     $0389                           ; 854D 8D 89 03                 ...
+        sta     Jaws_HP_Hi                           ; 854D 8D 89 03                 ...
         jmp     L82ED                           ; 8550 4C ED 82                 L..
 
 ; ----------------------------------------------------------------------------
@@ -523,14 +565,14 @@ L85C4:
         sta     $13                             ; 85C6 85 13                    ..
 L85C8:
         lda     #$14                            ; 85C8 A9 14                    ..
-        sta     $0389                           ; 85CA 8D 89 03                 ...
+        sta     Jaws_HP_Hi                           ; 85CA 8D 89 03                 ...
         lda     $0304                           ; 85CD AD 04 03                 ...
         ora     #$40                            ; 85D0 09 40                    .@
         sta     $0304                           ; 85D2 8D 04 03                 ...
         lda     #$10                            ; 85D5 A9 10                    ..
         jsr     LD11F                           ; 85D7 20 1F D1                  ..
         lda     #$00                            ; 85DA A9 00                    ..
-        sta     $0389                           ; 85DC 8D 89 03                 ...
+        sta     Jaws_HP_Hi                           ; 85DC 8D 89 03                 ...
         lda     $0304                           ; 85DF AD 04 03                 ...
         ora     #$40                            ; 85E2 09 40                    .@
         sta     $0304                           ; 85E4 8D 04 03                 ...
@@ -640,25 +682,25 @@ L8697:
 
 ; ----------------------------------------------------------------------------
 L86E1:
-        jsr     L8BEA                           ; 86E1 20 EA 8B                  ..
-        jsr     L8BB6                           ; 86E4 20 B6 8B                  ..
+        jsr     PPUDisableNMI                           ; 86E1 20 EA 8B                  ..
+        jsr     PPUDisableRendering                           ; 86E4 20 B6 8B                  ..
         jsr     L8E12                           ; 86E7 20 12 8E                  ..
         jsr     DrawStatusLine                           ; 86EA 20 8F A7                  ..
         lda     #RomGraphicsE                            ; 86ED A9 0E                    ..
         jsr     DrawROMGraphics                           ; 86EF 20 69 8D                  i.
         lda     #$08                            ; 86F2 A9 08                    ..
         jsr     L8EBD                           ; 86F4 20 BD 8E                  ..
-        jsr     SetPPURenderHorizontal                           ; 86F7 20 F6 8B                  ..
+        jsr     PPURenderHorizontal                           ; 86F7 20 F6 8B                  ..
         lda     #$00                            ; 86FA A9 00                    ..
-        sta     $0320                           ; 86FC 8D 20 03                 . .
+        sta     SCROLL_X                           ; 86FC 8D 20 03                 . .
         sta     $0321                           ; 86FF 8D 21 03                 .!.
-        sta     $0322                           ; 8702 8D 22 03                 .".
+        sta     SCROLL_Y                           ; 8702 8D 22 03                 .".
         sta     $0323                           ; 8705 8D 23 03                 .#.
         lda     #$01                            ; 8708 A9 01                    ..
         sta     $0305                           ; 870A 8D 05 03                 ...
         sta     $0302                           ; 870D 8D 02 03                 ...
         lda     #$02                            ; 8710 A9 02                    ..
-        sta     $0307                           ; 8712 8D 07 03                 ...
+        sta     ActiveCHR                           ; 8712 8D 07 03                 ...
         lda     #$22                            ; 8715 A9 22                    ."
         sta     PPUADDR                           ; 8717 8D 06 20                 .. 
         lda     #$72                            ; 871A A9 72                    .r
@@ -674,7 +716,7 @@ L86E1:
         jsr     L874B                           ; 8732 20 4B 87                  K.
         lda     #$1B                            ; 8735 A9 1B                    ..
         jsr     LE2CD                           ; 8737 20 CD E2                  ..
-        jsr     L8BDE                           ; 873A 20 DE 8B                  ..
+        jsr     PPUEnableNMI                           ; 873A 20 DE 8B                  ..
         jsr     L8BC2                           ; 873D 20 C2 8B                  ..
 L8740:
         lda     #$01                            ; 8740 A9 01                    ..
@@ -750,14 +792,14 @@ L87EC:
 
 ; ----------------------------------------------------------------------------
 L87F9:
-        jsr     L8BEA                           ; 87F9 20 EA 8B                  ..
-        jsr     L8BB6                           ; 87FC 20 B6 8B                  ..
+        jsr     PPUDisableNMI                           ; 87F9 20 EA 8B                  ..
+        jsr     PPUDisableRendering                           ; 87FC 20 B6 8B                  ..
         jsr     L8A41                           ; 87FF 20 41 8A                  A.
         jsr     L8A5E                           ; 8802 20 5E 8A                  ^.
         jsr     L977C                           ; 8805 20 7C 97                  |.
         lda     #$00                            ; 8808 A9 00                    ..
         sta     $0306                           ; 880A 8D 06 03                 ...
-        sta     $0307                           ; 880D 8D 07 03                 ...
+        sta     ActiveCHR                           ; 880D 8D 07 03                 ...
         jsr     L8E12                           ; 8810 20 12 8E                  ..
         lda     #RomGraphics8                            ; 8813 A9 08                    ..
         jsr     DrawROMGraphics                           ; 8815 20 69 8D                  i.
@@ -765,13 +807,13 @@ L87F9:
         lda     #$07                            ; 881B A9 07                    ..
         jsr     L8EBD                           ; 881D 20 BD 8E                  ..
         lda     #$00                            ; 8820 A9 00                    ..
-        sta     $0320                           ; 8822 8D 20 03                 . .
-        sta     $0338                           ; 8825 8D 38 03                 .8.
-        sta     $0339                           ; 8828 8D 39 03                 .9.
-        sta     $0322                           ; 882B 8D 22 03                 .".
+        sta     SCROLL_X                           ; 8822 8D 20 03                 . .
+        sta     Camera_X_Lo                           ; 8825 8D 38 03                 .8.
+        sta     Camera_X_Hi                           ; 8828 8D 39 03                 .9.
+        sta     SCROLL_Y                           ; 882B 8D 22 03                 .".
         sta     $0323                           ; 882E 8D 23 03                 .#.
-        sta     $033A                           ; 8831 8D 3A 03                 .:.
-        sta     $033B                           ; 8834 8D 3B 03                 .;.
+        sta     Camera_Y_Lo                           ; 8831 8D 3A 03                 .:.
+        sta     Camera_Y_Hi                           ; 8834 8D 3B 03                 .;.
         lda     #$80                            ; 8837 A9 80                    ..
         sta     $40                             ; 8839 85 40                    .@
         lda     #$06                            ; 883B A9 06                    ..
@@ -789,7 +831,7 @@ L87F9:
         jsr     L9A37                           ; 8856 20 37 9A                  7.
         lda     #$01                            ; 8859 A9 01                    ..
         sta     $0305                           ; 885B 8D 05 03                 ...
-        jsr     L8BDE                           ; 885E 20 DE 8B                  ..
+        jsr     PPUEnableNMI                           ; 885E 20 DE 8B                  ..
         jsr     L8BC2                           ; 8861 20 C2 8B                  ..
         lda     #$78                            ; 8864 A9 78                    .x
         jsr     LD11F                           ; 8866 20 1F D1                  ..
@@ -811,17 +853,17 @@ L87F9:
         .byte   $1B,$1C                         ; 888B 1B 1C                    ..
 ; ----------------------------------------------------------------------------
 L888D:
-        jsr     L8BEA                           ; 888D 20 EA 8B                  ..
-        jsr     L8BB6                           ; 8890 20 B6 8B                  ..
-        lda     $030E                           ; 8893 AD 0E 03                 ...
-        and     #$E7                            ; 8896 29 E7                    ).
-        sta     $030E                           ; 8898 8D 0E 03                 ...
+        jsr     PPUDisableNMI
+        jsr     PPUDisableRendering
+        lda     PPUCTRL_MIRROR
+        and     #%11100111            ; disable sprite+bg rendering flags
+        sta     PPUCTRL_MIRROR
         jsr     L8A41                           ; 889B 20 41 8A                  A.
         jsr     L8A5E                           ; 889E 20 5E 8A                  ^.
         jsr     L977C                           ; 88A1 20 7C 97                  |.
         lda     #$00                            ; 88A4 A9 00                    ..
         sta     $0306                           ; 88A6 8D 06 03                 ...
-        sta     $0307                           ; 88A9 8D 07 03                 ...
+        sta     ActiveCHR                           ; 88A9 8D 07 03                 ...
         jsr     L8E12                           ; 88AC 20 12 8E                  ..
         lda     #RomGraphicsD                            ; 88AF A9 0D                    ..
         jsr     DrawROMGraphics                           ; 88B1 20 69 8D                  i.
@@ -830,13 +872,13 @@ L888D:
         lda     #$06                            ; 88BA A9 06                    ..
         jsr     L8EBD                           ; 88BC 20 BD 8E                  ..
         lda     #$00                            ; 88BF A9 00                    ..
-        sta     $0320                           ; 88C1 8D 20 03                 . .
-        sta     $0338                           ; 88C4 8D 38 03                 .8.
-        sta     $0339                           ; 88C7 8D 39 03                 .9.
-        sta     $0322                           ; 88CA 8D 22 03                 .".
+        sta     SCROLL_X                           ; 88C1 8D 20 03                 . .
+        sta     Camera_X_Lo                           ; 88C4 8D 38 03                 .8.
+        sta     Camera_X_Hi                           ; 88C7 8D 39 03                 .9.
+        sta     SCROLL_Y                           ; 88CA 8D 22 03                 .".
         sta     $0323                           ; 88CD 8D 23 03                 .#.
-        sta     $033A                           ; 88D0 8D 3A 03                 .:.
-        sta     $033B                           ; 88D3 8D 3B 03                 .;.
+        sta     Camera_Y_Lo                           ; 88D0 8D 3A 03                 .:.
+        sta     Camera_Y_Hi                           ; 88D3 8D 3B 03                 .;.
         lda     #$80                            ; 88D6 A9 80                    ..
         sta     $40                             ; 88D8 85 40                    .@
         lda     #$06                            ; 88DA A9 06                    ..
@@ -862,7 +904,7 @@ L888D:
         jsr     L9A37                           ; 8905 20 37 9A                  7.
         lda     #$01                            ; 8908 A9 01                    ..
         sta     $0305                           ; 890A 8D 05 03                 ...
-        jsr     L8BDE                           ; 890D 20 DE 8B                  ..
+        jsr     PPUEnableNMI                           ; 890D 20 DE 8B                  ..
         jsr     L8BC2                           ; 8910 20 C2 8B                  ..
 L8913:
         jsr     L8C40                           ; 8913 20 40 8C                  @.
@@ -920,9 +962,9 @@ L893A:
         sta     $0305                           ; 8984 8D 05 03                 ...
         lda     #$B4                            ; 8987 A9 B4                    ..
         jsr     LD11F                           ; 8989 20 1F D1                  ..
-        lda     $030E                           ; 898C AD 0E 03                 ...
+        lda     PPUCTRL_MIRROR                           ; 898C AD 0E 03                 ...
         ora     #$10                            ; 898F 09 10                    ..
-        sta     $030E                           ; 8991 8D 0E 03                 ...
+        sta     PPUCTRL_MIRROR                           ; 8991 8D 0E 03                 ...
         lda     #$01                            ; 8994 A9 01                    ..
         sta     $0305                           ; 8996 8D 05 03                 ...
         jmp     L82ED                           ; 8999 4C ED 82                 L..
@@ -950,34 +992,34 @@ L8A16:
         lda     $16                             ; 8A1C A5 16                    ..
         clc                                     ; 8A1E 18                       .
         adc     #$08                            ; 8A1F 69 08                    i.
-        sta     $0682                           ; 8A21 8D 82 06                 ...
+        sta     Boat_X_Lo                           ; 8A21 8D 82 06                 ...
         lda     $17                             ; 8A24 A5 17                    ..
         adc     #$00                            ; 8A26 69 00                    i.
-        sta     $0683                           ; 8A28 8D 83 06                 ...
+        sta     Boat_X_Hi                           ; 8A28 8D 83 06                 ...
         lda     $038D                           ; 8A2B AD 8D 03                 ...
         jsr     L8C29                           ; 8A2E 20 29 8C                  ).
         lda     $16                             ; 8A31 A5 16                    ..
         clc                                     ; 8A33 18                       .
         adc     #$08                            ; 8A34 69 08                    i.
-        sta     $0684                           ; 8A36 8D 84 06                 ...
+        sta     Boat_Y_Lo                           ; 8A36 8D 84 06                 ...
         lda     $17                             ; 8A39 A5 17                    ..
         adc     #$00                            ; 8A3B 69 00                    i.
-        sta     $0685                           ; 8A3D 8D 85 06                 ...
+        sta     Boat_Y_Hi                           ; 8A3D 8D 85 06                 ...
         rts                                     ; 8A40 60                       `
 
 ; ----------------------------------------------------------------------------
 L8A41:
-        lda     $0683                           ; 8A41 AD 83 06                 ...
+        lda     Boat_X_Hi                           ; 8A41 AD 83 06                 ...
         lsr     a                               ; 8A44 4A                       J
-        lda     $0682                           ; 8A45 AD 82 06                 ...
+        lda     Boat_X_Lo                           ; 8A45 AD 82 06                 ...
         ror     a                               ; 8A48 6A                       j
         lsr     a                               ; 8A49 4A                       J
         lsr     a                               ; 8A4A 4A                       J
         lsr     a                               ; 8A4B 4A                       J
         sta     $038C                           ; 8A4C 8D 8C 03                 ...
-        lda     $0685                           ; 8A4F AD 85 06                 ...
+        lda     Boat_Y_Hi                           ; 8A4F AD 85 06                 ...
         lsr     a                               ; 8A52 4A                       J
-        lda     $0684                           ; 8A53 AD 84 06                 ...
+        lda     Boat_Y_Lo                           ; 8A53 AD 84 06                 ...
         ror     a                               ; 8A56 6A                       j
         lsr     a                               ; 8A57 4A                       J
         lsr     a                               ; 8A58 4A                       J
@@ -987,17 +1029,17 @@ L8A41:
 
 ; ----------------------------------------------------------------------------
 L8A5E:
-        lda     $0703                           ; 8A5E AD 03 07                 ...
+        lda     Jaws_X_Hi                           ; 8A5E AD 03 07                 ...
         lsr     a                               ; 8A61 4A                       J
-        lda     $0702                           ; 8A62 AD 02 07                 ...
+        lda     Jaws_X_Lo                           ; 8A62 AD 02 07                 ...
         ror     a                               ; 8A65 6A                       j
         lsr     a                               ; 8A66 4A                       J
         lsr     a                               ; 8A67 4A                       J
         lsr     a                               ; 8A68 4A                       J
         sta     $0348                           ; 8A69 8D 48 03                 .H.
-        lda     $0705                           ; 8A6C AD 05 07                 ...
+        lda     Jaws_Y_Hi                           ; 8A6C AD 05 07                 ...
         lsr     a                               ; 8A6F 4A                       J
-        lda     $0704                           ; 8A70 AD 04 07                 ...
+        lda     Jaws_Y_Lo                           ; 8A70 AD 04 07                 ...
         ror     a                               ; 8A73 6A                       j
         lsr     a                               ; 8A74 4A                       J
         lsr     a                               ; 8A75 4A                       J
@@ -1015,36 +1057,36 @@ VNMI:
         lda     #$01                            ; 8A80 A9 01                    ..
         sta     $0301                           ; 8A82 8D 01 03                 ...
         lda     $0302                           ; 8A85 AD 02 03                 ...
-        beq     L8ABF                           ; 8A88 F0 35                    .5
+        beq     @L8ABF                           ; 8A88 F0 35                    .5
         lda     #$01                            ; 8A8A A9 01                    ..
         bit     $0305                           ; 8A8C 2C 05 03                 ,..
-        beq     L8ABC                           ; 8A8F F0 2B                    .+
-        bmi     L8AA0                           ; 8A91 30 0D                    0.
+        beq     @CopySprites                           ; 8A8F F0 2B                    .+
+        bmi     @L8AA0                           ; 8A91 30 0D                    0.
         lda     #$40                            ; 8A93 A9 40                    .@
         sta     $48                             ; 8A95 85 48                    .H
         lda     #$2B                            ; 8A97 A9 2B                    .+
         sta     $49                             ; 8A99 85 49                    .I
         lda     #$C0                            ; 8A9B A9 C0                    ..
-        jmp     L8AAA                           ; 8A9D 4C AA 8A                 L..
+        jmp     @L8AAA                           ; 8A9D 4C AA 8A                 L..
 
 ; ----------------------------------------------------------------------------
-L8AA0:
+@L8AA0:
         lda     #$00                            ; 8AA0 A9 00                    ..
         sta     $48                             ; 8AA2 85 48                    .H
         lda     #$2B                            ; 8AA4 A9 2B                    .+
         sta     $49                             ; 8AA6 85 49                    .I
         lda     #$B0                            ; 8AA8 A9 B0                    ..
-L8AAA:
-        sta     $0200                           ; 8AAA 8D 00 02                 ...
+@L8AAA:
+        sta     Sprite_PosY                           ; 8AAA 8D 00 02                 ...
         lda     #$FF                            ; 8AAD A9 FF                    ..
-        sta     $0201                           ; 8AAF 8D 01 02                 ...
+        sta     Sprite_Tile                           ; 8AAF 8D 01 02                 ...
         lda     #$20                            ; 8AB2 A9 20                    . 
-        sta     $0202                           ; 8AB4 8D 02 02                 ...
+        sta     Sprite_Attr                           ; 8AB4 8D 02 02                 ...
         lda     #$D0                            ; 8AB7 A9 D0                    ..
-        sta     $0203                           ; 8AB9 8D 03 02                 ...
-L8ABC:
-        jsr     L8EAF                           ; 8ABC 20 AF 8E                  ..
-L8ABF:
+        sta     Sprite_PosX                           ; 8AB9 8D 03 02                 ...
+@CopySprites:
+        jsr     DMACopySprites                           ; 8ABC 20 AF 8E                  ..
+@L8ABF:
         lda     #$01                            ; 8ABF A9 01                    ..
         bit     $0300                           ; 8AC1 2C 00 03                 ,..
         beq     L8ACC                           ; 8AC4 F0 06                    ..
@@ -1053,10 +1095,10 @@ L8ABF:
 
 ; ----------------------------------------------------------------------------
 L8ACC:
-        jsr     L8B10                           ; 8ACC 20 10 8B                  ..
+        jsr     L8B10
 L8ACF:
-        lda     $030E                           ; 8ACF AD 0E 03                 ...
-        and     #$FD                            ; 8AD2 29 FD                    ).
+        lda     PPUCTRL_MIRROR
+        and     #%11111101
         tax                                     ; 8AD4 AA                       .
         lda     $0323                           ; 8AD5 AD 23 03                 .#.
         and     #$01                            ; 8AD8 29 01                    ).
@@ -1065,22 +1107,22 @@ L8ACF:
         inx
 ; ----------------------------------------------------------------------------
 L8ADE:
-        stx     $030E                           ; 8ADE 8E 0E 03                 ...
+        stx     PPUCTRL_MIRROR                           ; 8ADE 8E 0E 03                 ...
         stx     PPUCTRL                           ; 8AE1 8E 00 20                 .. 
-        lda     $030F                           ; 8AE4 AD 0F 03                 ...
+        lda     PPUMASK_MIRROR                           ; 8AE4 AD 0F 03                 ...
         sta     PPUMASK                           ; 8AE7 8D 01 20                 .. 
         lda     PPUSTATUS                           ; 8AEA AD 02 20                 .. 
-        lda     $0320                           ; 8AED AD 20 03                 . .
+        lda     SCROLL_X                           ; 8AED AD 20 03                 . .
         sta     PPUSCROLL                           ; 8AF0 8D 05 20                 .. 
-        lda     $0322                           ; 8AF3 AD 22 03                 .".
+        lda     SCROLL_Y                           ; 8AF3 AD 22 03                 .".
         sta     PPUSCROLL                           ; 8AF6 8D 05 20                 .. 
-        ldx     $0307                           ; 8AF9 AE 07 03                 ...
-        lda     L80B1,x                         ; 8AFC BD B1 80                 ...
-        sta     L80B1,x                         ; 8AFF 9D B1 80                 ...
+        ldx     ActiveCHR                           ; 8AF9 AE 07 03                 ...
+        lda     CHRBANKS,x                         ; 8AFC BD B1 80                 ...
+        sta     CHRBANKS,x                         ; 8AFF 9D B1 80                 ...
         lda     $055D                           ; 8B02 AD 5D 05                 .].
-        bne     L8B0A                           ; 8B05 D0 03                    ..
+        bne     @Exit                           ; 8B05 D0 03                    ..
         jsr     LE353                           ; 8B07 20 53 E3                  S.
-L8B0A:
+@Exit:
         pla                                     ; 8B0A 68                       h
         tay                                     ; 8B0B A8                       .
         pla                                     ; 8B0C 68                       h
@@ -1167,8 +1209,8 @@ L8B82:
 L8B83:
         lda     #$40                            ; 8B83 A9 40                    .@
 L8B85:
-        bit     PPUSTATUS                           ; 8B85 2C 02 20                 ,. 
-        bvc     L8B85                           ; 8B88 50 FB                    P.
+:       bit     PPUSTATUS                           ; 8B85 2C 02 20                 ,. 
+        bvc     :-                           ; 8B88 50 FB                    P.
         lda     $49                             ; 8B8A A5 49                    .I
         sta     PPUADDR                           ; 8B8C 8D 06 20                 .. 
         lda     $48                             ; 8B8F A5 48                    .H
@@ -1176,12 +1218,12 @@ L8B85:
         lda     #$00                            ; 8B94 A9 00                    ..
         sta     PPUSCROLL                           ; 8B96 8D 05 20                 .. 
         sta     PPUSCROLL                           ; 8B99 8D 05 20                 .. 
-        lda     L80B1                           ; 8B9C AD B1 80                 ...
-        sta     L80B1                           ; 8B9F 8D B1 80                 ...
-        lda     $030F                           ; 8BA2 AD 0F 03                 ...
+        lda     CHRBANKS                           ; 8B9C AD B1 80                 ...
+        sta     CHRBANKS                           ; 8B9F 8D B1 80                 ...
+        lda     PPUMASK_MIRROR                           ; 8BA2 AD 0F 03                 ...
         and     #$EF                            ; 8BA5 29 EF                    ).
         sta     PPUMASK                           ; 8BA7 8D 01 20                 .. 
-        lda     $030E                           ; 8BAA AD 0E 03                 ...
+        lda     PPUCTRL_MIRROR                           ; 8BAA AD 0E 03                 ...
         and     #$E7                            ; 8BAD 29 E7                    ).
         ora     #$10                            ; 8BAF 09 10                    ..
         sta     PPUCTRL                           ; 8BB1 8D 00 20                 .. 
@@ -1189,53 +1231,54 @@ L8B85:
 
 ; ----------------------------------------------------------------------------
 VIRQ:
-        .byte   $40                             ; 8BB5 40                       @
+        rti
 ; ----------------------------------------------------------------------------
-L8BB6:
-        lda     $030F                           ; 8BB6 AD 0F 03                 ...
-        and     #$E7                            ; 8BB9 29 E7                    ).
-        sta     $030F                           ; 8BBB 8D 0F 03                 ...
-        sta     PPUMASK                           ; 8BBE 8D 01 20                 .. 
-        rts                                     ; 8BC1 60                       `
+
+PPUDisableRendering:
+        lda PPUMASK_MIRROR
+        and #%11100111
+        sta PPUMASK_MIRROR
+        sta PPUMASK
+        rts
 
 ; ----------------------------------------------------------------------------
 L8BC2:
-        lda     $030F                           ; 8BC2 AD 0F 03                 ...
-        ora     #$18                            ; 8BC5 09 18                    ..
-        sta     $030F                           ; 8BC7 8D 0F 03                 ...
-        lda     $030E                           ; 8BCA AD 0E 03                 ...
-        pha                                     ; 8BCD 48                       H
-        ora     #$80                            ; 8BCE 09 80                    ..
-        sta     PPUCTRL                           ; 8BD0 8D 00 20                 .. 
-        jsr     L8C40                           ; 8BD3 20 40 8C                  @.
-        pla                                     ; 8BD6 68                       h
-        sta     $030E                           ; 8BD7 8D 0E 03                 ...
-        sta     PPUCTRL                           ; 8BDA 8D 00 20                 .. 
-        rts                                     ; 8BDD 60                       `
+        lda PPUMASK_MIRROR
+        ora #%00011000
+        sta PPUMASK_MIRROR
+        lda PPUCTRL_MIRROR
+        pha
+        ora #%10000000
+        sta PPUCTRL
+        jsr L8C40
+        pla
+        sta PPUCTRL_MIRROR
+        sta PPUCTRL
+        rts
 
 ; ----------------------------------------------------------------------------
-L8BDE:
-        lda     $030E                           ; 8BDE AD 0E 03                 ...
-        ora     #$80                            ; 8BE1 09 80                    ..
-        sta     $030E                           ; 8BE3 8D 0E 03                 ...
-        sta     PPUCTRL                           ; 8BE6 8D 00 20                 .. 
-        rts                                     ; 8BE9 60                       `
+PPUEnableNMI:
+        lda PPUCTRL_MIRROR
+        ora #%10000000
+        sta PPUCTRL_MIRROR
+        sta PPUCTRL
+        rts
 
 ; ----------------------------------------------------------------------------
-L8BEA:
-        lda     $030E                           ; 8BEA AD 0E 03                 ...
-        and     #$7F                            ; 8BED 29 7F                    ).
-        sta     $030E                           ; 8BEF 8D 0E 03                 ...
-        sta     PPUCTRL                           ; 8BF2 8D 00 20                 .. 
-        rts                                     ; 8BF5 60                       `
+PPUDisableNMI:
+        lda PPUCTRL_MIRROR
+        and #%01111111
+        sta PPUCTRL_MIRROR
+        sta PPUCTRL
+        rts
 
 ; ----------------------------------------------------------------------------
-SetPPURenderHorizontal:
-        lda     $030E                           ; 8BF6 AD 0E 03                 ...
-        and     #$FB                            ; 8BF9 29 FB                    ).
-        sta     $030E                           ; 8BFB 8D 0E 03                 ...
-        sta     PPUCTRL                           ; 8BFE 8D 00 20                 .. 
-        rts                                     ; 8C01 60                       `
+PPURenderHorizontal:
+        lda PPUCTRL_MIRROR
+        and #%11111011
+        sta PPUCTRL_MIRROR
+        sta PPUCTRL
+        rts
 
 ; ----------------------------------------------------------------------------
         .byte   $AD,$0E,$03,$09,$04,$8D,$0E,$03 ; 8C02 AD 0E 03 09 04 8D 0E 03  ........
@@ -1446,7 +1489,7 @@ DrawROMGraphics:
         sta     $10                             ; 8D6E 85 10                    ..
         lda     RomGraphicsPtrs+1,x                         ; 8D70 BD 9E C1                 ...
         sta     $11                             ; 8D73 85 11                    ..
-        jsr     SetPPURenderHorizontal          ; 8D75 20 F6 8B                  ..
+        jsr     PPURenderHorizontal          ; 8D75 20 F6 8B                  ..
         ldx     #$00                            ; 8D78 A2 00                    ..
         jsr     L8DFF                           ; 8D7A 20 FF 8D                  ..
 L8D7D:
@@ -1541,15 +1584,15 @@ L8DFF:
 
 ; ----------------------------------------------------------------------------
 L8E12:
-        jsr     L8BB6                           ; 8E12 20 B6 8B                  ..
-        jsr     SetPPURenderHorizontal                           ; 8E15 20 F6 8B                  ..
+        jsr     PPUDisableRendering                           ; 8E12 20 B6 8B                  ..
+        jsr     PPURenderHorizontal                           ; 8E15 20 F6 8B                  ..
         lda     #$00                            ; 8E18 A9 00                    ..
         sta     $0303                           ; 8E1A 8D 03 03                 ...
         sta     $0302                           ; 8E1D 8D 02 03                 ...
         sta     $0304                           ; 8E20 8D 04 03                 ...
         sta     $0305                           ; 8E23 8D 05 03                 ...
-        jsr     L8E7D                           ; 8E26 20 7D 8E                  }.
-        jsr     L8E9C                           ; 8E29 20 9C 8E                  ..
+        jsr     ClearScreen                           ; 8E26 20 7D 8E                  }.
+        jsr     MoveAllSpritesOffscreen                           ; 8E29 20 9C 8E                  ..
         rts                                     ; 8E2C 60                       `
 
 ; ----------------------------------------------------------------------------
@@ -1557,9 +1600,9 @@ L8E2D:
         lda     #$00                            ; 8E2D A9 00                    ..
         sta     $0303                           ; 8E2F 8D 03 03                 ...
         sta     $0304                           ; 8E32 8D 04 03                 ...
-        jsr     L8BB6                           ; 8E35 20 B6 8B                  ..
-        jsr     L8E9C                           ; 8E38 20 9C 8E                  ..
-        jsr     SetPPURenderHorizontal                           ; 8E3B 20 F6 8B                  ..
+        jsr     PPUDisableRendering                           ; 8E35 20 B6 8B                  ..
+        jsr     MoveAllSpritesOffscreen                           ; 8E38 20 9C 8E                  ..
+        jsr     PPURenderHorizontal                           ; 8E3B 20 F6 8B                  ..
         lda     #$20                            ; 8E3E A9 20                    . 
         sta     PPUADDR                           ; 8E40 8D 06 20                 .. 
         lda     #$00                            ; 8E43 A9 00                    ..
@@ -1596,42 +1639,42 @@ L8E76:
         rts                                     ; 8E7C 60                       `
 
 ; ----------------------------------------------------------------------------
-L8E7D:
-        lda     #$20                            ; 8E7D A9 20                    . 
-        sta     PPUADDR                           ; 8E7F 8D 06 20                 .. 
-        jsr     L8E8A                           ; 8E82 20 8A 8E                  ..
-        lda     #$28                            ; 8E85 A9 28                    .(
-        sta     PPUADDR                           ; 8E87 8D 06 20                 .. 
-L8E8A:
-        lda     #$00                            ; 8E8A A9 00                    ..
-        sta     PPUADDR                           ; 8E8C 8D 06 20                 .. 
-        ldy     #$04                            ; 8E8F A0 04                    ..
-        tax                                     ; 8E91 AA                       .
-L8E92:
-        sta     PPUDATA                           ; 8E92 8D 07 20                 .. 
-        dex                                     ; 8E95 CA                       .
-        bne     L8E92                           ; 8E96 D0 FA                    ..
-        dey                                     ; 8E98 88                       .
-        bne     L8E92                           ; 8E99 D0 F7                    ..
-        rts                                     ; 8E9B 60                       `
+ClearScreen:
+        lda     #$20
+        sta     PPUADDR
+        jsr     @ClearScreen1
+        lda     #$28
+        sta     PPUADDR
+@ClearScreen1:
+        lda     #$00
+        sta     PPUADDR
+        ldy     #$04
+        tax
+@WritePPUDATA:
+        sta     PPUDATA
+        dex
+        bne     @WritePPUDATA
+        dey
+        bne     @WritePPUDATA
+        rts
 
 ; ----------------------------------------------------------------------------
-L8E9C:
-        lda     #$F0                            ; 8E9C A9 F0                    ..
-        ldx     #$00                            ; 8E9E A2 00                    ..
-L8EA0:
-        sta     $0200,x                         ; 8EA0 9D 00 02                 ...
-        inx                                     ; 8EA3 E8                       .
-        inx                                     ; 8EA4 E8                       .
-        inx                                     ; 8EA5 E8                       .
-        inx                                     ; 8EA6 E8                       .
-        bne     L8EA0                           ; 8EA7 D0 F7                    ..
-        lda     #$01                            ; 8EA9 A9 01                    ..
-        sta     $0302                           ; 8EAB 8D 02 03                 ...
-        rts                                     ; 8EAE 60                       `
+MoveAllSpritesOffscreen:
+        lda     #$F0
+        ldx     #$00
+@MoveNextSprite:
+        sta     Sprite_PosY,x
+        inx
+        inx
+        inx
+        inx
+        bne     @MoveNextSprite
+        lda     #$01
+        sta     $0302
+        rts
 
 ; ----------------------------------------------------------------------------
-L8EAF:
+DMACopySprites:
         lda     #$00                            ; 8EAF A9 00                    ..
         sta     OAMADDR                           ; 8EB1 8D 03 20                 .. 
         sta     $0302                           ; 8EB4 8D 02 03                 ...
@@ -1645,24 +1688,24 @@ L8EBD:
         lda     $0300                           ; 8EC0 AD 00 03                 ...
         ora     #$01                            ; 8EC3 09 01                    ..
         sta     $0300                           ; 8EC5 8D 00 03                 ...
-        lda     $030F                           ; 8EC8 AD 0F 03                 ...
+        lda     PPUMASK_MIRROR                           ; 8EC8 AD 0F 03                 ...
         pha                                     ; 8ECB 48                       H
-        jsr     L8BB6                           ; 8ECC 20 B6 8B                  ..
-        lda     $030E                           ; 8ECF AD 0E 03                 ...
+        jsr     PPUDisableRendering                           ; 8ECC 20 B6 8B                  ..
+        lda     PPUCTRL_MIRROR                           ; 8ECF AD 0E 03                 ...
         pha                                     ; 8ED2 48                       H
-        jsr     L8BDE                           ; 8ED3 20 DE 8B                  ..
+        jsr     PPUEnableNMI                           ; 8ED3 20 DE 8B                  ..
         jsr     L8C40                           ; 8ED6 20 40 8C                  @.
         pla                                     ; 8ED9 68                       h
-        sta     $030E                           ; 8EDA 8D 0E 03                 ...
+        sta     PPUCTRL_MIRROR                           ; 8EDA 8D 0E 03                 ...
         sta     PPUMASK                           ; 8EDD 8D 01 20                 .. 
         pla                                     ; 8EE0 68                       h
-        sta     $030F                           ; 8EE1 8D 0F 03                 ...
+        sta     PPUMASK_MIRROR                           ; 8EE1 8D 0F 03                 ...
         sta     PPUMASK                           ; 8EE4 8D 01 20                 .. 
         rts                                     ; 8EE7 60                       `
 
 ; ----------------------------------------------------------------------------
 L8EE8:
-        lda     $030E                           ; 8EE8 AD 0E 03                 ...
+        lda     PPUCTRL_MIRROR                           ; 8EE8 AD 0E 03                 ...
         and     #$FB                            ; 8EEB 29 FB                    ).
         sta     PPUCTRL                           ; 8EED 8D 00 20                 .. 
         lda     $046F                           ; 8EF0 AD 6F 04                 .o.
@@ -1936,9 +1979,9 @@ L90F4:
         lda     $21                             ; 90F4 A5 21                    .!
         asl     a                               ; 90F6 0A                       .
         tax                                     ; 90F7 AA                       .
-        lda     L910D,x                         ; 90F8 BD 0D 91                 ...
+        lda     PTRS,x                         ; 90F8 BD 0D 91                 ...
         sta     $44                             ; 90FB 85 44                    .D
-        lda     L910E,x                         ; 90FD BD 0E 91                 ...
+        lda     PTRS+1,x                         ; 90FD BD 0E 91                 ...
         sta     $45                             ; 9100 85 45                    .E
         lda     HeldInputs1                           ; 9102 AD 30 03                 .0.
         lsr     a                               ; 9105 4A                       J
@@ -1949,13 +1992,15 @@ L90F4:
         lda     ($44),y                         ; 910A B1 44                    .D
         rts                                     ; 910C 60                       `
 
-; ----------------------------------------------------------------------------
-L910D:
-        .byte   $13                             ; 910D 13                       .
-L910E:
-        .byte   $91,$13,$91,$13,$91,$08,$06,$02 ; 910E 91 13 91 13 91 08 06 02  ........
-        .byte   $08,$04,$04,$04,$08,$00,$00,$00 ; 9116 08 04 04 04 08 00 00 00  ........
-        .byte   $08,$08,$08,$08,$08             ; 911E 08 08 08 08 08           .....
+
+PTRS:
+.addr PTRS2
+.addr PTRS2
+.addr PTRS2
+
+PTRS2:
+.byte $08, $06, $02, $08, $04, $04, $04, $08, $00, $00, $00, $08, $08, $08, $08, $08
+
 ; ----------------------------------------------------------------------------
 L9123:
         lda     $34                             ; 9123 A5 34                    .4
@@ -2727,11 +2772,11 @@ L966B:
         .byte   $A9,$0F,$60                     ; 966B A9 0F 60                 ..`
 ; ----------------------------------------------------------------------------
 L966E:
-        lda     $0682                           ; 966E AD 82 06                 ...
+        lda     Boat_X_Lo                           ; 966E AD 82 06                 ...
         sec                                     ; 9671 38                       8
         sbc     #$80                            ; 9672 E9 80                    ..
         tax                                     ; 9674 AA                       .
-        lda     $0683                           ; 9675 AD 83 06                 ...
+        lda     Boat_X_Hi                           ; 9675 AD 83 06                 ...
         sbc     #$00                            ; 9678 E9 00                    ..
         tay                                     ; 967A A8                       .
         bcs     L9683                           ; 967B B0 06                    ..
@@ -2752,16 +2797,16 @@ L968F:
         txa                                     ; 9695 8A                       .
         sec                                     ; 9696 38                       8
         sbc     #$08                            ; 9697 E9 08                    ..
-        sta     $0338                           ; 9699 8D 38 03                 .8.
-        sta     $0320                           ; 969C 8D 20 03                 . .
+        sta     Camera_X_Lo                           ; 9699 8D 38 03                 .8.
+        sta     SCROLL_X                           ; 969C 8D 20 03                 . .
         tya                                     ; 969F 98                       .
         sbc     #$00                            ; 96A0 E9 00                    ..
-        sta     $0339                           ; 96A2 8D 39 03                 .9.
-        lda     $0684                           ; 96A5 AD 84 06                 ...
+        sta     Camera_X_Hi                           ; 96A2 8D 39 03                 .9.
+        lda     Boat_Y_Lo                           ; 96A5 AD 84 06                 ...
         sec                                     ; 96A8 38                       8
         sbc     #$60                            ; 96A9 E9 60                    .`
         tax                                     ; 96AB AA                       .
-        lda     $0685                           ; 96AC AD 85 06                 ...
+        lda     Boat_Y_Hi                           ; 96AC AD 85 06                 ...
         sbc     #$00                            ; 96AF E9 00                    ..
         tay                                     ; 96B1 A8                       .
         bcs     L96BA                           ; 96B2 B0 06                    ..
@@ -2782,10 +2827,10 @@ L96C6:
         txa                                     ; 96CC 8A                       .
         sec                                     ; 96CD 38                       8
         sbc     #$0F                            ; 96CE E9 0F                    ..
-        sta     $033A                           ; 96D0 8D 3A 03                 .:.
+        sta     Camera_Y_Lo                           ; 96D0 8D 3A 03                 .:.
         tya                                     ; 96D3 98                       .
         sbc     #$00                            ; 96D4 E9 00                    ..
-        sta     $033B                           ; 96D6 8D 3B 03                 .;.
+        sta     Camera_Y_Hi                           ; 96D6 8D 3B 03                 .;.
         txa                                     ; 96D9 8A                       .
         clc                                     ; 96DA 18                       .
         adc     #$10                            ; 96DB 69 10                    i.
@@ -2799,17 +2844,17 @@ L96C6:
         .byte   $69,$0F,$C8                     ; 96E7 69 0F C8                 i..
 ; ----------------------------------------------------------------------------
 L96EA:
-        sta     $0322                           ; 96EA 8D 22 03                 .".
+        sta     SCROLL_Y                           ; 96EA 8D 22 03                 .".
         sty     $0323                           ; 96ED 8C 23 03                 .#.
         rts                                     ; 96F0 60                       `
 
 ; ----------------------------------------------------------------------------
 L96F1:
-        lda     $0684                           ; 96F1 AD 84 06                 ...
+        lda     Boat_Y_Lo                           ; 96F1 AD 84 06                 ...
         sec                                     ; 96F4 38                       8
         sbc     #$60                            ; 96F5 E9 60                    .`
         tax                                     ; 96F7 AA                       .
-        lda     $0685                           ; 96F8 AD 85 06                 ...
+        lda     Boat_Y_Hi                           ; 96F8 AD 85 06                 ...
         sbc     #$00                            ; 96FB E9 00                    ..
         tay                                     ; 96FD A8                       .
         bcs     L9706                           ; 96FE B0 06                    ..
@@ -2835,10 +2880,10 @@ L9721:
         txa                                     ; 9721 8A                       .
         sec                                     ; 9722 38                       8
         sbc     #$0B                            ; 9723 E9 0B                    ..
-        sta     $033A                           ; 9725 8D 3A 03                 .:.
+        sta     Camera_Y_Lo                           ; 9725 8D 3A 03                 .:.
         tya                                     ; 9728 98                       .
         sbc     #$00                            ; 9729 E9 00                    ..
-        sta     $033B                           ; 972B 8D 3B 03                 .;.
+        sta     Camera_Y_Hi                           ; 972B 8D 3B 03                 .;.
         txa                                     ; 972E 8A                       .
         clc                                     ; 972F 18                       .
         adc     #$14                            ; 9730 69 14                    i.
@@ -2852,7 +2897,7 @@ L9721:
         .byte   $69,$0F,$C8                     ; 973C 69 0F C8                 i..
 ; ----------------------------------------------------------------------------
 L973F:
-        sta     $0322                           ; 973F 8D 22 03                 .".
+        sta     SCROLL_Y                           ; 973F 8D 22 03                 .".
         sty     $0323                           ; 9742 8C 23 03                 .#.
         rts                                     ; 9745 60                       `
 
@@ -3409,7 +3454,7 @@ L9A6C:
         beq     L9A8E                           ; 9A7F F0 0D                    ..
 L9A81:
         lda     #$F0                            ; 9A81 A9 F0                    ..
-        sta     $0200,x                         ; 9A83 9D 00 02                 ...
+        sta     Sprite_PosY,x                         ; 9A83 9D 00 02                 ...
         txa                                     ; 9A86 8A                       .
         clc                                     ; 9A87 18                       .
         adc     $0F                             ; 9A88 65 0F                    e.
@@ -3432,20 +3477,20 @@ L9A94:
         lda     ($40),y                         ; 9A9D B1 40                    .@
         iny                                     ; 9A9F C8                       .
         sec                                     ; 9AA0 38                       8
-        sbc     $0338                           ; 9AA1 ED 38 03                 .8.
+        sbc     Camera_X_Lo                           ; 9AA1 ED 38 03                 .8.
         sta     $02                             ; 9AA4 85 02                    ..
         lda     ($40),y                         ; 9AA6 B1 40                    .@
         iny                                     ; 9AA8 C8                       .
-        sbc     $0339                           ; 9AA9 ED 39 03                 .9.
+        sbc     Camera_X_Hi                           ; 9AA9 ED 39 03                 .9.
         sta     $03                             ; 9AAC 85 03                    ..
         lda     ($40),y                         ; 9AAE B1 40                    .@
         iny                                     ; 9AB0 C8                       .
         sec                                     ; 9AB1 38                       8
-        sbc     $033A                           ; 9AB2 ED 3A 03                 .:.
+        sbc     Camera_Y_Lo                           ; 9AB2 ED 3A 03                 .:.
         sta     $04                             ; 9AB5 85 04                    ..
         lda     ($40),y                         ; 9AB7 B1 40                    .@
         iny                                     ; 9AB9 C8                       .
-        sbc     $033B                           ; 9ABA ED 3B 03                 .;.
+        sbc     Camera_Y_Hi                           ; 9ABA ED 3B 03                 .;.
         sta     $05                             ; 9ABD 85 05                    ..
         lda     ($40),y                         ; 9ABF B1 40                    .@
         iny                                     ; 9AC1 C8                       .
@@ -3469,7 +3514,7 @@ L9ADC:
         and     #$FF                            ; 9ADD 29 FF                    ).
         bmi     L9AEF                           ; 9ADF 30 0E                    0.
         adc     $02                             ; 9AE1 65 02                    e.
-        sta     $0203,x                         ; 9AE3 9D 03 02                 ...
+        sta     Sprite_PosX,x                         ; 9AE3 9D 03 02                 ...
         lda     $03                             ; 9AE6 A5 03                    ..
         adc     #$00                            ; 9AE8 69 00                    i.
         beq     L9AFA                           ; 9AEA F0 0E                    ..
@@ -3478,7 +3523,7 @@ L9ADC:
 ; ----------------------------------------------------------------------------
 L9AEF:
         adc     $02                             ; 9AEF 65 02                    e.
-        sta     $0203,x                         ; 9AF1 9D 03 02                 ...
+        sta     Sprite_PosX,x                         ; 9AF1 9D 03 02                 ...
         lda     $03                             ; 9AF4 A5 03                    ..
         adc     #$FF                            ; 9AF6 69 FF                    i.
         bne     L9B49                           ; 9AF8 D0 4F                    .O
@@ -3493,7 +3538,7 @@ L9B05:
         and     #$FF                            ; 9B06 29 FF                    ).
         bmi     L9B18                           ; 9B08 30 0E                    0.
         adc     $04                             ; 9B0A 65 04                    e.
-        sta     $0200,x                         ; 9B0C 9D 00 02                 ...
+        sta     Sprite_PosY,x                         ; 9B0C 9D 00 02                 ...
         lda     $05                             ; 9B0F A5 05                    ..
         adc     #$00                            ; 9B11 69 00                    i.
         beq     L9B23                           ; 9B13 F0 0E                    ..
@@ -3502,22 +3547,22 @@ L9B05:
 ; ----------------------------------------------------------------------------
 L9B18:
         adc     $04                             ; 9B18 65 04                    e.
-        sta     $0200,x                         ; 9B1A 9D 00 02                 ...
+        sta     Sprite_PosY,x                         ; 9B1A 9D 00 02                 ...
         lda     $05                             ; 9B1D A5 05                    ..
         adc     #$FF                            ; 9B1F 69 FF                    i.
         bne     L9B49                           ; 9B21 D0 26                    .&
 L9B23:
-        lda     $0200,x                         ; 9B23 BD 00 02                 ...
+        lda     Sprite_PosY,x                         ; 9B23 BD 00 02                 ...
         cmp     #$F0                            ; 9B26 C9 F0                    ..
         bcs     L9B49                           ; 9B28 B0 1F                    ..
         iny                                     ; 9B2A C8                       .
         lda     ($06),y                         ; 9B2B B1 06                    ..
         iny                                     ; 9B2D C8                       .
-        sta     $0201,x                         ; 9B2E 9D 01 02                 ...
+        sta     Sprite_Tile,x                         ; 9B2E 9D 01 02                 ...
         lda     ($06),y                         ; 9B31 B1 06                    ..
         iny                                     ; 9B33 C8                       .
         eor     $00                             ; 9B34 45 00                    E.
-        sta     $0202,x                         ; 9B36 9D 02 02                 ...
+        sta     Sprite_Attr,x                         ; 9B36 9D 02 02                 ...
         lda     #$01                            ; 9B39 A9 01                    ..
         sta     $01                             ; 9B3B 85 01                    ..
         txa                                     ; 9B3D 8A                       .
@@ -3766,11 +3811,11 @@ L9CCB:
         sta     $20                             ; 9CDC 85 20                    . 
         and     #$10                            ; 9CDE 29 10                    ).
         bne     L9CFF                           ; 9CE0 D0 1D                    ..
-        lda     $0682                           ; 9CE2 AD 82 06                 ...
+        lda     Boat_X_Lo                           ; 9CE2 AD 82 06                 ...
         clc                                     ; 9CE5 18                       .
         adc     L9D52,x                         ; 9CE6 7D 52 9D                 }R.
         sta     $22                             ; 9CE9 85 22                    ."
-        lda     $0683                           ; 9CEB AD 83 06                 ...
+        lda     Boat_X_Hi                           ; 9CEB AD 83 06                 ...
         adc     #$00                            ; 9CEE 69 00                    i.
         sta     $23                             ; 9CF0 85 23                    .#
         lda     L9D54,x                         ; 9CF2 BD 54 9D                 .T.
@@ -3781,11 +3826,11 @@ L9CCB:
 
 ; ----------------------------------------------------------------------------
 L9CFF:
-        lda     $0682                           ; 9CFF AD 82 06                 ...
+        lda     Boat_X_Lo                           ; 9CFF AD 82 06                 ...
         sec                                     ; 9D02 38                       8
         sbc     L9D52,x                         ; 9D03 FD 52 9D                 .R.
         sta     $22                             ; 9D06 85 22                    ."
-        lda     $0683                           ; 9D08 AD 83 06                 ...
+        lda     Boat_X_Hi                           ; 9D08 AD 83 06                 ...
         sbc     #$00                            ; 9D0B E9 00                    ..
         sta     $23                             ; 9D0D 85 23                    .#
         lda     L9D54,x                         ; 9D0F BD 54 9D                 .T.
@@ -3805,9 +3850,9 @@ L9D23:
         clc                                     ; 9D2D 18                       .
         lda     L9D53,x                         ; 9D2E BD 53 9D                 .S.
         bmi     L9D40                           ; 9D31 30 0D                    0.
-        adc     $0684                           ; 9D33 6D 84 06                 m..
+        adc     Boat_Y_Lo                           ; 9D33 6D 84 06                 m..
         sta     $24                             ; 9D36 85 24                    .$
-        lda     $0685                           ; 9D38 AD 85 06                 ...
+        lda     Boat_Y_Hi                           ; 9D38 AD 85 06                 ...
         adc     #$00                            ; 9D3B 69 00                    i.
         jmp     L9D4A                           ; 9D3D 4C 4A 9D                 LJ.
 
@@ -4276,18 +4321,18 @@ LA075:
         asl     $16                             ; A09A 06 16                    ..
         rol     $17                             ; A09C 26 17                    &.
 LA09E:
-        lda     $0388                           ; A09E AD 88 03                 ...
+        lda     Jaws_HP_Lo                           ; A09E AD 88 03                 ...
         sec                                     ; A0A1 38                       8
         sbc     $16                             ; A0A2 E5 16                    ..
-        sta     $0388                           ; A0A4 8D 88 03                 ...
-        lda     $0389                           ; A0A7 AD 89 03                 ...
+        sta     Jaws_HP_Lo                           ; A0A4 8D 88 03                 ...
+        lda     Jaws_HP_Hi                           ; A0A7 AD 89 03                 ...
         sbc     $17                             ; A0AA E5 17                    ..
         bpl     LA0B3                           ; A0AC 10 05                    ..
         .byte   $A9,$00,$8D,$88,$03             ; A0AE A9 00 8D 88 03           .....
 ; ----------------------------------------------------------------------------
 LA0B3:
-        sta     $0389                           ; A0B3 8D 89 03                 ...
-        ora     $0388                           ; A0B6 0D 88 03                 ...
+        sta     Jaws_HP_Hi                           ; A0B3 8D 89 03                 ...
+        ora     Jaws_HP_Lo                           ; A0B6 0D 88 03                 ...
         bne     LA0C6                           ; A0B9 D0 0B                    ..
         lda     $0306                           ; A0BB AD 06 03                 ...
         ora     #$20                            ; A0BE 09 20                    . 
@@ -4563,7 +4608,7 @@ LA32F:
         lda     $033F                           ; A337 AD 3F 03                 .?.
         adc     #$00                            ; A33A 69 00                    i.
         sta     $25                             ; A33C 85 25                    .%
-        lda     $0682                           ; A33E AD 82 06                 ...
+        lda     Boat_X_Lo                           ; A33E AD 82 06                 ...
         and     #$F0                            ; A341 29 F0                    ).
         sta     $12                             ; A343 85 12                    ..
 LA345:
@@ -4606,11 +4651,11 @@ LA371:
         sta     $3A                             ; A383 85 3A                    .:
         lda     #$02                            ; A385 A9 02                    ..
         sta     $38                             ; A387 85 38                    .8
-        lda     $0684                           ; A389 AD 84 06                 ...
+        lda     Boat_Y_Lo                           ; A389 AD 84 06                 ...
         clc                                     ; A38C 18                       .
         adc     #$10                            ; A38D 69 10                    i.
         sta     $24                             ; A38F 85 24                    .$
-        lda     $0685                           ; A391 AD 85 06                 ...
+        lda     Boat_Y_Hi                           ; A391 AD 85 06                 ...
         adc     #$00                            ; A394 69 00                    i.
         sta     $25                             ; A396 85 25                    .%
         jsr     L99D0                           ; A398 20 D0 99                  ..
@@ -4624,7 +4669,7 @@ LA371:
 ; ----------------------------------------------------------------------------
 LA3AA:
         stx     $37                             ; A3AA 86 37                    .7
-        lda     $0682                           ; A3AC AD 82 06                 ...
+        lda     Boat_X_Lo                           ; A3AC AD 82 06                 ...
         bmi     LA3BF                           ; A3AF 30 0E                    0.
         lda     #$D0                            ; A3B1 A9 D0                    ..
         sta     $20                             ; A3B3 85 20                    . 
@@ -4771,9 +4816,9 @@ LA494:
 ; ----------------------------------------------------------------------------
         bit     $20                             ; A499 24 20                    $ 
         bvs     LA4F9                           ; A49B 70 5C                    p\
-        lda     $0684                           ; A49D AD 84 06                 ...
+        lda     Boat_Y_Lo                           ; A49D AD 84 06                 ...
         sta     $24                             ; A4A0 85 24                    .$
-        lda     $0685                           ; A4A2 AD 85 06                 ...
+        lda     Boat_Y_Hi                           ; A4A2 AD 85 06                 ...
         sta     $25                             ; A4A5 85 25                    .%
         lda     #$05                            ; A4A7 A9 05                    ..
         sta     $35                             ; A4A9 85 35                    .5
@@ -4787,11 +4832,11 @@ LA494:
         sta     $37                             ; A4BA 85 37                    .7
         lda     #$1F                            ; A4BC A9 1F                    ..
         jsr     L97AD                           ; A4BE 20 AD 97                  ..
-        lda     $0683                           ; A4C1 AD 83 06                 ...
+        lda     Boat_X_Hi                           ; A4C1 AD 83 06                 ...
         cmp     #$10                            ; A4C4 C9 10                    ..
         bcc     LA4CF                           ; A4C6 90 07                    ..
         bne     LA4E4                           ; A4C8 D0 1A                    ..
-        lda     $0682                           ; A4CA AD 82 06                 ...
+        lda     Boat_X_Lo                           ; A4CA AD 82 06                 ...
         bpl     LA4E4                           ; A4CD 10 15                    ..
 LA4CF:
         lda     #$C0                            ; A4CF A9 C0                    ..
@@ -4989,9 +5034,9 @@ LA61A:
         bcc     LA641                           ; A62B 90 14                    ..
         inc     $38                             ; A62D E6 38                    .8
         ldy     #$01                            ; A62F A0 01                    ..
-        lda     $0682                           ; A631 AD 82 06                 ...
+        lda     Boat_X_Lo                           ; A631 AD 82 06                 ...
         cmp     $22                             ; A634 C5 22                    ."
-        lda     $0683                           ; A636 AD 83 06                 ...
+        lda     Boat_X_Hi                           ; A636 AD 83 06                 ...
         sbc     $23                             ; A639 E5 23                    .#
         bcs     LA63F                           ; A63B B0 02                    ..
         .byte   $A0,$FF                         ; A63D A0 FF                    ..
@@ -5203,7 +5248,7 @@ DrawStatusLine:
 
 ; ----------------------------------------------------------------------------
 DrawStatusLine_Score: ; A79E
-        jsr SetPPURenderHorizontal
+        jsr PPURenderHorizontal
         ; set draw location to 2B81 (score digits)
         lda #$2B
         sta PPUADDR 
@@ -5394,7 +5439,7 @@ LA902:
         bpl     LA956                           ; A906 10 4E                    .N
         lda     $0101                           ; A908 AD 01 01                 ...
         beq     LA956                           ; A90B F0 49                    .I
-        lda     $030E                           ; A90D AD 0E 03                 ...
+        lda     PPUCTRL_MIRROR                           ; A90D AD 0E 03                 ...
         and     #$FB                            ; A910 29 FB                    ).
         sta     PPUCTRL                           ; A912 8D 00 20                 .. 
         ldx     #$00                            ; A915 A2 00                    ..
@@ -5439,14 +5484,14 @@ LA956:
 
 ; ----------------------------------------------------------------------------
 DrawStatusLine_JawsPower:
-        jsr     SetPPURenderHorizontal                           ; A95C 20 F6 8B                  ..
+        jsr     PPURenderHorizontal                           ; A95C 20 F6 8B                  ..
         lda     #$2B                            ; A95F A9 2B                    .+
         sta     PPUADDR                           ; A961 8D 06 20                 .. 
         lda     #$94                            ; A964 A9 94                    ..
         sta     PPUADDR                           ; A966 8D 06 20                 .. 
         ldy     #$08                            ; A969 A0 08                    ..
         ldx     #$0A                            ; A96B A2 0A                    ..
-        lda     $0389                           ; A96D AD 89 03                 ...
+        lda     Jaws_HP_Hi                           ; A96D AD 89 03                 ...
 LA970:
         cmp     #$02                            ; A970 C9 02                    ..
         bcc     LA97D                           ; A972 90 09                    ..
@@ -5475,7 +5520,7 @@ LA991:
 
 ; ----------------------------------------------------------------------------
 DrawStatusLine_Shells:
-        jsr     SetPPURenderHorizontal                           ; A992 20 F6 8B                  ..
+        jsr     PPURenderHorizontal                           ; A992 20 F6 8B                  ..
         lda     #$2B                            ; A995 A9 2B                    .+
         sta     PPUADDR                           ; A997 8D 06 20                 .. 
         lda     #$8C                            ; A99A A9 8C                    ..
@@ -5519,7 +5564,7 @@ LA9E3:
 
 ; ----------------------------------------------------------------------------
 LA9E4:
-        jsr     SetPPURenderHorizontal                           ; A9E4 20 F6 8B                  ..
+        jsr     PPURenderHorizontal                           ; A9E4 20 F6 8B                  ..
         lda     $033C                           ; A9E7 AD 3C 03                 .<.
         clc                                     ; A9EA 18                       .
         adc     #$20                            ; A9EB 69 20                    i 
@@ -5778,9 +5823,9 @@ LAB9A:
 
 ; ----------------------------------------------------------------------------
 LABA0:
-        lda     $030E                           ; ABA0 AD 0E 03                 ...
+        lda     PPUCTRL_MIRROR                           ; ABA0 AD 0E 03                 ...
         ora     #$04                            ; ABA3 09 04                    ..
-        sta     $030E                           ; ABA5 8D 0E 03                 ...
+        sta     PPUCTRL_MIRROR                           ; ABA5 8D 0E 03                 ...
         sta     PPUCTRL                           ; ABA8 8D 00 20                 .. 
         lda     #$20                            ; ABAB A9 20                    . 
         sta     PPUADDR                           ; ABAD 8D 06 20                 .. 
@@ -5808,9 +5853,9 @@ LABD0:
 
 ; ----------------------------------------------------------------------------
 LABDC:
-        lda     $030E                           ; ABDC AD 0E 03                 ...
+        lda     PPUCTRL_MIRROR                           ; ABDC AD 0E 03                 ...
         ora     #$04                            ; ABDF 09 04                    ..
-        sta     $030E                           ; ABE1 8D 0E 03                 ...
+        sta     PPUCTRL_MIRROR                           ; ABE1 8D 0E 03                 ...
         sta     PPUCTRL                           ; ABE4 8D 00 20                 .. 
         lda     #$20                            ; ABE7 A9 20                    . 
         sta     PPUADDR                           ; ABE9 8D 06 20                 .. 
@@ -5901,10 +5946,10 @@ LAC3F:
 
 ; ----------------------------------------------------------------------------
 LAC82:
-        jsr     L8BEA                           ; AC82 20 EA 8B                  ..
-        jsr     L8BB6                           ; AC85 20 B6 8B                  ..
+        jsr     PPUDisableNMI                           ; AC82 20 EA 8B                  ..
+        jsr     PPUDisableRendering                           ; AC85 20 B6 8B                  ..
         lda     #$02                            ; AC88 A9 02                    ..
-        sta     $0307                           ; AC8A 8D 07 03                 ...
+        sta     ActiveCHR                           ; AC8A 8D 07 03                 ...
         lda     #$00                            ; AC8D A9 00                    ..
         sta     $031A                           ; AC8F 8D 1A 03                 ...
         sta     $031B                           ; AC92 8D 1B 03                 ...
@@ -5942,7 +5987,7 @@ LAC82:
         sta     $033F                           ; ACDA 8D 3F 03                 .?.
         lda     ($44),y                         ; ACDD B1 44                    .D
         jsr     L8EBD                           ; ACDF 20 BD 8E                  ..
-        jsr     L8BDE                           ; ACE2 20 DE 8B                  ..
+        jsr     PPUEnableNMI                           ; ACE2 20 DE 8B                  ..
         rts                                     ; ACE5 60                       `
 
 ; ----------------------------------------------------------------------------
@@ -5953,7 +5998,7 @@ LACE6:
         sta     $00                             ; ACEB 85 00                    ..
         lda     UnknownData+1,x                         ; ACED BD 21 CD                 .!.
         sta     $01                             ; ACF0 85 01                    ..
-        jsr     SetPPURenderHorizontal                           ; ACF2 20 F6 8B                  ..
+        jsr     PPURenderHorizontal                           ; ACF2 20 F6 8B                  ..
         ldy     #$00                            ; ACF5 A0 00                    ..
         jsr     LAD81                           ; ACF7 20 81 AD                  ..
 LACFA:
@@ -6772,21 +6817,21 @@ RomGraphicsD = 13
 RomGraphicsE = 14
 
 RomGraphicsPtrs:
-.word @RomGraphicsTitleScreen
-.word @RomGraphicsStatusLineText
-.word @RomGraphics2
-.word @RomGraphics3
-.word @RomGraphics4
-.word @RomGraphics5
-.word @RomGraphics6
-.word @RomGraphics7
-.word @RomGraphics8
-.word @RomGraphics9
-.word @RomGraphicsA
-.word @RomGraphicsB
-.word @RomGraphicsC
-.word @RomGraphicsD
-.word @RomGraphicsE
+.addr @RomGraphicsTitleScreen
+.addr @RomGraphicsStatusLineText
+.addr @RomGraphics2
+.addr @RomGraphics3
+.addr @RomGraphics4
+.addr @RomGraphics5
+.addr @RomGraphics6
+.addr @RomGraphics7
+.addr @RomGraphics8
+.addr @RomGraphics9
+.addr @RomGraphicsA
+.addr @RomGraphicsB
+.addr @RomGraphicsC
+.addr @RomGraphicsD
+.addr @RomGraphicsE
 
 @RomGraphicsTitleScreen:
 .byte $00, $20, $FF, $FF, $20, $10, $02, $FF, $01, $D7, $20, $A5, $B5, $FF, $0E, $01, $01, $FF, $05, $62, $01, $61, $A2, $A0, $02, $B2, $A4, $D0, $01, $01, $D3, $FF, $0D, $01, $01, $FF, $05, $72, $01, $71, $B2, $01, $E0, $01, $B4, $01, $01, $E2, $E3, $22, $23, $FF, $0B, $01, $01, $FF, $05, $82, $01, $81, $01, $01, $F0, $01, $C4, $01, $01, $F2, $F3, $FF, $0A, $60, $90, $91, $01, $01, $02, $68, $69, $6A, $6B, $92, $01, $01, $01, $01, $01, $65, $D4, $D5, $01, $01, $C5, $FF, $0A, $70, $01, $A1, $01, $A3, $02, $78, $79, $7A, $7B, $02, $62, $01, $63, $64, $01, $75, $E4, $E5, $F5, $01, $01, $FF, $0A, $80, $B0, $01, $01, $B3, $02, $88, $89, $8A, $8B, $02, $72, $01, $73, $74, $01, $85, $F4, $01, $01, $01, $66, $FF, $0B, $C0, $C1, $C2, $C3, $02, $98, $99, $9A, $9B, $02, $93, $94, $83, $84, $94, $95, $B1, $D1, $D2, $E1, $F1, $FF, $0B, $86, $87, $A6, $A7, $02, $A8, $A9, $AA, $AB, $02, $8C, $8D, $8E, $8F, $02, $02, $02, $02, $02, $02, $02, $02, $02, $02, $FF, $08, $96, $97, $B6, $B7, $02, $B8, $B9, $BA, $BB, $02, $9C, $9D, $9E, $9F, $FF, $0D, $5C, $5D, $5D, $5F, $5C, $5D, $5E, $5F, $6C, $6D, $6E, $6F, $7C, $7D, $7E, $7F, $5C, $5D, $5E, $5F, $5C, $5D, $5E, $5F, $5C, $5D, $5E, $5F, $5C, $5D, $5E, $5F, $04, $05, $06, $07, $04, $05, $06, $07, $04, $05, $06, $07, $04, $05, $06, $07, $04, $05, $06, $07, $04, $05, $06, $07, $04, $05, $06, $07, $04, $05, $06, $07, $14, $15, $16, $17, $14, $15, $16, $17, $14, $15, $16, $17, $14, $15, $16, $17, $14, $15, $16, $17, $14, $15, $16, $17, $14, $15, $16, $17, $14, $15, $16, $17, $FF, $01, $86, $22, $40, $31, $39, $38, $37, $20, $4C, $4A, $4E, $20, $54, $4F, $59, $53, $2C, $4C, $54, $44, $2E, $FF, $13, $54, $4D, $26, $40, $31, $39, $38, $37, $FF, $0F, $55, $4E, $49, $56, $45, $52, $53, $41, $4C, $20, $43, $49, $54, $59, $20, $53, $54, $55, $44, $49, $4F, $53, $2C, $49, $4E, $43, $2E, $FF, $08, $41, $4C, $4C, $20, $52, $49, $47, $48, $54, $53, $20, $52, $45, $53, $45, $52, $56, $45, $44, $2E, $FF, $09, $4C, $49, $43, $45, $4E, $53, $45, $44, $20, $42, $59, $20, $4D, $45, $52, $43, $48, $41, $4E, $44, $49, $53, $49, $4E, $47, $FF, $07, $43, $4F, $52, $50, $4F, $52, $41, $54, $49, $4F, $4E, $20, $4F, $46, $20, $41, $4D, $45, $52, $49, $43, $41, $2C, $49, $4E, $43, $2E, $FF, $06, $4C, $49, $43, $45, $4E, $53, $45, $44, $20, $42, $59, $20, $4E, $49, $4E, $54, $45, $4E, $44, $4F, $20, $4F, $46, $FF, $0F, $41, $4D, $45, $52, $49, $43, $41, $2C, $49, $4E, $43, $2E, $FF, $01, $C0, $23, $FF, $FF, $12, $01, $AA, $FF, $01, $D2, $23, $6A, $9A, $AA, $AA, $AA, $AA, $AA, $0A, $46, $19, $0A, $AA, $AA, $AA, $FF, $FF, $20, $01, $00, $FF, $00
@@ -6930,7 +6975,7 @@ UnknownData:
 .byte   $00,$0F,$00,$00,$00             ; CF09 00 0F 00 00 00           .....
 ; ----------------------------------------------------------------------------
 LCF0E:
-        jsr     L8BEA                           ; CF0E 20 EA 8B                  ..
+        jsr     PPUDisableNMI                           ; CF0E 20 EA 8B                  ..
         lda     #$FF                            ; CF11 A9 FF                    ..
         jsr     LE2CD                           ; CF13 20 CD E2                  ..
         jsr     L977C                           ; CF16 20 7C 97                  |.
@@ -6941,16 +6986,16 @@ LCF0E:
         lda     #RomGraphics9                            ; CF24 A9 09                    ..
         jsr     DrawROMGraphics                           ; CF26 20 69 8D                  i.
         lda     #$00                            ; CF29 A9 00                    ..
-        sta     $0320                           ; CF2B 8D 20 03                 . .
-        sta     $0322                           ; CF2E 8D 22 03                 .".
+        sta     SCROLL_X                           ; CF2B 8D 20 03                 . .
+        sta     SCROLL_Y                           ; CF2E 8D 22 03                 .".
         sta     $0323                           ; CF31 8D 23 03                 .#.
-        sta     $0307                           ; CF34 8D 07 03                 ...
+        sta     ActiveCHR                           ; CF34 8D 07 03                 ...
         lda     #$01                            ; CF37 A9 01                    ..
         sta     $0302                           ; CF39 8D 02 03                 ...
         sta     $0305                           ; CF3C 8D 05 03                 ...
         lda     #$03                            ; CF3F A9 03                    ..
         jsr     LE2CD                           ; CF41 20 CD E2                  ..
-        jsr     L8BDE                           ; CF44 20 DE 8B                  ..
+        jsr     PPUEnableNMI                           ; CF44 20 DE 8B                  ..
         jsr     L8BC2                           ; CF47 20 C2 8B                  ..
         lda     #$B4                            ; CF4A A9 B4                    ..
         sta     $12                             ; CF4C 85 12                    ..
@@ -6961,7 +7006,7 @@ LCF4E:
         jsr     L8B83                           ; CF56 20 83 8B                  ..
         dec     $12                             ; CF59 C6 12                    ..
         bne     LCF4E                           ; CF5B D0 F1                    ..
-        jsr     L8BEA                           ; CF5D 20 EA 8B                  ..
+        jsr     PPUDisableNMI                           ; CF5D 20 EA 8B                  ..
         jsr     L8E12                           ; CF60 20 12 8E                  ..
         jsr     DrawStatusLine                           ; CF63 20 8F A7                  ..
         lda     #RomGraphics5                            ; CF66 A9 05                    ..
@@ -6973,17 +7018,17 @@ LCF4E:
         lda     #$03                            ; CF75 A9 03                    ..
         jsr     L8EBD                           ; CF77 20 BD 8E                  ..
         lda     #$02                            ; CF7A A9 02                    ..
-        sta     $0307                           ; CF7C 8D 07 03                 ...
+        sta     ActiveCHR                           ; CF7C 8D 07 03                 ...
         lda     #$00                            ; CF7F A9 00                    ..
-        sta     $0320                           ; CF81 8D 20 03                 . .
+        sta     SCROLL_X                           ; CF81 8D 20 03                 . .
         sta     $0323                           ; CF84 8D 23 03                 .#.
-        sta     $0338                           ; CF87 8D 38 03                 .8.
-        sta     $033A                           ; CF8A 8D 3A 03                 .:.
-        sta     $033B                           ; CF8D 8D 3B 03                 .;.
+        sta     Camera_X_Lo                           ; CF87 8D 38 03                 .8.
+        sta     Camera_Y_Lo                           ; CF8A 8D 3A 03                 .:.
+        sta     Camera_Y_Hi                           ; CF8D 8D 3B 03                 .;.
         lda     #$10                            ; CF90 A9 10                    ..
-        sta     $0339                           ; CF92 8D 39 03                 .9.
+        sta     Camera_X_Hi                           ; CF92 8D 39 03                 .9.
         lda     #$20                            ; CF95 A9 20                    . 
-        sta     $0322                           ; CF97 8D 22 03                 .".
+        sta     SCROLL_Y                           ; CF97 8D 22 03                 .".
         lda     #$48                            ; CF9A A9 48                    .H
         sta     $033C                           ; CF9C 8D 3C 03                 .<.
         lda     #$00                            ; CF9F A9 00                    ..
@@ -7008,7 +7053,7 @@ LCF4E:
         sta     $52                             ; CFCA 85 52                    .R
         sta     $53                             ; CFCC 85 53                    .S
         sta     $54                             ; CFCE 85 54                    .T
-        jsr     L8BDE                           ; CFD0 20 DE 8B                  ..
+        jsr     PPUEnableNMI                           ; CFD0 20 DE 8B                  ..
         jsr     L8BC2                           ; CFD3 20 C2 8B                  ..
 LCFD6:
         jsr     L8C40                           ; CFD6 20 40 8C                  @.
@@ -7033,20 +7078,20 @@ LCFD6:
 LD002:
         dec     $52                             ; D002 C6 52                    .R
         bne     LCFD6                           ; D004 D0 D0                    ..
-        jsr     L8BEA                           ; D006 20 EA 8B                  ..
+        jsr     PPUDisableNMI                           ; D006 20 EA 8B                  ..
         jsr     L8BC2                           ; D009 20 C2 8B                  ..
         jsr     L8E2D                           ; D00C 20 2D 8E                  -.
         lda     #RomGraphicsA                            ; D00F A9 0A                    ..
         jsr     DrawROMGraphics                           ; D011 20 69 8D                  i.
         lda     #$00                            ; D014 A9 00                    ..
-        sta     $0320                           ; D016 8D 20 03                 . .
-        sta     $0322                           ; D019 8D 22 03                 .".
+        sta     SCROLL_X                           ; D016 8D 20 03                 . .
+        sta     SCROLL_Y                           ; D019 8D 22 03                 .".
         sta     $0323                           ; D01C 8D 23 03                 .#.
-        sta     $0307                           ; D01F 8D 07 03                 ...
+        sta     ActiveCHR                           ; D01F 8D 07 03                 ...
         lda     #$01                            ; D022 A9 01                    ..
         sta     $0302                           ; D024 8D 02 03                 ...
         sta     $0305                           ; D027 8D 05 03                 ...
-        jsr     L8BDE                           ; D02A 20 DE 8B                  ..
+        jsr     PPUEnableNMI                           ; D02A 20 DE 8B                  ..
         jsr     L8BC2                           ; D02D 20 C2 8B                  ..
         lda     #$1A                            ; D030 A9 1A                    ..
         jsr     LE2CD                           ; D032 20 CD E2                  ..
@@ -7792,23 +7837,23 @@ LD617:
 LD762:
         lda     #$FF                            ; D762 A9 FF                    ..
         jsr     LE2CD                           ; D764 20 CD E2                  ..
-        jsr     L8BEA                           ; D767 20 EA 8B                  ..
-        jsr     L8BB6                           ; D76A 20 B6 8B                  ..
+        jsr     PPUDisableNMI                           ; D767 20 EA 8B                  ..
+        jsr     PPUDisableRendering                           ; D76A 20 B6 8B                  ..
         jsr     L8E12                           ; D76D 20 12 8E                  ..
         lda     #$04                            ; D770 A9 04                    ..
         jsr     L8EBD                           ; D772 20 BD 8E                  ..
         lda     #$03                            ; D775 A9 03                    ..
-        sta     $0307                           ; D777 8D 07 03                 ...
+        sta     ActiveCHR                           ; D777 8D 07 03                 ...
         lda     #RomGraphics4                            ; D77A A9 04                    ..
         jsr     DrawROMGraphics                           ; D77C 20 69 8D                  i.
         lda     #$00                            ; D77F A9 00                    ..
-        sta     $0320                           ; D781 8D 20 03                 . .
-        sta     $0322                           ; D784 8D 22 03                 .".
+        sta     SCROLL_X                           ; D781 8D 20 03                 . .
+        sta     SCROLL_Y                           ; D784 8D 22 03                 .".
         sta     $0323                           ; D787 8D 23 03                 .#.
         ldx     #$00                            ; D78A A2 00                    ..
 LD78C:
         lda     LD890,x                         ; D78C BD 90 D8                 ...
-        sta     $0200,x                         ; D78F 9D 00 02                 ...
+        sta     Sprite_PosY,x                         ; D78F 9D 00 02                 ...
         inx                                     ; D792 E8                       .
         cpx     #$20                            ; D793 E0 20                    . 
         bcc     LD78C                           ; D795 90 F5                    ..
@@ -7823,13 +7868,13 @@ LD79B:
 LD7A4:
         lda     LD8B0,y                         ; D7A4 B9 B0 D8                 ...
         iny                                     ; D7A7 C8                       .
-        sta     $0221,x                         ; D7A8 9D 21 02                 .!.
+        sta     Sprite_Tile + (SPR*8),x                         ; D7A8 9D 21 02                 .!.
         lda     LD8B0,y                         ; D7AB B9 B0 D8                 ...
         iny                                     ; D7AE C8                       .
-        sta     $0222,x                         ; D7AF 9D 22 02                 .".
+        sta     Sprite_Attr + (SPR*8),x                         ; D7AF 9D 22 02                 .".
         lda     LD8B0,y                         ; D7B2 B9 B0 D8                 ...
         iny                                     ; D7B5 C8                       .
-        sta     $0223,x                         ; D7B6 9D 23 02                 .#.
+        sta     Sprite_PosX + (SPR*8),x                         ; D7B6 9D 23 02                 .#.
         inx                                     ; D7B9 E8                       .
         inx                                     ; D7BA E8                       .
         inx                                     ; D7BB E8                       .
@@ -7853,7 +7898,7 @@ LD7D6:
         sta     $0302                           ; D7DE 8D 02 03                 ...
         lda     #$02                            ; D7E1 A9 02                    ..
         jsr     LE2CD                           ; D7E3 20 CD E2                  ..
-        jsr     L8BDE                           ; D7E6 20 DE 8B                  ..
+        jsr     PPUEnableNMI                           ; D7E6 20 DE 8B                  ..
         jsr     L8BC2                           ; D7E9 20 C2 8B                  ..
 LD7EC:
         jsr     L8C40                           ; D7EC 20 40 8C                  @.
@@ -7863,18 +7908,18 @@ LD7EC:
         jsr     LDBFA                           ; D7F7 20 FA DB                  ..
         jsr     LD963                           ; D7FA 20 63 D9                  c.
         jsr     LF600                           ; D7FD 20 00 F6                  ..
-        jsr     ReadJoypads                           ; D800 20 87 8C                  ..
-        lda     HeldInputs1                           ; D803 AD 30 03                 .0.
-        and     #(JOY_A|JOY_B)                             ; D806 29 C0                    ).
+        jsr     ReadJoypads
+        lda     HeldInputs1
+        and     #(JOY_A|JOY_B)
         beq     LD831                           ; D808 F0 27                    .'
         bpl     LD820                           ; D80A 10 14                    ..
         lda     $0460                           ; D80C AD 60 04                 .`.
         clc                                     ; D80F 18                       .
         adc     #$04                            ; D810 69 04                    i.
         sta     $0460                           ; D812 8D 60 04                 .`.
-        lda     $0320                           ; D815 AD 20 03                 . .
+        lda     SCROLL_X                           ; D815 AD 20 03                 . .
         adc     #$00                            ; D818 69 00                    i.
-        sta     $0320                           ; D81A 8D 20 03                 . .
+        sta     SCROLL_X                           ; D81A 8D 20 03                 . .
         jmp     LD831                           ; D81D 4C 31 D8                 L1.
 
 ; ----------------------------------------------------------------------------
@@ -7883,14 +7928,14 @@ LD820:
         sec                                     ; D823 38                       8
         sbc     #$08                            ; D824 E9 08                    ..
         sta     $0460                           ; D826 8D 60 04                 .`.
-        lda     $0320                           ; D829 AD 20 03                 . .
+        lda     SCROLL_X                           ; D829 AD 20 03                 . .
         sbc     #$00                            ; D82C E9 00                    ..
-        sta     $0320                           ; D82E 8D 20 03                 . .
+        sta     SCROLL_X                           ; D82E 8D 20 03                 . .
 LD831:
         lda     $0393                           ; D831 AD 93 03                 ...
         clc                                     ; D834 18                       .
         adc     #$06                            ; D835 69 06                    i.
-        sta     $021D                           ; D837 8D 1D 02                 ...
+        sta     Sprite_Tile + (SPR*7)                           ; D837 8D 1D 02                 ...
         jsr     LD862                           ; D83A 20 62 D8                  b.
         bit     $0306                           ; D83D 2C 06 03                 ,..
         bmi     LD84C                           ; D840 30 0A                    0.
@@ -7915,7 +7960,7 @@ LD862:
         lda     $23                             ; D862 A5 23                    .#
         bne     LD86C                           ; D864 D0 06                    ..
         lda     #$F0                            ; D866 A9 F0                    ..
-        sta     $02B0                           ; D868 8D B0 02                 ...
+        sta     Sprite_PosY + (SPR * 44) ;$02B0                           ; D868 8D B0 02                 ...
         rts                                     ; D86B 60                       `
 
 ; ----------------------------------------------------------------------------
@@ -7967,7 +8012,7 @@ LD94F:
         lda     LD91C,y                         ; D952 B9 1C D9                 ...
         iny                                     ; D955 C8                       .
 LD956:
-        sta     $0220,x                         ; D956 9D 20 02                 . .
+        sta     Sprite_PosY + (SPR*8),x                         ; D956 9D 20 02                 . .
         inx                                     ; D959 E8                       .
         inx                                     ; D95A E8                       .
         inx                                     ; D95B E8                       .
@@ -8074,9 +8119,9 @@ LD9EB:
         ldy     #$00                            ; DA19 A0 00                    ..
 LDA1B:
         lda     LDA32,y                         ; DA1B B9 32 DA                 .2.
-        sta     $0221,x                         ; DA1E 9D 21 02                 .!.
+        sta     Sprite_Tile + (SPR * 8),x                         ; DA1E 9D 21 02                 .!.
         lda     LDA33,y                         ; DA21 B9 33 DA                 .3.
-        sta     $0222,x                         ; DA24 9D 22 02                 .".
+        sta     Sprite_Attr + (SPR * 8),x                         ; DA24 9D 22 02                 .".
         inx                                     ; DA27 E8                       .
         inx                                     ; DA28 E8                       .
         inx                                     ; DA29 E8                       .
@@ -8424,7 +8469,7 @@ LDC5D:
         and     #$FF                            ; DC5E 29 FF                    ).
         bmi     LDC6F                           ; DC60 30 0D                    0.
         adc     $22                             ; DC62 65 22                    e"
-        sta     $02BB,x                         ; DC64 9D BB 02                 ...
+        sta     Sprite_PosX + (SPR * 46),x                         ; DC64 9D BB 02                 ...
         lda     $23                             ; DC67 A5 23                    .#
         adc     #$00                            ; DC69 69 00                    i.
         beq     LDC7A                           ; DC6B F0 0D                    ..
@@ -8432,7 +8477,7 @@ LDC5D:
 ; ----------------------------------------------------------------------------
 LDC6F:
         adc     $22                             ; DC6F 65 22                    e"
-        sta     $02BB,x                         ; DC71 9D BB 02                 ...
+        sta     Sprite_PosX + (SPR * 46),x                         ; DC71 9D BB 02                 ...
         lda     $23                             ; DC74 A5 23                    .#
         adc     #$FF                            ; DC76 69 FF                    i.
         bne     LDCA6                           ; DC78 D0 2C                    .,
@@ -8444,16 +8489,16 @@ LDC7A:
 ; ----------------------------------------------------------------------------
 LDC86:
         adc     $24                             ; DC86 65 24                    e$
-        sta     $02B8,x                         ; DC88 9D B8 02                 ...
+        sta     Sprite_PosY + (SPR * 46),x                         ; DC88 9D B8 02                 ...
         lda     #$FF                            ; DC8B A9 FF                    ..
         adc     $25                             ; DC8D 65 25                    e%
         bne     LDCA6                           ; DC8F D0 15                    ..
         iny                                     ; DC91 C8                       .
         lda     ($26),y                         ; DC92 B1 26                    .&
         iny                                     ; DC94 C8                       .
-        sta     $02B9,x                         ; DC95 9D B9 02                 ...
+        sta     Sprite_Tile + (SPR * 46),x                         ; DC95 9D B9 02                 ...
         lda     $01                             ; DC98 A5 01                    ..
-        sta     $02BA,x                         ; DC9A 9D BA 02                 ...
+        sta     Sprite_Attr + (SPR * 46),x                         ; DC9A 9D BA 02                 ...
         inx                                     ; DC9D E8                       .
         inx                                     ; DC9E E8                       .
         inx                                     ; DC9F E8                       .
@@ -8470,7 +8515,7 @@ LDCAB:
         beq     LDCBB                           ; DCAD F0 0C                    ..
         lda     #$F0                            ; DCAF A9 F0                    ..
 LDCB1:
-        sta     $02B8,x                         ; DCB1 9D B8 02                 ...
+        sta     Sprite_PosY + (SPR * 46),x                         ; DCB1 9D B8 02                 ...
         inx                                     ; DCB4 E8                       .
         inx                                     ; DCB5 E8                       .
         inx                                     ; DCB6 E8                       .
@@ -8484,7 +8529,7 @@ LDCBB:
 
 ; ----------------------------------------------------------------------------
 LDCC1:
-        jsr     L8BEA                           ; DCC1 20 EA 8B                  ..
+        jsr     PPUDisableNMI                           ; DCC1 20 EA 8B                  ..
         jsr     L8E12                           ; DCC4 20 12 8E                  ..
         jsr     DrawStatusLine                           ; DCC7 20 8F A7                  ..
         lda     #RomGraphics5                            ; DCCA A9 05                    ..
@@ -8496,19 +8541,19 @@ LDCC1:
         lda     #$03                            ; DCD9 A9 03                    ..
         jsr     L8EBD                           ; DCDB 20 BD 8E                  ..
         lda     #$02                            ; DCDE A9 02                    ..
-        sta     $0307                           ; DCE0 8D 07 03                 ...
+        sta     ActiveCHR                           ; DCE0 8D 07 03                 ...
         lda     #$00                            ; DCE3 A9 00                    ..
-        sta     $0320                           ; DCE5 8D 20 03                 . .
+        sta     SCROLL_X                           ; DCE5 8D 20 03                 . .
         sta     $0323                           ; DCE8 8D 23 03                 .#.
-        sta     $0338                           ; DCEB 8D 38 03                 .8.
-        sta     $0339                           ; DCEE 8D 39 03                 .9.
-        sta     $033B                           ; DCF1 8D 3B 03                 .;.
+        sta     Camera_X_Lo                           ; DCEB 8D 38 03                 .8.
+        sta     Camera_X_Hi                           ; DCEE 8D 39 03                 .9.
+        sta     Camera_Y_Hi                           ; DCF1 8D 3B 03                 .;.
         lda     #$20                            ; DCF4 A9 20                    . 
-        sta     $0322                           ; DCF6 8D 22 03                 .".
-        sta     $033A                           ; DCF9 8D 3A 03                 .:.
+        sta     SCROLL_Y                           ; DCF6 8D 22 03                 .".
+        sta     Camera_Y_Lo                           ; DCF9 8D 3A 03                 .:.
         jsr     L977C                           ; DCFC 20 7C 97                  |.
         sta     $0302                           ; DCFF 8D 02 03                 ...
-        jsr     L8BDE                           ; DD02 20 DE 8B                  ..
+        jsr     PPUEnableNMI                           ; DD02 20 DE 8B                  ..
         jsr     L8BC2                           ; DD05 20 C2 8B                  ..
 LDD08:
         jsr     L8C40                           ; DD08 20 40 8C                  @.
@@ -8516,30 +8561,30 @@ LDD08:
         jsr     L9A37                           ; DD0E 20 37 9A                  7.
         lda     $0680                           ; DD11 AD 80 06                 ...
         bne     LDD08                           ; DD14 D0 F2                    ..
-        jsr     L8BEA                           ; DD16 20 EA 8B                  ..
-        jsr     L8BB6                           ; DD19 20 B6 8B                  ..
-        lda     $030E                           ; DD1C AD 0E 03                 ...
+        jsr     PPUDisableNMI                           ; DD16 20 EA 8B                  ..
+        jsr     PPUDisableRendering                           ; DD19 20 B6 8B                  ..
+        lda     PPUCTRL_MIRROR                           ; DD1C AD 0E 03                 ...
         ora     #$18                            ; DD1F 09 18                    ..
-        sta     $030E                           ; DD21 8D 0E 03                 ...
+        sta     PPUCTRL_MIRROR                           ; DD21 8D 0E 03                 ...
         jsr     L8E12                           ; DD24 20 12 8E                  ..
         lda     #$05                            ; DD27 A9 05                    ..
         jsr     L8EBD                           ; DD29 20 BD 8E                  ..
         lda     #$03                            ; DD2C A9 03                    ..
-        sta     $0307                           ; DD2E 8D 07 03                 ...
+        sta     ActiveCHR                           ; DD2E 8D 07 03                 ...
         lda     #RomGraphics6                            ; DD31 A9 06                    ..
         jsr     DrawROMGraphics                           ; DD33 20 69 8D                  i.
         lda     #$00                            ; DD36 A9 00                    ..
-        sta     $0320                           ; DD38 8D 20 03                 . .
-        sta     $0322                           ; DD3B 8D 22 03                 .".
+        sta     SCROLL_X                           ; DD38 8D 20 03                 . .
+        sta     SCROLL_Y                           ; DD3B 8D 22 03                 .".
         sta     $0323                           ; DD3E 8D 23 03                 .#.
-        sta     $0338                           ; DD41 8D 38 03                 .8.
-        sta     $0339                           ; DD44 8D 39 03                 .9.
-        sta     $033A                           ; DD47 8D 3A 03                 .:.
-        sta     $033B                           ; DD4A 8D 3B 03                 .;.
+        sta     Camera_X_Lo                           ; DD41 8D 38 03                 .8.
+        sta     Camera_X_Hi                           ; DD44 8D 39 03                 .9.
+        sta     Camera_Y_Lo                           ; DD47 8D 3A 03                 .:.
+        sta     Camera_Y_Hi                           ; DD4A 8D 3B 03                 .;.
         jsr     L977C                           ; DD4D 20 7C 97                  |.
         lda     #$01                            ; DD50 A9 01                    ..
         sta     $0302                           ; DD52 8D 02 03                 ...
-        jsr     L8BDE                           ; DD55 20 DE 8B                  ..
+        jsr     PPUEnableNMI                           ; DD55 20 DE 8B                  ..
         jsr     L8BC2                           ; DD58 20 C2 8B                  ..
         lda     #$00                            ; DD5B A9 00                    ..
         sta     $0301                           ; DD5D 8D 01 03                 ...
@@ -8861,18 +8906,18 @@ LDED4:
         .byte   $F8,$E7,$80,$FC,$E8,$C6,$FC,$F0 ; E28C F8 E7 80 FC E8 C6 FC F0  ........
         .byte   $D6,$FC,$F8,$C5,$80             ; E294 D6 FC F8 C5 80           .....
 ; ----------------------------------------------------------------------------
-LE299:
+SoundSystemInit:
         lda     #$00                            ; E299 A9 00                    ..
-        sta     SND_MASTERCTRL_REG                           ; E29B 8D 15 40                 ..@
+        sta     SND_MASTERCTRL                           ; E29B 8D 15 40                 ..@
         lda     #$30                            ; E29E A9 30                    .0
-        sta     SND_SQUARE1_REG                           ; E2A0 8D 00 40                 ..@
-        sta     SND_SQUARE2_REG                           ; E2A3 8D 04 40                 ..@
-        sta     SND_NOISE_REG                           ; E2A6 8D 0C 40                 ..@
+        sta     SND_SQUARE1_TIMER                           ; E2A0 8D 00 40                 ..@
+        sta     SND_SQUARE2_TIMER                           ; E2A3 8D 04 40                 ..@
+        sta     SND_NOISE_TIMER                           ; E2A6 8D 0C 40                 ..@
         lda     #$80                            ; E2A9 A9 80                    ..
-        sta     SND_TRIANGLE_REG                           ; E2AB 8D 08 40                 ..@
+        sta     SND_TRIANGLE_TIMER                           ; E2AB 8D 08 40                 ..@
         lda     #$08                            ; E2AE A9 08                    ..
-        sta     $4001                           ; E2B0 8D 01 40                 ..@
-        sta     $4005                           ; E2B3 8D 05 40                 ..@
+        sta     SND_SQUARE1_LENGTH                           ; E2B0 8D 01 40                 ..@
+        sta     SND_SQUARE2_LENGTH                           ; E2B3 8D 05 40                 ..@
         lda     #$00                            ; E2B6 A9 00                    ..
         sta     $0566                           ; E2B8 8D 66 05                 .f.
         lda     #$FF                            ; E2BB A9 FF                    ..
@@ -8883,7 +8928,7 @@ LE2BF:
         cpx     #$08                            ; E2C3 E0 08                    ..
         bcc     LE2BF                           ; E2C5 90 F8                    ..
         lda     #$0F                            ; E2C7 A9 0F                    ..
-        sta     SND_MASTERCTRL_REG                           ; E2C9 8D 15 40                 ..@
+        sta     SND_MASTERCTRL                           ; E2C9 8D 15 40                 ..@
         rts                                     ; E2CC 60                       `
 
 ; ----------------------------------------------------------------------------
@@ -9044,10 +9089,10 @@ LE3DB:
 ; ----------------------------------------------------------------------------
 LE3F2:
         sta     $056C,x                         ; E3F2 9D 6C 05                 .l.
-        sta     SND_SQUARE1_REG,y                         ; E3F5 99 00 40                 ..@
+        sta     SND_SQUARE1_TIMER,y                         ; E3F5 99 00 40                 ..@
         lda     $0560,x                         ; E3F8 BD 60 05                 .`.
         sta     $056D,x                         ; E3FB 9D 6D 05                 .m.
-        sta     $4001,y                         ; E3FE 99 01 40                 ..@
+        sta     SND_SQUARE1_LENGTH,y                         ; E3FE 99 01 40                 ..@
 LE401:
         inx                                     ; E401 E8                       .
         inx                                     ; E402 E8                       .
@@ -9057,7 +9102,7 @@ LE407:
         lda     LE417,x                         ; E407 BD 17 E4                 ...
         tay                                     ; E40A A8                       .
         lda     $055F,x                         ; E40B BD 5F 05                 ._.
-        sta     SND_SQUARE1_REG,y                         ; E40E 99 00 40                 ..@
+        sta     SND_SQUARE1_TIMER,y                         ; E40E 99 00 40                 ..@
         inx                                     ; E411 E8                       .
         cpx     #$0C                            ; E412 E0 0C                    ..
         bcc     LE407                           ; E414 90 F1                    ..
@@ -10107,6 +10152,9 @@ LF581:
         .byte   $00,$B0,$00,$B8,$00,$C0,$00,$C8 ; F5A9 00 B0 00 B8 00 C0 00 C8  ........
         .byte   $00,$D0,$00,$D8,$00,$E0,$00,$E8 ; F5B1 00 D0 00 D8 00 E0 00 E8  ........
         .byte   $00,$F0,$00,$F8,$00,$00         ; F5B9 00 F0 00 F8 00 00        ......
+
+
+
 LF5BF:
         .byte   $01                             ; F5BF 01                       .
 LF5C0:
@@ -10122,9 +10170,8 @@ LF5C0:
 LF600:
         ldx     #$00                            ; F600 A2 00                    ..
         ldy     #$00                            ; F602 A0 00                    ..
-LF604:
-        bit     PPUSTATUS                           ; F604 2C 02 20                 ,. 
-        bvc     LF604                           ; F607 50 FB                    P.
+:       bit     PPUSTATUS                           ; F604 2C 02 20                 ,. 
+        bvc     :-                           ; F607 50 FB                    P.
         bvs     LF611                           ; F609 70 06                    p.
 LF60B:
         ldy     LF5BF,x                         ; F60B BC BF F5                 ...
@@ -10137,7 +10184,7 @@ LF611:
         lda     #$00                            ; F617 A9 00                    ..
         sta     PPUSCROLL                           ; F619 8D 05 20                 .. 
         lda     HeldInputs1                           ; F61C AD 30 03                 .0.
-        and     #$C0                            ; F61F 29 C0                    ).
+        and     #(JOY_A|JOY_B)                            ; F61F 29 C0                    ).
         beq     LF655                           ; F621 F0 32                    .2
         bpl     LF63E                           ; F623 10 19                    ..
         jmp     LF628                           ; F625 4C 28 F6                 L(.
