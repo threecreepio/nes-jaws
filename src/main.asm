@@ -41,32 +41,27 @@ PressedInputs1        = $0332
 HeldInputs2           = $0331
 PressedInputs2        = $0333
 
-
 CurrentScore          = $0380
 
-Jaws_HP_Lo            = $0388
-Jaws_HP_Hi            = $0389
-Jaws_X_Lo             = $0702
-Jaws_X_Hi             = $0703
-Jaws_Y_Lo             = $0704
-Jaws_Y_Hi             = $0705
-
-Camera_X_Lo           = $0338
-Camera_X_Hi           = $0339
-Camera_Y_Lo           = $033A
-Camera_Y_Hi           = $033B
-
-Boat_X_Lo             = $0682
-Boat_X_Hi             = $0683
-Boat_Y_Lo             = $0684
-Boat_Y_Hi             = $0685
+JawsHP                = $0388 ; 16 bit
+JawsX                 = $0702 ; 16 bit
+JawsY                 = $0704 ; 16 bit
+CameraX               = $0338 ; 16 bit
+CameraY               = $033A ; 16 bit
+BoatX                 = $0682 ; 16 bit
+BoatY                 = $0684 ; 16 bit
 
 
-Sprite_PosY     = $200
-Sprite_Tile     = $201
-Sprite_Attr     = $202
-Sprite_PosX     = $203
-SPR             = 4
+SpritePosY            = $200
+SpriteTile            = $201
+SpriteAttr            = $202
+SpritePosX            = $203
+SPR                   = 4
+
+
+
+; $20 bytes of working data
+WorkingData     = $20
 
 
 
@@ -168,14 +163,14 @@ VBOOT:
         sta     PPUCTRL                           ; 8158 8D 00 20                 .. 
         lda     #$00                            ; 815B A9 00                    ..
         sta     PPUMASK_MIRROR                           ; 815D 8D 0F 03                 ...
-        jsr     L8166                           ; 8160 20 66 81                  f.
+        jsr     DrawTitleScreen                           ; 8160 20 66 81                  f.
         jmp     L8277                           ; 8163 4C 77 82                 Lw.
 
 ; ----------------------------------------------------------------------------
-L8166:
+DrawTitleScreen:
         jsr     PPUDisableNMI                           ; 8166 20 EA 8B                  ..
         jsr     PPUDisableRendering                           ; 8169 20 B6 8B                  ..
-        jsr     L8E12                           ; 816C 20 12 8E                  ..
+        jsr     ClearScreenAndSprites                           ; 816C 20 12 8E                  ..
         lda     #$00                            ; 816F A9 00                    ..
         sta     ActiveCHR                           ; 8171 8D 07 03                 ...
         jsr     L8EBD                           ; 8174 20 BD 8E                  ..
@@ -183,12 +178,12 @@ L8166:
         jsr     DrawROMGraphics                           ; 8179 20 69 8D                  i.
         lda     #$00                            ; 817C A9 00                    ..
         sta     SCROLL_X                           ; 817E 8D 20 03                 . .
-        sta     Camera_X_Lo                           ; 8181 8D 38 03                 .8.
-        sta     Camera_X_Hi                           ; 8184 8D 39 03                 .9.
+        sta     CameraX                           ; 8181 8D 38 03                 .8.
+        sta     CameraX+1                           ; 8184 8D 39 03                 .9.
         sta     SCROLL_Y                           ; 8187 8D 22 03                 .".
         sta     $0323                           ; 818A 8D 23 03                 .#.
-        sta     Camera_Y_Lo                           ; 818D 8D 3A 03                 .:.
-        sta     Camera_Y_Hi                           ; 8190 8D 3B 03                 .;.
+        sta     CameraY                           ; 818D 8D 3A 03                 .:.
+        sta     CameraY+1                           ; 8190 8D 3B 03                 .;.
         jsr     L977C                           ; 8193 20 7C 97                  |.
         jsr     L974C                           ; 8196 20 4C 97                  L.
         lda     #$C0                            ; 8199 A9 C0                    ..
@@ -199,7 +194,7 @@ L8166:
         sta     $22                             ; 81A4 85 22                    ."
         lda     #$37                            ; 81A6 A9 37                    .7
         sta     $24                             ; 81A8 85 24                    .$
-        jsr     StoreDataFromZP                           ; 81AA 20 61 97                  a.
+        jsr     StoreWorkingData                           ; 81AA 20 61 97                  a.
         jsr     L9A37                           ; 81AD 20 37 9A                  7.
         jsr     PPUEnableNMI                           ; 81B0 20 DE 8B                  ..
         jsr     L8BC2                           ; 81B3 20 C2 8B                  ..
@@ -208,7 +203,7 @@ L8166:
         lda     #$00                            ; 81BB A9 00                    ..
         sta     $00                             ; 81BD 85 00                    ..
 L81BF:
-        jsr     L8C40                           ; 81BF 20 40 8C                  @.
+        jsr     WaitFor1Frame                           ; 81BF 20 40 8C                  @.
         lda     #$01                            ; 81C2 A9 01                    ..
         sta     $0302                           ; 81C4 8D 02 03                 ...
         jsr     ReadJoypads                           ; 81C7 20 87 8C                  ..
@@ -253,18 +248,22 @@ L8277:
         ; clear stack
         ldx     #$FF
         txs
-        jsr     PPUDisableNMI                           ; 827A 20 EA 8B                  ..
-        lda     #$FF                            ; 827D A9 FF                    ..
-        jsr     LE2CD                           ; 827F 20 CD E2                  ..
-        jsr     PPUDisableRendering                           ; 8282 20 B6 8B                  ..
-        jsr     L8E12                           ; 8285 20 12 8E                  ..
-        lda     #$00                            ; 8288 A9 00                    ..
-        tax                                     ; 828A AA                       .
-L828B:
-        sta     CurrentScore,x                         ; 828B 9D 80 03                 ...
-        inx                                     ; 828E E8                       .
-        cpx     #$80                            ; 828F E0 80                    ..
-        bcc     L828B                           ; 8291 90 F8                    ..
+        jsr     PPUDisableNMI
+        lda     #$FF
+        jsr     LE2CD
+        jsr     PPUDisableRendering
+        jsr     ClearScreenAndSprites
+
+        ; clear some game state
+        lda     #$00
+        tax
+@ClearGameState:
+        sta     $0380,x
+        inx
+        cpx     #$80
+        bcc     @ClearGameState
+
+
         lda     #$03                            ; 8293 A9 03                    ..
         sta     $0387                           ; 8295 8D 87 03                 ...
         lda     #$00                            ; 8298 A9 00                    ..
@@ -292,14 +291,14 @@ L82C3:
         lda     #$03                            ; 82D1 A9 03                    ..
         sta     $0393                           ; 82D3 8D 93 03                 ...
         lda     #$00                            ; 82D6 A9 00                    ..
-        sta     Jaws_HP_Lo                           ; 82D8 8D 88 03                 ...
+        sta     JawsHP                           ; 82D8 8D 88 03                 ...
         lda     #$14                            ; 82DB A9 14                    ..
-        sta     Jaws_HP_Hi                           ; 82DD 8D 89 03                 ...
+        sta     JawsHP+1                           ; 82DD 8D 89 03                 ...
         lda     #$04                            ; 82E0 A9 04                    ..
         sta     $038C                           ; 82E2 8D 8C 03                 ...
         lda     #$04                            ; 82E5 A9 04                    ..
         sta     $038D                           ; 82E7 8D 8D 03                 ...
-        jsr     L86E1                           ; 82EA 20 E1 86                  ..
+        jsr     DrawGetReadyScreen                           ; 82EA 20 E1 86                  ..
 L82ED:
         jsr     PPUDisableNMI                           ; 82ED 20 EA 8B                  ..
         jsr     PPUDisableRendering                           ; 82F0 20 B6 8B                  ..
@@ -307,7 +306,7 @@ L82ED:
         jsr     DrawStatusLine                           ; 82F6 20 8F A7                  ..
         bit     $0341                           ; 82F9 2C 41 03                 ,A.
         bmi     L8304                           ; 82FC 30 06                    0.
-        jsr     DrawStatusLine_Power                           ; 82FE 20 D3 87                  ..
+        jsr     DrawStatusLine_PowerLabel                           ; 82FE 20 D3 87                  ..
         jmp     L8314                           ; 8301 4C 14 83                 L..
 
 ; ----------------------------------------------------------------------------
@@ -337,7 +336,7 @@ L8314:
         jsr     L8BC2                           ; 833D 20 C2 8B                  ..
         lda     #$00                            ; 8340 A9 00                    ..
         jsr     LE2CD                           ; 8342 20 CD E2                  ..
-        jsr     L8C40                           ; 8345 20 40 8C                  @.
+        jsr     WaitFor1Frame                           ; 8345 20 40 8C                  @.
 L8348:
         jsr     ReadJoypads                           ; 8348 20 87 8C                  ..
         jsr     L9D7A                           ; 834B 20 7A 9D                  z.
@@ -383,7 +382,7 @@ L838A:
         jsr     LA7CB                           ; 8391 20 CB A7                  ..
         jsr     L8B5F                           ; 8394 20 5F 8B                  _.
         jsr     L8B83                           ; 8397 20 83 8B                  ..
-        jsr     L8C40                           ; 839A 20 40 8C                  @.
+        jsr     WaitFor1Frame                           ; 839A 20 40 8C                  @.
         jmp     L8348                           ; 839D 4C 48 83                 LH.
 
 ; ----------------------------------------------------------------------------
@@ -422,10 +421,10 @@ L840F:
         sta     $0302                           ; 8416 8D 02 03                 ...
 L8419:
         jsr     L8B83                           ; 8419 20 83 8B                  ..
-        jsr     L8C40                           ; 841C 20 40 8C                  @.
+        jsr     WaitFor1Frame                           ; 841C 20 40 8C                  @.
         jsr     L8B5F                           ; 841F 20 5F 8B                  _.
         ldy     #$02                            ; 8422 A0 02                    ..
-        jsr     L8C60                           ; 8424 20 60 8C                  `.
+        jsr     WaitForYSpins                           ; 8424 20 60 8C                  `.
         lda     $0574                           ; 8427 AD 74 05                 .t.
         bmi     L8419                           ; 842A 30 ED                    0.
         lda     #$01                            ; 842C A9 01                    ..
@@ -443,9 +442,9 @@ L8419:
         lda     #$00                            ; 844D A9 00                    ..
         sta     SCROLL_X                           ; 844F 8D 20 03                 . .
         lda     #$00                            ; 8452 A9 00                    ..
-        sta     Camera_X_Lo                           ; 8454 8D 38 03                 .8.
+        sta     CameraX                           ; 8454 8D 38 03                 .8.
         lda     #$10                            ; 8457 A9 10                    ..
-        sta     Camera_X_Hi                           ; 8459 8D 39 03                 .9.
+        sta     CameraX+1                           ; 8459 8D 39 03                 .9.
         jsr     LA749                           ; 845C 20 49 A7                  I.
         jsr     L96F1                           ; 845F 20 F1 96                  ..
         jsr     PPUEnableNMI                           ; 8462 20 DE 8B                  ..
@@ -517,16 +516,16 @@ L8525:
         and     #$07                            ; 8537 29 07                    ).
         sta     $038B                           ; 8539 8D 8B 03                 ...
 L853C:
-        lda     Jaws_HP_Hi                           ; 853C AD 89 03                 ...
+        lda     JawsHP+1                           ; 853C AD 89 03                 ...
         clc                                     ; 853F 18                       .
         adc     #$04                            ; 8540 69 04                    i.
         cmp     #$14                            ; 8542 C9 14                    ..
         bcc     L854D                           ; 8544 90 07                    ..
         lda     #$00                            ; 8546 A9 00                    ..
-        sta     Jaws_HP_Lo                           ; 8548 8D 88 03                 ...
+        sta     JawsHP                           ; 8548 8D 88 03                 ...
         lda     #$14                            ; 854B A9 14                    ..
 L854D:
-        sta     Jaws_HP_Hi                           ; 854D 8D 89 03                 ...
+        sta     JawsHP+1                           ; 854D 8D 89 03                 ...
         jmp     L82ED                           ; 8550 4C ED 82                 L..
 
 ; ----------------------------------------------------------------------------
@@ -565,14 +564,14 @@ L85C4:
         sta     $13                             ; 85C6 85 13                    ..
 L85C8:
         lda     #$14                            ; 85C8 A9 14                    ..
-        sta     Jaws_HP_Hi                           ; 85CA 8D 89 03                 ...
+        sta     JawsHP+1                           ; 85CA 8D 89 03                 ...
         lda     $0304                           ; 85CD AD 04 03                 ...
         ora     #$40                            ; 85D0 09 40                    .@
         sta     $0304                           ; 85D2 8D 04 03                 ...
         lda     #$10                            ; 85D5 A9 10                    ..
         jsr     LD11F                           ; 85D7 20 1F D1                  ..
         lda     #$00                            ; 85DA A9 00                    ..
-        sta     Jaws_HP_Hi                           ; 85DC 8D 89 03                 ...
+        sta     JawsHP+1                           ; 85DC 8D 89 03                 ...
         lda     $0304                           ; 85DF AD 04 03                 ...
         ora     #$40                            ; 85E2 09 40                    .@
         sta     $0304                           ; 85E4 8D 04 03                 ...
@@ -592,7 +591,7 @@ L8605:
         sta     $0680                           ; 860C 8D 80 06                 ...
 L860F:
         jsr     L8B83                           ; 860F 20 83 8B                  ..
-        jsr     L8C40                           ; 8612 20 40 8C                  @.
+        jsr     WaitFor1Frame                           ; 8612 20 40 8C                  @.
         jsr     L8621                           ; 8615 20 21 86                  !.
         jsr     L9A37                           ; 8618 20 37 9A                  7.
         bit     $0680                           ; 861B 2C 80 06                 ,..
@@ -605,7 +604,7 @@ L8621:
         sta     $40                             ; 8623 85 40                    .@
         lda     #$06                            ; 8625 A9 06                    ..
         sta     $41                             ; 8627 85 41                    .A
-        jsr     LoadDataIntoZP                           ; 8629 20 54 97                  T.
+        jsr     LoadWorkingData                           ; 8629 20 54 97                  T.
         bit     $20                             ; 862C 24 20                    $ 
         bvs     L8644                           ; 862E 70 14                    p.
         lda     #$C0                            ; 8630 A9 C0                    ..
@@ -616,7 +615,7 @@ L8621:
         sta     $35                             ; 863A 85 35                    .5
         lda     #$24                            ; 863C A9 24                    .$
         jsr     L97AD                           ; 863E 20 AD 97                  ..
-        jmp     StoreDataFromZP                           ; 8641 4C 61 97                 La.
+        jmp     StoreWorkingData                           ; 8641 4C 61 97                 La.
 
 ; ----------------------------------------------------------------------------
 L8644:
@@ -624,7 +623,7 @@ L8644:
         bmi     L8681                           ; 8646 30 39                    09
         dec     $35                             ; 8648 C6 35                    .5
         beq     L864F                           ; 864A F0 03                    ..
-        jmp     StoreDataFromZP                           ; 864C 4C 61 97                 La.
+        jmp     StoreWorkingData                           ; 864C 4C 61 97                 La.
 
 ; ----------------------------------------------------------------------------
 L864F:
@@ -653,7 +652,7 @@ L8659:
         sta     $32                             ; 8678 85 32                    .2
         lda     #$01                            ; 867A A9 01                    ..
         sta     $33                             ; 867C 85 33                    .3
-        jmp     StoreDataFromZP                           ; 867E 4C 61 97                 La.
+        jmp     StoreWorkingData                           ; 867E 4C 61 97                 La.
 
 ; ----------------------------------------------------------------------------
 L8681:
@@ -662,13 +661,13 @@ L8681:
         bne     L868E                           ; 8685 D0 07                    ..
         lda     #$00                            ; 8687 A9 00                    ..
         sta     $20                             ; 8689 85 20                    . 
-        jmp     StoreDataFromZP                           ; 868B 4C 61 97                 La.
+        jmp     StoreWorkingData                           ; 868B 4C 61 97                 La.
 
 ; ----------------------------------------------------------------------------
 L868E:
         jsr     L97BE                           ; 868E 20 BE 97                  ..
         jsr     L981B                           ; 8691 20 1B 98                  ..
-        jmp     StoreDataFromZP                           ; 8694 4C 61 97                 La.
+        jmp     StoreWorkingData                           ; 8694 4C 61 97                 La.
 
 ; ----------------------------------------------------------------------------
 L8697:
@@ -681,12 +680,12 @@ L8697:
         .byte "         YOU/VE HIT JAWS!        "
 
 ; ----------------------------------------------------------------------------
-L86E1:
+DrawGetReadyScreen:
         jsr     PPUDisableNMI                           ; 86E1 20 EA 8B                  ..
         jsr     PPUDisableRendering                           ; 86E4 20 B6 8B                  ..
-        jsr     L8E12                           ; 86E7 20 12 8E                  ..
+        jsr     ClearScreenAndSprites                           ; 86E7 20 12 8E                  ..
         jsr     DrawStatusLine                           ; 86EA 20 8F A7                  ..
-        lda     #RomGraphicsE                            ; 86ED A9 0E                    ..
+        lda     #RomGraphicsGetReadyScreen                            ; 86ED A9 0E                    ..
         jsr     DrawROMGraphics                           ; 86EF 20 69 8D                  i.
         lda     #$08                            ; 86F2 A9 08                    ..
         jsr     L8EBD                           ; 86F4 20 BD 8E                  ..
@@ -769,8 +768,8 @@ L8768:
         .byte "    YOU NEED MORE CONCH SHELLS.  "
 
 ; ----------------------------------------------------------------------------
-DrawStatusLine_Power:
-        lda     #RomGraphicsB                            ; 87D3 A9 0B                    ..
+DrawStatusLine_PowerLabel:
+        lda     #RomGraphicsStatusPowerLabel                            ; 87D3 A9 0B                    ..
         jsr     DrawROMGraphics                           ; 87D5 20 69 8D                  i.
         lda     #$2B                            ; 87D8 A9 2B                    .+
         sta     PPUADDR                           ; 87DA 8D 06 20                 .. 
@@ -800,7 +799,7 @@ L87F9:
         lda     #$00                            ; 8808 A9 00                    ..
         sta     $0306                           ; 880A 8D 06 03                 ...
         sta     ActiveCHR                           ; 880D 8D 07 03                 ...
-        jsr     L8E12                           ; 8810 20 12 8E                  ..
+        jsr     ClearScreenAndSprites                           ; 8810 20 12 8E                  ..
         lda     #RomGraphics8                            ; 8813 A9 08                    ..
         jsr     DrawROMGraphics                           ; 8815 20 69 8D                  i.
         jsr     DrawStatusLine                           ; 8818 20 8F A7                  ..
@@ -808,17 +807,17 @@ L87F9:
         jsr     L8EBD                           ; 881D 20 BD 8E                  ..
         lda     #$00                            ; 8820 A9 00                    ..
         sta     SCROLL_X                           ; 8822 8D 20 03                 . .
-        sta     Camera_X_Lo                           ; 8825 8D 38 03                 .8.
-        sta     Camera_X_Hi                           ; 8828 8D 39 03                 .9.
+        sta     CameraX                           ; 8825 8D 38 03                 .8.
+        sta     CameraX+1                           ; 8828 8D 39 03                 .9.
         sta     SCROLL_Y                           ; 882B 8D 22 03                 .".
         sta     $0323                           ; 882E 8D 23 03                 .#.
-        sta     Camera_Y_Lo                           ; 8831 8D 3A 03                 .:.
-        sta     Camera_Y_Hi                           ; 8834 8D 3B 03                 .;.
+        sta     CameraY                           ; 8831 8D 3A 03                 .:.
+        sta     CameraY+1                           ; 8834 8D 3B 03                 .;.
         lda     #$80                            ; 8837 A9 80                    ..
         sta     $40                             ; 8839 85 40                    .@
         lda     #$06                            ; 883B A9 06                    ..
         sta     $41                             ; 883D 85 41                    .A
-        jsr     LoadDataIntoZP                           ; 883F 20 54 97                  T.
+        jsr     LoadWorkingData                           ; 883F 20 54 97                  T.
         lda     #$C0                            ; 8842 A9 C0                    ..
         sta     $20                             ; 8844 85 20                    . 
         lda     #$07                            ; 8846 A9 07                    ..
@@ -827,7 +826,7 @@ L87F9:
         sta     $22                             ; 884D 85 22                    ."
         lda     #$67                            ; 884F A9 67                    .g
         sta     $24                             ; 8851 85 24                    .$
-        jsr     StoreDataFromZP                           ; 8853 20 61 97                  a.
+        jsr     StoreWorkingData                           ; 8853 20 61 97                  a.
         jsr     L9A37                           ; 8856 20 37 9A                  7.
         lda     #$01                            ; 8859 A9 01                    ..
         sta     $0305                           ; 885B 8D 05 03                 ...
@@ -864,26 +863,26 @@ L888D:
         lda     #$00                            ; 88A4 A9 00                    ..
         sta     $0306                           ; 88A6 8D 06 03                 ...
         sta     ActiveCHR                           ; 88A9 8D 07 03                 ...
-        jsr     L8E12                           ; 88AC 20 12 8E                  ..
+        jsr     ClearScreenAndSprites                           ; 88AC 20 12 8E                  ..
         lda     #RomGraphicsD                            ; 88AF A9 0D                    ..
         jsr     DrawROMGraphics                           ; 88B1 20 69 8D                  i.
         jsr     DrawStatusLine                           ; 88B4 20 8F A7                  ..
-        jsr     DrawStatusLine_Power                           ; 88B7 20 D3 87                  ..
+        jsr     DrawStatusLine_PowerLabel                           ; 88B7 20 D3 87                  ..
         lda     #$06                            ; 88BA A9 06                    ..
         jsr     L8EBD                           ; 88BC 20 BD 8E                  ..
         lda     #$00                            ; 88BF A9 00                    ..
         sta     SCROLL_X                           ; 88C1 8D 20 03                 . .
-        sta     Camera_X_Lo                           ; 88C4 8D 38 03                 .8.
-        sta     Camera_X_Hi                           ; 88C7 8D 39 03                 .9.
+        sta     CameraX                           ; 88C4 8D 38 03                 .8.
+        sta     CameraX+1                           ; 88C7 8D 39 03                 .9.
         sta     SCROLL_Y                           ; 88CA 8D 22 03                 .".
         sta     $0323                           ; 88CD 8D 23 03                 .#.
-        sta     Camera_Y_Lo                           ; 88D0 8D 3A 03                 .:.
-        sta     Camera_Y_Hi                           ; 88D3 8D 3B 03                 .;.
+        sta     CameraY                           ; 88D0 8D 3A 03                 .:.
+        sta     CameraY+1                           ; 88D3 8D 3B 03                 .;.
         lda     #$80                            ; 88D6 A9 80                    ..
         sta     $40                             ; 88D8 85 40                    .@
         lda     #$06                            ; 88DA A9 06                    ..
         sta     $41                             ; 88DC 85 41                    .A
-        jsr     LoadDataIntoZP                           ; 88DE 20 54 97                  T.
+        jsr     LoadWorkingData                           ; 88DE 20 54 97                  T.
         lda     #$C0                            ; 88E1 A9 C0                    ..
         sta     $20                             ; 88E3 85 20                    . 
         lda     #$0C                            ; 88E5 A9 0C                    ..
@@ -900,21 +899,21 @@ L888D:
         sta     $30                             ; 88FC 85 30                    .0
         lda     #$00                            ; 88FE A9 00                    ..
         sta     $31                             ; 8900 85 31                    .1
-        jsr     StoreDataFromZP                           ; 8902 20 61 97                  a.
+        jsr     StoreWorkingData                           ; 8902 20 61 97                  a.
         jsr     L9A37                           ; 8905 20 37 9A                  7.
         lda     #$01                            ; 8908 A9 01                    ..
         sta     $0305                           ; 890A 8D 05 03                 ...
         jsr     PPUEnableNMI                           ; 890D 20 DE 8B                  ..
         jsr     L8BC2                           ; 8910 20 C2 8B                  ..
 L8913:
-        jsr     L8C40                           ; 8913 20 40 8C                  @.
+        jsr     WaitFor1Frame                           ; 8913 20 40 8C                  @.
         lda     #$80                            ; 8916 A9 80                    ..
         sta     $40                             ; 8918 85 40                    .@
         lda     #$06                            ; 891A A9 06                    ..
         sta     $41                             ; 891C 85 41                    .A
-        jsr     LoadDataIntoZP                           ; 891E 20 54 97                  T.
+        jsr     LoadWorkingData                           ; 891E 20 54 97                  T.
         jsr     MoveJawsX                           ; 8921 20 FA 97                  ..
-        jsr     StoreDataFromZP                           ; 8924 20 61 97                  a.
+        jsr     StoreWorkingData                           ; 8924 20 61 97                  a.
         lda     $23                             ; 8927 A5 23                    .#
         bmi     L8931                           ; 8929 30 06                    0.
         lda     $22                             ; 892B A5 22                    ."
@@ -992,34 +991,34 @@ L8A16:
         lda     $16                             ; 8A1C A5 16                    ..
         clc                                     ; 8A1E 18                       .
         adc     #$08                            ; 8A1F 69 08                    i.
-        sta     Boat_X_Lo                           ; 8A21 8D 82 06                 ...
+        sta     BoatX                           ; 8A21 8D 82 06                 ...
         lda     $17                             ; 8A24 A5 17                    ..
         adc     #$00                            ; 8A26 69 00                    i.
-        sta     Boat_X_Hi                           ; 8A28 8D 83 06                 ...
+        sta     BoatX+1                           ; 8A28 8D 83 06                 ...
         lda     $038D                           ; 8A2B AD 8D 03                 ...
         jsr     L8C29                           ; 8A2E 20 29 8C                  ).
         lda     $16                             ; 8A31 A5 16                    ..
         clc                                     ; 8A33 18                       .
         adc     #$08                            ; 8A34 69 08                    i.
-        sta     Boat_Y_Lo                           ; 8A36 8D 84 06                 ...
+        sta     BoatY                           ; 8A36 8D 84 06                 ...
         lda     $17                             ; 8A39 A5 17                    ..
         adc     #$00                            ; 8A3B 69 00                    i.
-        sta     Boat_Y_Hi                           ; 8A3D 8D 85 06                 ...
+        sta     BoatY+1                           ; 8A3D 8D 85 06                 ...
         rts                                     ; 8A40 60                       `
 
 ; ----------------------------------------------------------------------------
 L8A41:
-        lda     Boat_X_Hi                           ; 8A41 AD 83 06                 ...
+        lda     BoatX+1                           ; 8A41 AD 83 06                 ...
         lsr     a                               ; 8A44 4A                       J
-        lda     Boat_X_Lo                           ; 8A45 AD 82 06                 ...
+        lda     BoatX                           ; 8A45 AD 82 06                 ...
         ror     a                               ; 8A48 6A                       j
         lsr     a                               ; 8A49 4A                       J
         lsr     a                               ; 8A4A 4A                       J
         lsr     a                               ; 8A4B 4A                       J
         sta     $038C                           ; 8A4C 8D 8C 03                 ...
-        lda     Boat_Y_Hi                           ; 8A4F AD 85 06                 ...
+        lda     BoatY+1                           ; 8A4F AD 85 06                 ...
         lsr     a                               ; 8A52 4A                       J
-        lda     Boat_Y_Lo                           ; 8A53 AD 84 06                 ...
+        lda     BoatY                           ; 8A53 AD 84 06                 ...
         ror     a                               ; 8A56 6A                       j
         lsr     a                               ; 8A57 4A                       J
         lsr     a                               ; 8A58 4A                       J
@@ -1029,17 +1028,17 @@ L8A41:
 
 ; ----------------------------------------------------------------------------
 L8A5E:
-        lda     Jaws_X_Hi                           ; 8A5E AD 03 07                 ...
+        lda     JawsX+1                           ; 8A5E AD 03 07                 ...
         lsr     a                               ; 8A61 4A                       J
-        lda     Jaws_X_Lo                           ; 8A62 AD 02 07                 ...
+        lda     JawsX                           ; 8A62 AD 02 07                 ...
         ror     a                               ; 8A65 6A                       j
         lsr     a                               ; 8A66 4A                       J
         lsr     a                               ; 8A67 4A                       J
         lsr     a                               ; 8A68 4A                       J
         sta     $0348                           ; 8A69 8D 48 03                 .H.
-        lda     Jaws_Y_Hi                           ; 8A6C AD 05 07                 ...
+        lda     JawsY+1                           ; 8A6C AD 05 07                 ...
         lsr     a                               ; 8A6F 4A                       J
-        lda     Jaws_Y_Lo                           ; 8A70 AD 04 07                 ...
+        lda     JawsY                           ; 8A70 AD 04 07                 ...
         ror     a                               ; 8A73 6A                       j
         lsr     a                               ; 8A74 4A                       J
         lsr     a                               ; 8A75 4A                       J
@@ -1049,49 +1048,49 @@ L8A5E:
 
 ; ----------------------------------------------------------------------------
 VNMI:
-        pha                                     ; 8A7B 48                       H
-        txa                                     ; 8A7C 8A                       .
-        pha                                     ; 8A7D 48                       H
-        tya                                     ; 8A7E 98                       .
-        pha                                     ; 8A7F 48                       H
-        lda     #$01                            ; 8A80 A9 01                    ..
-        sta     $0301                           ; 8A82 8D 01 03                 ...
-        lda     $0302                           ; 8A85 AD 02 03                 ...
-        beq     @L8ABF                           ; 8A88 F0 35                    .5
-        lda     #$01                            ; 8A8A A9 01                    ..
-        bit     $0305                           ; 8A8C 2C 05 03                 ,..
-        beq     @CopySprites                           ; 8A8F F0 2B                    .+
-        bmi     @L8AA0                           ; 8A91 30 0D                    0.
-        lda     #$40                            ; 8A93 A9 40                    .@
-        sta     $48                             ; 8A95 85 48                    .H
-        lda     #$2B                            ; 8A97 A9 2B                    .+
-        sta     $49                             ; 8A99 85 49                    .I
-        lda     #$C0                            ; 8A9B A9 C0                    ..
-        jmp     @L8AAA                           ; 8A9D 4C AA 8A                 L..
+        pha
+        txa
+        pha
+        tya
+        pha
+        lda #$01
+        sta $0301
+        lda $0302
+        beq @L8ABF
+        lda #$01
+        bit $0305
+        beq @CopySprites
+        bmi @L8AA0
+        lda #$40
+        sta $48
+        lda #$2B
+        sta $49
+        lda #$C0
+        jmp @PositionSprite0
 
 ; ----------------------------------------------------------------------------
 @L8AA0:
-        lda     #$00                            ; 8AA0 A9 00                    ..
-        sta     $48                             ; 8AA2 85 48                    .H
-        lda     #$2B                            ; 8AA4 A9 2B                    .+
-        sta     $49                             ; 8AA6 85 49                    .I
-        lda     #$B0                            ; 8AA8 A9 B0                    ..
-@L8AAA:
-        sta     Sprite_PosY                           ; 8AAA 8D 00 02                 ...
-        lda     #$FF                            ; 8AAD A9 FF                    ..
-        sta     Sprite_Tile                           ; 8AAF 8D 01 02                 ...
-        lda     #$20                            ; 8AB2 A9 20                    . 
-        sta     Sprite_Attr                           ; 8AB4 8D 02 02                 ...
-        lda     #$D0                            ; 8AB7 A9 D0                    ..
-        sta     Sprite_PosX                           ; 8AB9 8D 03 02                 ...
+        lda #$00                            ; 8AA0 A9 00                    ..
+        sta $48                             ; 8AA2 85 48                    .H
+        lda #$2B                            ; 8AA4 A9 2B                    .+
+        sta $49                             ; 8AA6 85 49                    .I
+        lda #$B0                            ; 8AA8 A9 B0                    ..
+@PositionSprite0:
+        sta SpritePosY                           ; 8AAA 8D 00 02                 ...
+        lda #$FF                            ; 8AAD A9 FF                    ..
+        sta SpriteTile                           ; 8AAF 8D 01 02                 ...
+        lda #$20                            ; 8AB2 A9 20                    . 
+        sta SpriteAttr                           ; 8AB4 8D 02 02                 ...
+        lda #$D0                            ; 8AB7 A9 D0                    ..
+        sta SpritePosX                           ; 8AB9 8D 03 02                 ...
 @CopySprites:
-        jsr     DMACopySprites                           ; 8ABC 20 AF 8E                  ..
+        jsr DMACopySprites                           ; 8ABC 20 AF 8E                  ..
 @L8ABF:
-        lda     #$01                            ; 8ABF A9 01                    ..
-        bit     $0300                           ; 8AC1 2C 00 03                 ,..
-        beq     L8ACC                           ; 8AC4 F0 06                    ..
-        jsr     L8EE8                           ; 8AC6 20 E8 8E                  ..
-        jmp     L8ACF                           ; 8AC9 4C CF 8A                 L..
+        lda #$01                            ; 8ABF A9 01                    ..
+        bit $0300                           ; 8AC1 2C 00 03                 ,..
+        beq L8ACC                           ; 8AC4 F0 06                    ..
+        jsr WritePalette                           ; 8AC6 20 E8 8E                  ..
+        jmp L8ACF                           ; 8AC9 4C CF 8A                 L..
 
 ; ----------------------------------------------------------------------------
 L8ACC:
@@ -1149,6 +1148,7 @@ L8B17:
         jmp     ($0334)                         ; 8B26 6C 34 03                 l4.
 
 ; ----------------------------------------------------------------------------
+; JP these pointers update 303.. but i dont know what 303 is used for yet.
 L8B29:
         .byte   $58                             ; 8B29 58                       X
 L8B2A:
@@ -1207,27 +1207,27 @@ L8B82:
 
 ; ----------------------------------------------------------------------------
 L8B83:
-        lda     #$40                            ; 8B83 A9 40                    .@
+        lda #$40
 L8B85:
-:       bit     PPUSTATUS                           ; 8B85 2C 02 20                 ,. 
-        bvc     :-                           ; 8B88 50 FB                    P.
-        lda     $49                             ; 8B8A A5 49                    .I
-        sta     PPUADDR                           ; 8B8C 8D 06 20                 .. 
-        lda     $48                             ; 8B8F A5 48                    .H
-        sta     PPUADDR                           ; 8B91 8D 06 20                 .. 
-        lda     #$00                            ; 8B94 A9 00                    ..
-        sta     PPUSCROLL                           ; 8B96 8D 05 20                 .. 
-        sta     PPUSCROLL                           ; 8B99 8D 05 20                 .. 
-        lda     CHRBANKS                           ; 8B9C AD B1 80                 ...
-        sta     CHRBANKS                           ; 8B9F 8D B1 80                 ...
-        lda     PPUMASK_MIRROR                           ; 8BA2 AD 0F 03                 ...
-        and     #$EF                            ; 8BA5 29 EF                    ).
-        sta     PPUMASK                           ; 8BA7 8D 01 20                 .. 
-        lda     PPUCTRL_MIRROR                           ; 8BAA AD 0E 03                 ...
-        and     #$E7                            ; 8BAD 29 E7                    ).
-        ora     #$10                            ; 8BAF 09 10                    ..
-        sta     PPUCTRL                           ; 8BB1 8D 00 20                 .. 
-        rts                                     ; 8BB4 60                       `
+:       bit PPUSTATUS       ; delay until vblank
+        bvc :-
+        lda $49
+        sta PPUADDR
+        lda $48
+        sta PPUADDR
+        lda #$00
+        sta PPUSCROLL
+        sta PPUSCROLL
+        lda CHRBANKS
+        sta CHRBANKS
+        lda PPUMASK_MIRROR
+        and #%11101111      ; clear sprite rendering flag
+        sta PPUMASK
+        lda PPUCTRL_MIRROR
+        and #%11100111      ; set sprite and background table to $0000
+        ora #%00010000      ; set background table to $1000
+        sta PPUCTRL
+        rts
 
 ; ----------------------------------------------------------------------------
 VIRQ:
@@ -1236,7 +1236,7 @@ VIRQ:
 
 PPUDisableRendering:
         lda PPUMASK_MIRROR
-        and #%11100111
+        and #%11100111     ; clear sprite and background rendering flag
         sta PPUMASK_MIRROR
         sta PPUMASK
         rts
@@ -1250,7 +1250,7 @@ L8BC2:
         pha
         ora #%10000000
         sta PPUCTRL
-        jsr L8C40
+        jsr WaitFor1Frame
         pla
         sta PPUCTRL_MIRROR
         sta PPUCTRL
@@ -1259,7 +1259,7 @@ L8BC2:
 ; ----------------------------------------------------------------------------
 PPUEnableNMI:
         lda PPUCTRL_MIRROR
-        ora #%10000000
+        ora #%10000000     ; set nmi flag
         sta PPUCTRL_MIRROR
         sta PPUCTRL
         rts
@@ -1267,7 +1267,7 @@ PPUEnableNMI:
 ; ----------------------------------------------------------------------------
 PPUDisableNMI:
         lda PPUCTRL_MIRROR
-        and #%01111111
+        and #%01111111     ; clear nmi flag
         sta PPUCTRL_MIRROR
         sta PPUCTRL
         rts
@@ -1275,17 +1275,19 @@ PPUDisableNMI:
 ; ----------------------------------------------------------------------------
 PPURenderHorizontal:
         lda PPUCTRL_MIRROR
-        and #%11111011
+        and #%11111011     ; clear vertical rendering flag
         sta PPUCTRL_MIRROR
         sta PPUCTRL
         rts
 
+; seemingly unused code?
 ; ----------------------------------------------------------------------------
         .byte   $AD,$0E,$03,$09,$04,$8D,$0E,$03 ; 8C02 AD 0E 03 09 04 8D 0E 03  ........
         .byte   $8D,$01,$20,$60,$85,$17,$18,$A9 ; 8C0A 8D 01 20 60 85 17 18 A9  .. `....
         .byte   $00,$24,$17,$10,$03,$A9,$0F,$38 ; 8C12 00 24 17 10 03 A9 0F 38  .$.....8
         .byte   $66,$17,$6A,$66,$17,$6A,$66,$17 ; 8C1A 66 17 6A 66 17 6A 66 17  f.jf.jf.
         .byte   $6A,$66,$17,$6A,$85,$16,$60     ; 8C22 6A 66 17 6A 85 16 60     jf.j..`
+
 ; ----------------------------------------------------------------------------
 L8C29:
         sta     $16                             ; 8C29 85 16                    ..
@@ -1302,34 +1304,37 @@ L8C29:
         rts                                     ; 8C3F 60                       `
 
 ; ----------------------------------------------------------------------------
-L8C40:
+WaitFor1Frame:
         lda     #$00                            ; 8C40 A9 00                    ..
         sta     $0301                           ; 8C42 8D 01 03                 ...
-L8C45:
+@Wait:
         lda     $0301                           ; 8C45 AD 01 03                 ...
-        beq     L8C45                           ; 8C48 F0 FB                    ..
+        beq     @Wait                           ; 8C48 F0 FB                    ..
         lda     #$00                            ; 8C4A A9 00                    ..
         sta     $0301                           ; 8C4C 8D 01 03                 ...
         rts                                     ; 8C4F 60                       `
 
 ; ----------------------------------------------------------------------------
-L8C50:
-        jsr     L8C40                           ; 8C50 20 40 8C                  @.
+WaitForYFrames:
+        jsr     WaitFor1Frame                           ; 8C50 20 40 8C                  @.
         dey                                     ; 8C53 88                       .
-        bne     L8C50                           ; 8C54 D0 FA                    ..
+        bne     WaitForYFrames                           ; 8C54 D0 FA                    ..
         rts                                     ; 8C56 60                       `
 
+; seemingly unused code?
 ; ----------------------------------------------------------------------------
         .byte   $A0,$3C,$20,$50,$8C,$CA,$D0,$F8 ; 8C57 A0 3C 20 50 8C CA D0 F8  .< P....
         .byte   $60                             ; 8C5F 60                       `
 ; ----------------------------------------------------------------------------
-L8C60:
+
+; waits for roughly 1300 * Y cycles
+WaitForYSpins:
         ldx     #$00                            ; 8C60 A2 00                    ..
-L8C62:
+@Wait:
         dex                                     ; 8C62 CA                       .
-        bne     L8C62                           ; 8C63 D0 FD                    ..
+        bne     @Wait                           ; 8C63 D0 FD                    ..
         dey                                     ; 8C65 88                       .
-        bne     L8C62                           ; 8C66 D0 FA                    ..
+        bne     @Wait                           ; 8C66 D0 FA                    ..
         rts                                     ; 8C68 60                       `
 
 ; ----------------------------------------------------------------------------
@@ -1483,117 +1488,116 @@ L8D68:
 
 ; ----------------------------------------------------------------------------
 DrawROMGraphics:
-        asl     a                               ; 8D69 0A                       .
-        tax                                     ; 8D6A AA                       .
-        lda     RomGraphicsPtrs,x                         ; 8D6B BD 9D C1                 ...
-        sta     $10                             ; 8D6E 85 10                    ..
-        lda     RomGraphicsPtrs+1,x                         ; 8D70 BD 9E C1                 ...
-        sta     $11                             ; 8D73 85 11                    ..
-        jsr     PPURenderHorizontal          ; 8D75 20 F6 8B                  ..
-        ldx     #$00                            ; 8D78 A2 00                    ..
-        jsr     L8DFF                           ; 8D7A 20 FF 8D                  ..
-L8D7D:
-        jsr     L8DF6                           ; 8D7D 20 F6 8D                  ..
-        cmp     #$FF                            ; 8D80 C9 FF                    ..
-        beq     L8D90                           ; 8D82 F0 0C                    ..
-        sta     PPUDATA                           ; 8D84 8D 07 20                 .. 
-        inc     $12                             ; 8D87 E6 12                    ..
-        bne     L8D7D                           ; 8D89 D0 F2                    ..
-        inc     $13                             ; 8D8B E6 13                    ..
-        jmp     L8D7D                           ; 8D8D 4C 7D 8D                 L}.
+        @ROMPointer = $10           ; pointer to location in rom where the graphics are stored
+        @PPUPointer = $12           ; pointer to the ppu address that we are drawing to
+
+        asl a
+        tax
+        lda RomGraphicsPtrs,x
+        sta @ROMPointer
+        lda RomGraphicsPtrs+1,x
+        sta @ROMPointer+1
+        jsr PPURenderHorizontal
+        ldx #$00
+        jsr @GFXSetPPUAddress
+@GFXDraw:
+        jsr @GFXReadNextByte
+        cmp #$FF                    ; FF marks the end of a section of rendering
+        beq @FoundFF
+        sta PPUDATA
+        inc @PPUPointer             ; increment ppuaddr mirror
+        bne @GFXDraw
+        inc @PPUPointer+1
+        jmp @GFXDraw
+@FoundFF:
+        jsr @GFXReadNextByte
+        cmp #$00                    ; FF 00 marks the end of the graphics set
+        bne @NextSegment1
+        rts                         ; we're done drawing!
+
+@NextSegment1:
+        cmp #$01
+        bne @NextSegment2
+        jsr @GFXSetPPUAddress
+        jmp @GFXDraw
+
+@NextSegment2:
+        cmp #$FF
+        beq @GFXRepeatByte
+        clc
+        adc @PPUPointer
+        sta @PPUPointer
+        pha
+        lda @PPUPointer+1
+        adc #$00
+        sta @PPUPointer+1
+        sta PPUADDR
+        pla
+        sta PPUADDR
+        jmp @GFXDraw
+
+@GFXRepeatByte:
+        @TempBytesPerPage     = $0310
+        @TempPages            = $0311
+        @TempValueToRepeat    = $0312
+        jsr @GFXReadNextByte
+        sta @TempBytesPerPage
+        jsr @GFXReadNextByte
+        sta @TempPages
+        jsr @GFXReadNextByte
+        sta @TempValueToRepeat
+@DrawNextPage:
+        ldy @TempBytesPerPage
+        lda @TempValueToRepeat
+@DrawNextByte:
+        sta PPUDATA
+        dey
+        bne @DrawNextByte
+        clc
+        lda @PPUPointer
+        adc #$20
+        sta @PPUPointer
+        tay
+        lda @PPUPointer+1
+        adc #$00
+        sta @PPUPointer+1
+        sta PPUADDR
+        sty PPUADDR
+        dec @TempPages
+        bne @DrawNextPage
+        jmp @GFXDraw
+
+@GFXReadNextByte:
+        lda (@ROMPointer,x)
+        inc @ROMPointer
+        bne @NoCarry
+        inc @ROMPointer+1
+@NoCarry:
+        rts
+
+@GFXSetPPUAddress:
+        jsr @GFXReadNextByte
+        sta @PPUPointer
+        pha
+        jsr @GFXReadNextByte
+        sta @PPUPointer+1
+        sta PPUADDR
+        pla
+        sta PPUADDR
+        rts
 
 ; ----------------------------------------------------------------------------
-L8D90:
-        jsr     L8DF6                           ; 8D90 20 F6 8D                  ..
-        cmp     #$00                            ; 8D93 C9 00                    ..
-        bne     L8D98                           ; 8D95 D0 01                    ..
-        rts                                     ; 8D97 60                       `
-
-; ----------------------------------------------------------------------------
-L8D98:
-        cmp     #$01                            ; 8D98 C9 01                    ..
-        bne     L8DA2                           ; 8D9A D0 06                    ..
-        jsr     L8DFF                           ; 8D9C 20 FF 8D                  ..
-        jmp     L8D7D                           ; 8D9F 4C 7D 8D                 L}.
-
-; ----------------------------------------------------------------------------
-L8DA2:
-        cmp     #$FF                            ; 8DA2 C9 FF                    ..
-        beq     L8DBC                           ; 8DA4 F0 16                    ..
-        clc                                     ; 8DA6 18                       .
-        adc     $12                             ; 8DA7 65 12                    e.
-        sta     $12                             ; 8DA9 85 12                    ..
-        pha                                     ; 8DAB 48                       H
-        lda     $13                             ; 8DAC A5 13                    ..
-        adc     #$00                            ; 8DAE 69 00                    i.
-        sta     $13                             ; 8DB0 85 13                    ..
-        sta     PPUADDR                           ; 8DB2 8D 06 20                 .. 
-        pla                                     ; 8DB5 68                       h
-        sta     PPUADDR                           ; 8DB6 8D 06 20                 .. 
-        jmp     L8D7D                           ; 8DB9 4C 7D 8D                 L}.
-
-; ----------------------------------------------------------------------------
-L8DBC:
-        jsr     L8DF6                           ; 8DBC 20 F6 8D                  ..
-        sta     $0310                           ; 8DBF 8D 10 03                 ...
-        jsr     L8DF6                           ; 8DC2 20 F6 8D                  ..
-        sta     $0311                           ; 8DC5 8D 11 03                 ...
-        jsr     L8DF6                           ; 8DC8 20 F6 8D                  ..
-        sta     $0312                           ; 8DCB 8D 12 03                 ...
-L8DCE:
-        ldy     $0310                           ; 8DCE AC 10 03                 ...
-        lda     $0312                           ; 8DD1 AD 12 03                 ...
-L8DD4:
-        sta     PPUDATA                           ; 8DD4 8D 07 20                 .. 
-        dey                                     ; 8DD7 88                       .
-        bne     L8DD4                           ; 8DD8 D0 FA                    ..
-        clc                                     ; 8DDA 18                       .
-        lda     $12                             ; 8DDB A5 12                    ..
-        adc     #$20                            ; 8DDD 69 20                    i 
-        sta     $12                             ; 8DDF 85 12                    ..
-        tay                                     ; 8DE1 A8                       .
-        lda     $13                             ; 8DE2 A5 13                    ..
-        adc     #$00                            ; 8DE4 69 00                    i.
-        sta     $13                             ; 8DE6 85 13                    ..
-        sta     PPUADDR                           ; 8DE8 8D 06 20                 .. 
-        sty     PPUADDR                           ; 8DEB 8C 06 20                 .. 
-        dec     $0311                           ; 8DEE CE 11 03                 ...
-        bne     L8DCE                           ; 8DF1 D0 DB                    ..
-        jmp     L8D7D                           ; 8DF3 4C 7D 8D                 L}.
-
-; ----------------------------------------------------------------------------
-L8DF6:
-        lda     ($10,x)                         ; 8DF6 A1 10                    ..
-        inc     $10                             ; 8DF8 E6 10                    ..
-        bne     L8DFE                           ; 8DFA D0 02                    ..
-        inc     $11                             ; 8DFC E6 11                    ..
-L8DFE:
-        rts                                     ; 8DFE 60                       `
-
-; ----------------------------------------------------------------------------
-L8DFF:
-        jsr     L8DF6                           ; 8DFF 20 F6 8D                  ..
-        sta     $12                             ; 8E02 85 12                    ..
-        pha                                     ; 8E04 48                       H
-        jsr     L8DF6                           ; 8E05 20 F6 8D                  ..
-        sta     $13                             ; 8E08 85 13                    ..
-        sta     PPUADDR                           ; 8E0A 8D 06 20                 .. 
-        pla                                     ; 8E0D 68                       h
-        sta     PPUADDR                           ; 8E0E 8D 06 20                 .. 
-        rts                                     ; 8E11 60                       `
-
-; ----------------------------------------------------------------------------
-L8E12:
-        jsr     PPUDisableRendering                           ; 8E12 20 B6 8B                  ..
-        jsr     PPURenderHorizontal                           ; 8E15 20 F6 8B                  ..
-        lda     #$00                            ; 8E18 A9 00                    ..
-        sta     $0303                           ; 8E1A 8D 03 03                 ...
-        sta     $0302                           ; 8E1D 8D 02 03                 ...
-        sta     $0304                           ; 8E20 8D 04 03                 ...
-        sta     $0305                           ; 8E23 8D 05 03                 ...
-        jsr     ClearScreen                           ; 8E26 20 7D 8E                  }.
-        jsr     MoveAllSpritesOffscreen                           ; 8E29 20 9C 8E                  ..
-        rts                                     ; 8E2C 60                       `
+ClearScreenAndSprites:
+        jsr     PPUDisableRendering
+        jsr     PPURenderHorizontal
+        lda     #$00
+        sta     $0303
+        sta     $0302
+        sta     $0304
+        sta     $0305
+        jsr     ClearScreen
+        jsr     MoveAllSpritesOffscreen
+        rts
 
 ; ----------------------------------------------------------------------------
 L8E2D:
@@ -1663,7 +1667,7 @@ MoveAllSpritesOffscreen:
         lda     #$F0
         ldx     #$00
 @MoveNextSprite:
-        sta     Sprite_PosY,x
+        sta     SpritePosY,x
         inx
         inx
         inx
@@ -1675,12 +1679,12 @@ MoveAllSpritesOffscreen:
 
 ; ----------------------------------------------------------------------------
 DMACopySprites:
-        lda     #$00                            ; 8EAF A9 00                    ..
-        sta     OAMADDR                           ; 8EB1 8D 03 20                 .. 
-        sta     $0302                           ; 8EB4 8D 02 03                 ...
-        lda     #$02                            ; 8EB7 A9 02                    ..
-        sta     OAMDMA                           ; 8EB9 8D 14 40                 ..@
-        rts                                     ; 8EBC 60                       `
+        lda     #$00
+        sta     OAMADDR
+        sta     $0302
+        lda     #$02
+        sta     OAMDMA
+        rts
 
 ; ----------------------------------------------------------------------------
 L8EBD:
@@ -1694,7 +1698,7 @@ L8EBD:
         lda     PPUCTRL_MIRROR                           ; 8ECF AD 0E 03                 ...
         pha                                     ; 8ED2 48                       H
         jsr     PPUEnableNMI                           ; 8ED3 20 DE 8B                  ..
-        jsr     L8C40                           ; 8ED6 20 40 8C                  @.
+        jsr     WaitFor1Frame                           ; 8ED6 20 40 8C                  @.
         pla                                     ; 8ED9 68                       h
         sta     PPUCTRL_MIRROR                           ; 8EDA 8D 0E 03                 ...
         sta     PPUMASK                           ; 8EDD 8D 01 20                 .. 
@@ -1704,7 +1708,7 @@ L8EBD:
         rts                                     ; 8EE7 60                       `
 
 ; ----------------------------------------------------------------------------
-L8EE8:
+WritePalette:
         lda     PPUCTRL_MIRROR                           ; 8EE8 AD 0E 03                 ...
         and     #$FB                            ; 8EEB 29 FB                    ).
         sta     PPUCTRL                           ; 8EED 8D 00 20                 .. 
@@ -1935,7 +1939,7 @@ L907E:
 L9099:
         sta     $0340                           ; 9099 8D 40 03                 .@.
 L909C:
-        jmp     StoreDataFromZP                           ; 909C 4C 61 97                 La.
+        jmp     StoreWorkingData                           ; 909C 4C 61 97                 La.
 
 ; ----------------------------------------------------------------------------
 L909F:
@@ -2085,7 +2089,7 @@ L91AF:
         sta     $40                             ; 91B1 85 40                    .@
         lda     #$06                            ; 91B3 A9 06                    ..
         sta     $41                             ; 91B5 85 41                    .A
-        jsr     LoadDataIntoZP                           ; 91B7 20 54 97                  T.
+        jsr     LoadWorkingData                           ; 91B7 20 54 97                  T.
         lda     #$C0                            ; 91BA A9 C0                    ..
         sta     $20                             ; 91BC 85 20                    . 
         lda     #$00                            ; 91BE A9 00                    ..
@@ -2115,7 +2119,7 @@ L91AF:
         sta     $24                             ; 91E6 85 24                    .$
         lda     #$0D                            ; 91E8 A9 0D                    ..
         jsr     L97AD                           ; 91EA 20 AD 97                  ..
-        jmp     StoreDataFromZP                           ; 91ED 4C 61 97                 La.
+        jmp     StoreWorkingData                           ; 91ED 4C 61 97                 La.
 
 ; ----------------------------------------------------------------------------
 L91F0:
@@ -2148,7 +2152,7 @@ L91F8:
         jsr     L97AD                           ; 9227 20 AD 97                  ..
         lda     #$C0                            ; 922A A9 C0                    ..
         sta     $20                             ; 922C 85 20                    . 
-        jmp     StoreDataFromZP                           ; 922E 4C 61 97                 La.
+        jmp     StoreWorkingData                           ; 922E 4C 61 97                 La.
 
 ; ----------------------------------------------------------------------------
 L9231:
@@ -2156,7 +2160,7 @@ L9231:
         beq     L923D                           ; 9234 F0 07                    ..
         dec     $3D                             ; 9236 C6 3D                    .=
         beq     L9241                           ; 9238 F0 07                    ..
-        jmp     StoreDataFromZP                           ; 923A 4C 61 97                 La.
+        jmp     StoreWorkingData                           ; 923A 4C 61 97                 La.
 
 ; ----------------------------------------------------------------------------
 L923D:
@@ -2257,7 +2261,7 @@ L92EC:
 L92EE:
         sta     $06A0,x                         ; 92EE 9D A0 06                 ...
 L92F1:
-        jmp     StoreDataFromZP                           ; 92F1 4C 61 97                 La.
+        jmp     StoreWorkingData                           ; 92F1 4C 61 97                 La.
 
 ; ----------------------------------------------------------------------------
 L92F4:
@@ -2279,7 +2283,7 @@ L92FE:
         sta     $3F                             ; 9311 85 3F                    .?
         lda     #$B4                            ; 9313 A9 B4                    ..
         sta     $3D                             ; 9315 85 3D                    .=
-        jmp     StoreDataFromZP                           ; 9317 4C 61 97                 La.
+        jmp     StoreWorkingData                           ; 9317 4C 61 97                 La.
 
 ; ----------------------------------------------------------------------------
 L931A:
@@ -2440,7 +2444,7 @@ L9435:
         and     #$90                            ; 943A 29 90                    ).
         sta     $06A0,x                         ; 943C 9D A0 06                 ...
 L943F:
-        jmp     StoreDataFromZP                           ; 943F 4C 61 97                 La.
+        jmp     StoreWorkingData                           ; 943F 4C 61 97                 La.
 
 ; ----------------------------------------------------------------------------
 L9442:
@@ -2467,7 +2471,7 @@ L9456:
         sta     $3F                             ; 9469 85 3F                    .?
         lda     #$B4                            ; 946B A9 B4                    ..
         sta     $3D                             ; 946D 85 3D                    .=
-        jmp     StoreDataFromZP                           ; 946F 4C 61 97                 La.
+        jmp     StoreWorkingData                           ; 946F 4C 61 97                 La.
 
 ; ----------------------------------------------------------------------------
 L9472:
@@ -2645,7 +2649,7 @@ L95A1:
         lda     #$03                            ; 95B4 A9 03                    ..
         sta     $06A1,x                         ; 95B6 9D A1 06                 ...
 L95B9:
-        jmp     StoreDataFromZP                           ; 95B9 4C 61 97                 La.
+        jmp     StoreWorkingData                           ; 95B9 4C 61 97                 La.
 
 ; ----------------------------------------------------------------------------
 L95BC:
@@ -2772,11 +2776,11 @@ L966B:
         .byte   $A9,$0F,$60                     ; 966B A9 0F 60                 ..`
 ; ----------------------------------------------------------------------------
 L966E:
-        lda     Boat_X_Lo                           ; 966E AD 82 06                 ...
+        lda     BoatX                           ; 966E AD 82 06                 ...
         sec                                     ; 9671 38                       8
         sbc     #$80                            ; 9672 E9 80                    ..
         tax                                     ; 9674 AA                       .
-        lda     Boat_X_Hi                           ; 9675 AD 83 06                 ...
+        lda     BoatX+1                           ; 9675 AD 83 06                 ...
         sbc     #$00                            ; 9678 E9 00                    ..
         tay                                     ; 967A A8                       .
         bcs     L9683                           ; 967B B0 06                    ..
@@ -2797,16 +2801,16 @@ L968F:
         txa                                     ; 9695 8A                       .
         sec                                     ; 9696 38                       8
         sbc     #$08                            ; 9697 E9 08                    ..
-        sta     Camera_X_Lo                           ; 9699 8D 38 03                 .8.
+        sta     CameraX                           ; 9699 8D 38 03                 .8.
         sta     SCROLL_X                           ; 969C 8D 20 03                 . .
         tya                                     ; 969F 98                       .
         sbc     #$00                            ; 96A0 E9 00                    ..
-        sta     Camera_X_Hi                           ; 96A2 8D 39 03                 .9.
-        lda     Boat_Y_Lo                           ; 96A5 AD 84 06                 ...
+        sta     CameraX+1                           ; 96A2 8D 39 03                 .9.
+        lda     BoatY                           ; 96A5 AD 84 06                 ...
         sec                                     ; 96A8 38                       8
         sbc     #$60                            ; 96A9 E9 60                    .`
         tax                                     ; 96AB AA                       .
-        lda     Boat_Y_Hi                           ; 96AC AD 85 06                 ...
+        lda     BoatY+1                           ; 96AC AD 85 06                 ...
         sbc     #$00                            ; 96AF E9 00                    ..
         tay                                     ; 96B1 A8                       .
         bcs     L96BA                           ; 96B2 B0 06                    ..
@@ -2827,10 +2831,10 @@ L96C6:
         txa                                     ; 96CC 8A                       .
         sec                                     ; 96CD 38                       8
         sbc     #$0F                            ; 96CE E9 0F                    ..
-        sta     Camera_Y_Lo                           ; 96D0 8D 3A 03                 .:.
+        sta     CameraY                           ; 96D0 8D 3A 03                 .:.
         tya                                     ; 96D3 98                       .
         sbc     #$00                            ; 96D4 E9 00                    ..
-        sta     Camera_Y_Hi                           ; 96D6 8D 3B 03                 .;.
+        sta     CameraY+1                           ; 96D6 8D 3B 03                 .;.
         txa                                     ; 96D9 8A                       .
         clc                                     ; 96DA 18                       .
         adc     #$10                            ; 96DB 69 10                    i.
@@ -2850,11 +2854,11 @@ L96EA:
 
 ; ----------------------------------------------------------------------------
 L96F1:
-        lda     Boat_Y_Lo                           ; 96F1 AD 84 06                 ...
+        lda     BoatY                           ; 96F1 AD 84 06                 ...
         sec                                     ; 96F4 38                       8
         sbc     #$60                            ; 96F5 E9 60                    .`
         tax                                     ; 96F7 AA                       .
-        lda     Boat_Y_Hi                           ; 96F8 AD 85 06                 ...
+        lda     BoatY+1                           ; 96F8 AD 85 06                 ...
         sbc     #$00                            ; 96FB E9 00                    ..
         tay                                     ; 96FD A8                       .
         bcs     L9706                           ; 96FE B0 06                    ..
@@ -2880,10 +2884,10 @@ L9721:
         txa                                     ; 9721 8A                       .
         sec                                     ; 9722 38                       8
         sbc     #$0B                            ; 9723 E9 0B                    ..
-        sta     Camera_Y_Lo                           ; 9725 8D 3A 03                 .:.
+        sta     CameraY                           ; 9725 8D 3A 03                 .:.
         tya                                     ; 9728 98                       .
         sbc     #$00                            ; 9729 E9 00                    ..
-        sta     Camera_Y_Hi                           ; 972B 8D 3B 03                 .;.
+        sta     CameraY+1                           ; 972B 8D 3B 03                 .;.
         txa                                     ; 972E 8A                       .
         clc                                     ; 972F 18                       .
         adc     #$14                            ; 9730 69 14                    i.
@@ -2913,21 +2917,21 @@ L974C:
         sta     $40                             ; 974E 85 40                    .@
         lda     #$06                            ; 9750 A9 06                    ..
         sta     $41                             ; 9752 85 41                    .A
-LoadDataIntoZP:
+LoadWorkingData:
         ldy     #$00                            ; 9754 A0 00                    ..
 @Continue:
         lda     ($40),y                         ; 9756 B1 40                    .@
-        sta     $20,y                           ; 9758 99 20 00                 . .
+        sta     WorkingData,y                           ; 9758 99 20 00                 . .
         iny                                     ; 975B C8                       .
         cpy     #$20                            ; 975C C0 20                    . 
         bcc     @Continue                           ; 975E 90 F6                    ..
         rts                                     ; 9760 60                       `
 
 ; ----------------------------------------------------------------------------
-StoreDataFromZP:
+StoreWorkingData:
         ldy     #$00                            ; 9761 A0 00                    ..
 @Continue:
-        lda     $20,y                           ; 9763 B9 20 00                 . .
+        lda     WorkingData,y                           ; 9763 B9 20 00                 . .
         sta     ($40),y                         ; 9766 91 40                    .@
         iny                                     ; 9768 C8                       .
         cpy     #$20                            ; 9769 C0 20                    . 
@@ -2982,9 +2986,9 @@ L979B:
 L97AD:
         asl     a                               ; 97AD 0A                       .
         tax                                     ; 97AE AA                       .
-        lda     LADEF,x                         ; 97AF BD EF AD                 ...
+        lda     UnknownData2_Pointers,x                         ; 97AF BD EF AD                 ...
         sta     $28                             ; 97B2 85 28                    .(
-        lda     LADF0,x                         ; 97B4 BD F0 AD                 ...
+        lda     UnknownData2_Pointers+1,x                         ; 97B4 BD F0 AD                 ...
         sta     $29                             ; 97B7 85 29                    .)
         ldy     #$00                            ; 97B9 A0 00                    ..
         jmp     L97C8                           ; 97BB 4C C8 97                 L..
@@ -3088,43 +3092,41 @@ L9843:
         adc     $20,x                           ; 9845 75 20                    u 
         sta     $20,x                           ; 9847 95 20                    . 
         pla                                     ; 9849 68                       h
-        bmi     L9865                           ; 984A 30 19                    0.
+        bmi     @L9865                           ; 984A 30 19                    0.
         lda     #$00                            ; 984C A9 00                    ..
         adc     $21,x                           ; 984E 75 21                    u!
         sta     $21,x                           ; 9850 95 21                    .!
         tya                                     ; 9852 98                       .
         eor     $21,x                           ; 9853 55 21                    U!
-        bmi     L9880                           ; 9855 30 29                    0)
+        bmi     @ExitWithoutCarry                           ; 9855 30 29                    0)
         tya                                     ; 9857 98                       .
         clc                                     ; 9858 18                       .
         sbc     $21,x                           ; 9859 F5 21                    .!
-        bcs     L9880                           ; 985B B0 23                    .#
+        bcs     @ExitWithoutCarry                           ; 985B B0 23                    .#
         sty     $21,x                           ; 985D 94 21                    .!
         lda     #$00                            ; 985F A9 00                    ..
         sta     $20,x                           ; 9861 95 20                    . 
-        beq     L987E                           ; 9863 F0 19                    ..
-L9865:
+        beq     @ExitWithCarry                           ; 9863 F0 19                    ..
+@L9865:
         lda     #$FF                            ; 9865 A9 FF                    ..
         adc     $21,x                           ; 9867 75 21                    u!
         sta     $21,x                           ; 9869 95 21                    .!
         tya                                     ; 986B 98                       .
         eor     $21,x                           ; 986C 55 21                    U!
-        bmi     L9880                           ; 986E 30 10                    0.
+        bmi     @ExitWithoutCarry                           ; 986E 30 10                    0.
         dey                                     ; 9870 88                       .
         tya                                     ; 9871 98                       .
         cmp     $21,x                           ; 9872 D5 21                    .!
         iny                                     ; 9874 C8                       .
         tya                                     ; 9875 98                       .
-        bcc     L9880                           ; 9876 90 08                    ..
+        bcc     @ExitWithoutCarry                           ; 9876 90 08                    ..
         sta     $21,x                           ; 9878 95 21                    .!
         lda     #$00                            ; 987A A9 00                    ..
         sta     $20,x                           ; 987C 95 20                    . 
-L987E:
+@ExitWithCarry:
         sec                                     ; 987E 38                       8
         rts                                     ; 987F 60                       `
-
-; ----------------------------------------------------------------------------
-L9880:
+@ExitWithoutCarry:
         clc                                     ; 9880 18                       .
         rts                                     ; 9881 60                       `
 
@@ -3454,7 +3456,7 @@ L9A6C:
         beq     L9A8E                           ; 9A7F F0 0D                    ..
 L9A81:
         lda     #$F0                            ; 9A81 A9 F0                    ..
-        sta     Sprite_PosY,x                         ; 9A83 9D 00 02                 ...
+        sta     SpritePosY,x                         ; 9A83 9D 00 02                 ...
         txa                                     ; 9A86 8A                       .
         clc                                     ; 9A87 18                       .
         adc     $0F                             ; 9A88 65 0F                    e.
@@ -3477,20 +3479,20 @@ L9A94:
         lda     ($40),y                         ; 9A9D B1 40                    .@
         iny                                     ; 9A9F C8                       .
         sec                                     ; 9AA0 38                       8
-        sbc     Camera_X_Lo                           ; 9AA1 ED 38 03                 .8.
+        sbc     CameraX                           ; 9AA1 ED 38 03                 .8.
         sta     $02                             ; 9AA4 85 02                    ..
         lda     ($40),y                         ; 9AA6 B1 40                    .@
         iny                                     ; 9AA8 C8                       .
-        sbc     Camera_X_Hi                           ; 9AA9 ED 39 03                 .9.
+        sbc     CameraX+1                           ; 9AA9 ED 39 03                 .9.
         sta     $03                             ; 9AAC 85 03                    ..
         lda     ($40),y                         ; 9AAE B1 40                    .@
         iny                                     ; 9AB0 C8                       .
         sec                                     ; 9AB1 38                       8
-        sbc     Camera_Y_Lo                           ; 9AB2 ED 3A 03                 .:.
+        sbc     CameraY                           ; 9AB2 ED 3A 03                 .:.
         sta     $04                             ; 9AB5 85 04                    ..
         lda     ($40),y                         ; 9AB7 B1 40                    .@
         iny                                     ; 9AB9 C8                       .
-        sbc     Camera_Y_Hi                           ; 9ABA ED 3B 03                 .;.
+        sbc     CameraY+1                           ; 9ABA ED 3B 03                 .;.
         sta     $05                             ; 9ABD 85 05                    ..
         lda     ($40),y                         ; 9ABF B1 40                    .@
         iny                                     ; 9AC1 C8                       .
@@ -3514,7 +3516,7 @@ L9ADC:
         and     #$FF                            ; 9ADD 29 FF                    ).
         bmi     L9AEF                           ; 9ADF 30 0E                    0.
         adc     $02                             ; 9AE1 65 02                    e.
-        sta     Sprite_PosX,x                         ; 9AE3 9D 03 02                 ...
+        sta     SpritePosX,x                         ; 9AE3 9D 03 02                 ...
         lda     $03                             ; 9AE6 A5 03                    ..
         adc     #$00                            ; 9AE8 69 00                    i.
         beq     L9AFA                           ; 9AEA F0 0E                    ..
@@ -3523,7 +3525,7 @@ L9ADC:
 ; ----------------------------------------------------------------------------
 L9AEF:
         adc     $02                             ; 9AEF 65 02                    e.
-        sta     Sprite_PosX,x                         ; 9AF1 9D 03 02                 ...
+        sta     SpritePosX,x                         ; 9AF1 9D 03 02                 ...
         lda     $03                             ; 9AF4 A5 03                    ..
         adc     #$FF                            ; 9AF6 69 FF                    i.
         bne     L9B49                           ; 9AF8 D0 4F                    .O
@@ -3538,7 +3540,7 @@ L9B05:
         and     #$FF                            ; 9B06 29 FF                    ).
         bmi     L9B18                           ; 9B08 30 0E                    0.
         adc     $04                             ; 9B0A 65 04                    e.
-        sta     Sprite_PosY,x                         ; 9B0C 9D 00 02                 ...
+        sta     SpritePosY,x                         ; 9B0C 9D 00 02                 ...
         lda     $05                             ; 9B0F A5 05                    ..
         adc     #$00                            ; 9B11 69 00                    i.
         beq     L9B23                           ; 9B13 F0 0E                    ..
@@ -3547,22 +3549,22 @@ L9B05:
 ; ----------------------------------------------------------------------------
 L9B18:
         adc     $04                             ; 9B18 65 04                    e.
-        sta     Sprite_PosY,x                         ; 9B1A 9D 00 02                 ...
+        sta     SpritePosY,x                         ; 9B1A 9D 00 02                 ...
         lda     $05                             ; 9B1D A5 05                    ..
         adc     #$FF                            ; 9B1F 69 FF                    i.
         bne     L9B49                           ; 9B21 D0 26                    .&
 L9B23:
-        lda     Sprite_PosY,x                         ; 9B23 BD 00 02                 ...
+        lda     SpritePosY,x                         ; 9B23 BD 00 02                 ...
         cmp     #$F0                            ; 9B26 C9 F0                    ..
         bcs     L9B49                           ; 9B28 B0 1F                    ..
         iny                                     ; 9B2A C8                       .
         lda     ($06),y                         ; 9B2B B1 06                    ..
         iny                                     ; 9B2D C8                       .
-        sta     Sprite_Tile,x                         ; 9B2E 9D 01 02                 ...
+        sta     SpriteTile,x                         ; 9B2E 9D 01 02                 ...
         lda     ($06),y                         ; 9B31 B1 06                    ..
         iny                                     ; 9B33 C8                       .
         eor     $00                             ; 9B34 45 00                    E.
-        sta     Sprite_Attr,x                         ; 9B36 9D 02 02                 ...
+        sta     SpriteAttr,x                         ; 9B36 9D 02 02                 ...
         lda     #$01                            ; 9B39 A9 01                    ..
         sta     $01                             ; 9B3B 85 01                    ..
         txa                                     ; 9B3D 8A                       .
@@ -3596,7 +3598,7 @@ L9B5A:
         lda     #$03                            ; 9B62 A9 03                    ..
         sta     $46                             ; 9B64 85 46                    .F
 L9B66:
-        jsr     LoadDataIntoZP                           ; 9B66 20 54 97                  T.
+        jsr     LoadWorkingData                           ; 9B66 20 54 97                  T.
         lda     $20                             ; 9B69 A5 20                    . 
         bpl     L9B85                           ; 9B6B 10 18                    ..
         lda     #$9B                            ; 9B6D A9 9B                    ..
@@ -3608,7 +3610,7 @@ L9B66:
         .byte   $AE,$9B,$06,$9C,$28,$9C,$5D,$9C ; 9B78 AE 9B 06 9C 28 9C 5D 9C  ....(.].
         .byte   $7F,$9C                         ; 9B80 7F 9C                    ..
 ; ----------------------------------------------------------------------------
-        jsr     StoreDataFromZP                           ; 9B82 20 61 97                  a.
+        jsr     StoreWorkingData                           ; 9B82 20 61 97                  a.
 L9B85:
         jsr     L976E                           ; 9B85 20 6E 97                  n.
         dec     $46                             ; 9B88 C6 46                    .F
@@ -3624,12 +3626,12 @@ L9B8D:
         lda     #$03                            ; 9B95 A9 03                    ..
         sta     $46                             ; 9B97 85 46                    .F
 L9B99:
-        jsr     LoadDataIntoZP                           ; 9B99 20 54 97                  T.
+        jsr     LoadWorkingData                           ; 9B99 20 54 97                  T.
         lda     $20                             ; 9B9C A5 20                    . 
         bpl     L9BA3                           ; 9B9E 10 03                    ..
         jsr     L9C7F                           ; 9BA0 20 7F 9C                  ..
 L9BA3:
-        jsr     StoreDataFromZP                           ; 9BA3 20 61 97                  a.
+        jsr     StoreWorkingData                           ; 9BA3 20 61 97                  a.
         jsr     L976E                           ; 9BA6 20 6E 97                  n.
         dec     $46                             ; 9BA9 C6 46                    .F
         bne     L9B99                           ; 9BAB D0 EC                    ..
@@ -3811,11 +3813,11 @@ L9CCB:
         sta     $20                             ; 9CDC 85 20                    . 
         and     #$10                            ; 9CDE 29 10                    ).
         bne     L9CFF                           ; 9CE0 D0 1D                    ..
-        lda     Boat_X_Lo                           ; 9CE2 AD 82 06                 ...
+        lda     BoatX                           ; 9CE2 AD 82 06                 ...
         clc                                     ; 9CE5 18                       .
         adc     L9D52,x                         ; 9CE6 7D 52 9D                 }R.
         sta     $22                             ; 9CE9 85 22                    ."
-        lda     Boat_X_Hi                           ; 9CEB AD 83 06                 ...
+        lda     BoatX+1                           ; 9CEB AD 83 06                 ...
         adc     #$00                            ; 9CEE 69 00                    i.
         sta     $23                             ; 9CF0 85 23                    .#
         lda     L9D54,x                         ; 9CF2 BD 54 9D                 .T.
@@ -3826,11 +3828,11 @@ L9CCB:
 
 ; ----------------------------------------------------------------------------
 L9CFF:
-        lda     Boat_X_Lo                           ; 9CFF AD 82 06                 ...
+        lda     BoatX                           ; 9CFF AD 82 06                 ...
         sec                                     ; 9D02 38                       8
         sbc     L9D52,x                         ; 9D03 FD 52 9D                 .R.
         sta     $22                             ; 9D06 85 22                    ."
-        lda     Boat_X_Hi                           ; 9D08 AD 83 06                 ...
+        lda     BoatX+1                           ; 9D08 AD 83 06                 ...
         sbc     #$00                            ; 9D0B E9 00                    ..
         sta     $23                             ; 9D0D 85 23                    .#
         lda     L9D54,x                         ; 9D0F BD 54 9D                 .T.
@@ -3850,9 +3852,9 @@ L9D23:
         clc                                     ; 9D2D 18                       .
         lda     L9D53,x                         ; 9D2E BD 53 9D                 .S.
         bmi     L9D40                           ; 9D31 30 0D                    0.
-        adc     Boat_Y_Lo                           ; 9D33 6D 84 06                 m..
+        adc     BoatY                           ; 9D33 6D 84 06                 m..
         sta     $24                             ; 9D36 85 24                    .$
-        lda     Boat_Y_Hi                           ; 9D38 AD 85 06                 ...
+        lda     BoatY+1                           ; 9D38 AD 85 06                 ...
         adc     #$00                            ; 9D3B 69 00                    i.
         jmp     L9D4A                           ; 9D3D 4C 4A 9D                 LJ.
 
@@ -3891,7 +3893,7 @@ L9D7A:
         sta     $40                             ; 9D7C 85 40                    .@
         lda     #$07                            ; 9D7E A9 07                    ..
         sta     $41                             ; 9D80 85 41                    .A
-        jsr     LoadDataIntoZP                           ; 9D82 20 54 97                  T.
+        jsr     LoadWorkingData                           ; 9D82 20 54 97                  T.
         bit     $20                             ; 9D85 24 20                    $ 
         bvs     L9DB9                           ; 9D87 70 30                    p0
         lda     $0348                           ; 9D89 AD 48 03                 .H.
@@ -3921,7 +3923,7 @@ L9D7A:
         sta     $20                             ; 9DB0 85 20                    . 
         lda     #$80                            ; 9DB2 A9 80                    ..
         sta     $3D                             ; 9DB4 85 3D                    .=
-        jmp     StoreDataFromZP                           ; 9DB6 4C 61 97                 La.
+        jmp     StoreWorkingData                           ; 9DB6 4C 61 97                 La.
 
 ; ----------------------------------------------------------------------------
 L9DB9:
@@ -3936,7 +3938,7 @@ L9DB9:
         sta     $0340                           ; 9DCD 8D 40 03                 .@.
         lda     #$01                            ; 9DD0 A9 01                    ..
         sta     $0306                           ; 9DD2 8D 06 03                 ...
-        jmp     StoreDataFromZP                           ; 9DD5 4C 61 97                 La.
+        jmp     StoreWorkingData                           ; 9DD5 4C 61 97                 La.
 
 ; ----------------------------------------------------------------------------
 L9DD8:
@@ -4009,7 +4011,7 @@ L9E47:
 L9E4A:
         jsr     MoveJawsX                           ; 9E4A 20 FA 97                  ..
         jsr     L981B                           ; 9E4D 20 1B 98                  ..
-        jmp     StoreDataFromZP                           ; 9E50 4C 61 97                 La.
+        jmp     StoreWorkingData                           ; 9E50 4C 61 97                 La.
 
 ; ----------------------------------------------------------------------------
 L9E53:
@@ -4172,7 +4174,7 @@ L9F8A:
         sta     $40                             ; 9F8C 85 40                    .@
         lda     #$07                            ; 9F8E A9 07                    ..
         sta     $41                             ; 9F90 85 41                    .A
-        jsr     LoadDataIntoZP                           ; 9F92 20 54 97                  T.
+        jsr     LoadWorkingData                           ; 9F92 20 54 97                  T.
         bit     $20                             ; 9F95 24 20                    $ 
         bvs     L9FFD                           ; 9F97 70 64                    pd
         jsr     L8C69                           ; 9F99 20 69 8C                  i.
@@ -4224,7 +4226,7 @@ L9FED:
         sta     $39                             ; 9FF3 85 39                    .9
         lda     #$30                            ; 9FF5 A9 30                    .0
         jsr     L97AD                           ; 9FF7 20 AD 97                  ..
-        jmp     StoreDataFromZP                           ; 9FFA 4C 61 97                 La.
+        jmp     StoreWorkingData                           ; 9FFA 4C 61 97                 La.
 
 ; ----------------------------------------------------------------------------
 L9FFD:
@@ -4299,7 +4301,7 @@ LA053:
         adc     #$00                            ; A06E 69 00                    i.
         sta     $31                             ; A070 85 31                    .1
 LA072:
-        jmp     StoreDataFromZP                           ; A072 4C 61 97                 La.
+        jmp     StoreWorkingData                           ; A072 4C 61 97                 La.
 
 ; ----------------------------------------------------------------------------
 LA075:
@@ -4321,23 +4323,23 @@ LA075:
         asl     $16                             ; A09A 06 16                    ..
         rol     $17                             ; A09C 26 17                    &.
 LA09E:
-        lda     Jaws_HP_Lo                           ; A09E AD 88 03                 ...
+        lda     JawsHP                           ; A09E AD 88 03                 ...
         sec                                     ; A0A1 38                       8
         sbc     $16                             ; A0A2 E5 16                    ..
-        sta     Jaws_HP_Lo                           ; A0A4 8D 88 03                 ...
-        lda     Jaws_HP_Hi                           ; A0A7 AD 89 03                 ...
+        sta     JawsHP                           ; A0A4 8D 88 03                 ...
+        lda     JawsHP+1                           ; A0A7 AD 89 03                 ...
         sbc     $17                             ; A0AA E5 17                    ..
         bpl     LA0B3                           ; A0AC 10 05                    ..
         .byte   $A9,$00,$8D,$88,$03             ; A0AE A9 00 8D 88 03           .....
 ; ----------------------------------------------------------------------------
 LA0B3:
-        sta     Jaws_HP_Hi                           ; A0B3 8D 89 03                 ...
-        ora     Jaws_HP_Lo                           ; A0B6 0D 88 03                 ...
+        sta     JawsHP+1                           ; A0B3 8D 89 03                 ...
+        ora     JawsHP                           ; A0B6 0D 88 03                 ...
         bne     LA0C6                           ; A0B9 D0 0B                    ..
         lda     $0306                           ; A0BB AD 06 03                 ...
         ora     #$20                            ; A0BE 09 20                    . 
         sta     $0306                           ; A0C0 8D 06 03                 ...
-        jmp     StoreDataFromZP                           ; A0C3 4C 61 97                 La.
+        jmp     StoreWorkingData                           ; A0C3 4C 61 97                 La.
 
 ; ----------------------------------------------------------------------------
 LA0C6:
@@ -4387,7 +4389,7 @@ LA117:
         jsr     L981B                           ; A117 20 1B 98                  ..
         jsr     L9A14                           ; A11A 20 14 9A                  ..
         jsr     L99D0                           ; A11D 20 D0 99                  ..
-        jmp     StoreDataFromZP                           ; A120 4C 61 97                 La.
+        jmp     StoreWorkingData                           ; A120 4C 61 97                 La.
 
 ; ----------------------------------------------------------------------------
 LA123:
@@ -4459,9 +4461,9 @@ LA1B0:
         lda     $0306                           ; A1B0 AD 06 03                 ...
         and     #$FE                            ; A1B3 29 FE                    ).
         sta     $0306                           ; A1B5 8D 06 03                 ...
-        jsr     LoadDataIntoZP                           ; A1B8 20 54 97                  T.
+        jsr     LoadWorkingData                           ; A1B8 20 54 97                  T.
         jsr     LA206                           ; A1BB 20 06 A2                  ..
-        jsr     StoreDataFromZP                           ; A1BE 20 61 97                  a.
+        jsr     StoreWorkingData                           ; A1BE 20 61 97                  a.
 LA1C1:
         lda     $40                             ; A1C1 A5 40                    .@
         clc                                     ; A1C3 18                       .
@@ -4608,7 +4610,7 @@ LA32F:
         lda     $033F                           ; A337 AD 3F 03                 .?.
         adc     #$00                            ; A33A 69 00                    i.
         sta     $25                             ; A33C 85 25                    .%
-        lda     Boat_X_Lo                           ; A33E AD 82 06                 ...
+        lda     BoatX                           ; A33E AD 82 06                 ...
         and     #$F0                            ; A341 29 F0                    ).
         sta     $12                             ; A343 85 12                    ..
 LA345:
@@ -4651,11 +4653,11 @@ LA371:
         sta     $3A                             ; A383 85 3A                    .:
         lda     #$02                            ; A385 A9 02                    ..
         sta     $38                             ; A387 85 38                    .8
-        lda     Boat_Y_Lo                           ; A389 AD 84 06                 ...
+        lda     BoatY                           ; A389 AD 84 06                 ...
         clc                                     ; A38C 18                       .
         adc     #$10                            ; A38D 69 10                    i.
         sta     $24                             ; A38F 85 24                    .$
-        lda     Boat_Y_Hi                           ; A391 AD 85 06                 ...
+        lda     BoatY+1                           ; A391 AD 85 06                 ...
         adc     #$00                            ; A394 69 00                    i.
         sta     $25                             ; A396 85 25                    .%
         jsr     L99D0                           ; A398 20 D0 99                  ..
@@ -4669,7 +4671,7 @@ LA371:
 ; ----------------------------------------------------------------------------
 LA3AA:
         stx     $37                             ; A3AA 86 37                    .7
-        lda     Boat_X_Lo                           ; A3AC AD 82 06                 ...
+        lda     BoatX                           ; A3AC AD 82 06                 ...
         bmi     LA3BF                           ; A3AF 30 0E                    0.
         lda     #$D0                            ; A3B1 A9 D0                    ..
         sta     $20                             ; A3B3 85 20                    . 
@@ -4816,9 +4818,9 @@ LA494:
 ; ----------------------------------------------------------------------------
         bit     $20                             ; A499 24 20                    $ 
         bvs     LA4F9                           ; A49B 70 5C                    p\
-        lda     Boat_Y_Lo                           ; A49D AD 84 06                 ...
+        lda     BoatY                           ; A49D AD 84 06                 ...
         sta     $24                             ; A4A0 85 24                    .$
-        lda     Boat_Y_Hi                           ; A4A2 AD 85 06                 ...
+        lda     BoatY+1                           ; A4A2 AD 85 06                 ...
         sta     $25                             ; A4A5 85 25                    .%
         lda     #$05                            ; A4A7 A9 05                    ..
         sta     $35                             ; A4A9 85 35                    .5
@@ -4832,11 +4834,11 @@ LA494:
         sta     $37                             ; A4BA 85 37                    .7
         lda     #$1F                            ; A4BC A9 1F                    ..
         jsr     L97AD                           ; A4BE 20 AD 97                  ..
-        lda     Boat_X_Hi                           ; A4C1 AD 83 06                 ...
+        lda     BoatX+1                           ; A4C1 AD 83 06                 ...
         cmp     #$10                            ; A4C4 C9 10                    ..
         bcc     LA4CF                           ; A4C6 90 07                    ..
         bne     LA4E4                           ; A4C8 D0 1A                    ..
-        lda     Boat_X_Lo                           ; A4CA AD 82 06                 ...
+        lda     BoatX                           ; A4CA AD 82 06                 ...
         bpl     LA4E4                           ; A4CD 10 15                    ..
 LA4CF:
         lda     #$C0                            ; A4CF A9 C0                    ..
@@ -5034,9 +5036,9 @@ LA61A:
         bcc     LA641                           ; A62B 90 14                    ..
         inc     $38                             ; A62D E6 38                    .8
         ldy     #$01                            ; A62F A0 01                    ..
-        lda     Boat_X_Lo                           ; A631 AD 82 06                 ...
+        lda     BoatX                           ; A631 AD 82 06                 ...
         cmp     $22                             ; A634 C5 22                    ."
-        lda     Boat_X_Hi                           ; A636 AD 83 06                 ...
+        lda     BoatX+1                           ; A636 AD 83 06                 ...
         sbc     $23                             ; A639 E5 23                    .#
         bcs     LA63F                           ; A63B B0 02                    ..
         .byte   $A0,$FF                         ; A63D A0 FF                    ..
@@ -5206,9 +5208,9 @@ LA749:
         lda     $038E                           ; A749 AD 8E 03                 ...
         asl     a                               ; A74C 0A                       .
         tax                                     ; A74D AA                       .
-        lda     LBF48,x                         ; A74E BD 48 BF                 .H.
+        lda     UnknownData3_Pointers,x                         ; A74E BD 48 BF                 .H.
         sta     $44                             ; A751 85 44                    .D
-        lda     LBF49,x                         ; A753 BD 49 BF                 .I.
+        lda     UnknownData3_Pointers+1,x                         ; A753 BD 49 BF                 .I.
         sta     $45                             ; A756 85 45                    .E
         ldy     #$00                            ; A758 A0 00                    ..
         lda     ($44),y                         ; A75A B1 44                    .D
@@ -5491,7 +5493,7 @@ DrawStatusLine_JawsPower:
         sta     PPUADDR                           ; A966 8D 06 20                 .. 
         ldy     #$08                            ; A969 A0 08                    ..
         ldx     #$0A                            ; A96B A2 0A                    ..
-        lda     Jaws_HP_Hi                           ; A96D AD 89 03                 ...
+        lda     JawsHP+1                           ; A96D AD 89 03                 ...
 LA970:
         cmp     #$02                            ; A970 C9 02                    ..
         bcc     LA97D                           ; A972 90 09                    ..
@@ -5960,9 +5962,9 @@ LAC82:
         sta     $44                             ; AC9D 85 44                    .D
         lda     DrawROMGraphicsSet+1,x                         ; AC9F BD 09 CD                 ...
         sta     $45                             ; ACA2 85 45                    .E
-        jsr     L8E12                           ; ACA4 20 12 8E                  ..
+        jsr     ClearScreenAndSprites                           ; ACA4 20 12 8E                  ..
         jsr     DrawStatusLine                           ; ACA7 20 8F A7                  ..
-        jsr     DrawStatusLine_Power                           ; ACAA 20 D3 87                  ..
+        jsr     DrawStatusLine_PowerLabel                           ; ACAA 20 D3 87                  ..
         lda     #$01                            ; ACAD A9 01                    ..
         sta     $0305                           ; ACAF 8D 05 03                 ...
         sta     $0302                           ; ACB2 8D 02 03                 ...
@@ -6161,643 +6163,387 @@ LADD8:
         sta     $03                             ; ADEC 85 03                    ..
         rts                                     ; ADEE 60                       `
 
-; ----------------------------------------------------------------------------
-LADEF:
-        .byte   $7B                             ; ADEF 7B                       {
-LADF0:
-        .byte   $AE,$8B,$AE,$98,$AE,$69,$AE,$72 ; ADF0 AE 8B AE 98 AE 69 AE 72  .....i.r
-        .byte   $AE,$75,$AE,$78,$AE,$6C,$AE,$85 ; ADF8 AE 75 AE 78 AE 6C AE 85  .u.x.l..
-        .byte   $B0,$88,$B0,$8B,$B0,$BB,$B0,$6F ; AE00 B0 88 B0 8B B0 BB B0 6F  .......o
-        .byte   $AE,$A5,$AE,$EE,$AF,$19,$B0,$A8 ; AE08 AE A5 AE EE AF 19 B0 A8  ........
-        .byte   $AE,$B5,$AE,$C2,$AE,$CF,$AE,$DC ; AE10 AE B5 AE C2 AE CF AE DC  ........
-        .byte   $AE,$E9,$AE,$FB,$AE,$AD,$AF,$07 ; AE18 AE E9 AE FB AE AD AF 07  ........
-        .byte   $AF,$13,$AF,$1F,$AF,$31,$AF,$69 ; AE20 AF 13 AF 1F AF 31 AF 69  .....1.i
-        .byte   $AE,$3D,$AF,$49,$AF,$06,$B0,$55 ; AE28 AE 3D AF 49 AF 06 B0 55  .=.I...U
-        .byte   $AF,$58,$AF,$5B,$AF,$62,$AF,$69 ; AE30 AF 58 AF 5B AF 62 AF 69  .X.[.b.i
-        .byte   $AF,$6F,$AF,$69,$AE,$69,$AE,$82 ; AE38 AF 6F AF 69 AE 69 AE 82  .o.i.i..
-        .byte   $AF,$85,$AF,$88,$AF,$8B,$AF,$31 ; AE40 AF 85 AF 88 AF 8B AF 31  .......1
-        .byte   $B0,$3E,$B0,$51,$B0,$69,$AE,$8E ; AE48 B0 3E B0 51 B0 69 AE 8E  .>.Q.i..
-        .byte   $AF,$69,$AE,$61,$B0,$67,$B0,$6D ; AE50 AF 69 AE 61 B0 67 B0 6D  .i.a.g.m
-        .byte   $B0,$73,$B0,$79,$B0,$7F,$B0,$A1 ; AE58 B0 73 B0 79 B0 7F B0 A1  .s.y....
-        .byte   $AF,$BA,$AF,$69,$AE,$69,$AE,$D5 ; AE60 AF BA AF 69 AE 69 AE D5  ...i.i..
-        .byte   $AF,$00,$57,$BD,$00,$2E,$BE,$00 ; AE68 AF 00 57 BD 00 2E BE 00  ..W.....
-        .byte   $9D,$BE,$00,$BE,$B0,$00,$E1,$B1 ; AE70 9D BE 00 BE B0 00 E1 B1  ........
-        .byte   $00,$51,$B2,$06,$E1,$B0,$09,$04 ; AE78 00 51 B2 06 E1 B0 09 04  .Q......
-        .byte   $B1,$09,$27,$B1,$05,$4A,$B1,$0C ; AE80 B1 09 27 B1 05 4A B1 0C  ..'..J..
-        .byte   $6D,$B1,$FF,$08,$90,$B1,$08,$AB ; AE88 6D B1 FF 08 90 B1 08 AB  m.......
-        .byte   $B1,$08,$90,$B1,$08,$C6,$B1,$FF ; AE90 B1 08 90 B1 08 C6 B1 FF  ........
-        .byte   $08,$32,$B2,$08,$13,$B2,$08,$32 ; AE98 08 32 B2 08 13 B2 08 32  .2.....2
-        .byte   $B2,$08,$F4,$B1,$FF,$00,$68,$B2 ; AEA0 B2 08 F4 B1 FF 00 68 B2  ......h.
-        .byte   $07,$4D,$B3,$09,$60,$B3,$08,$73 ; AEA8 07 4D B3 09 60 B3 08 73  .M..`..s
-        .byte   $B3,$0C,$86,$B3,$FF,$07,$D2,$B3 ; AEB0 B3 0C 86 B3 FF 07 D2 B3  ........
-        .byte   $09,$F8,$B3,$06,$0B,$B4,$0C,$1E ; AEB8 09 F8 B3 06 0B B4 0C 1E  ........
-        .byte   $B4,$FF,$0C,$99,$B3,$0A,$AC,$B3 ; AEC0 B4 FF 0C 99 B3 0A AC B3  ........
-        .byte   $0F,$BF,$B3,$0A,$D2,$B3,$FF,$09 ; AEC8 0F BF B3 0A D2 B3 FF 09  ........
-        .byte   $31,$B4,$08,$44,$B4,$06,$57,$B4 ; AED0 31 B4 08 44 B4 06 57 B4  1..D..W.
-        .byte   $0C,$6A,$B4,$FF,$09,$7D,$B4,$08 ; AED8 0C 6A B4 FF 09 7D B4 08  .j...}..
-        .byte   $90,$B4,$06,$A3,$B4,$0C,$B6,$B4 ; AEE0 90 B4 06 A3 B4 0C B6 B4  ........
-        .byte   $FF,$07,$02,$B5,$07,$EF,$B4,$06 ; AEE8 FF 07 02 B5 07 EF B4 06  ........
-        .byte   $DC,$B4,$06,$C9,$B4,$03,$73,$B3 ; AEF0 DC B4 06 C9 B4 03 73 B3  ......s.
-        .byte   $00,$86,$B3,$08,$0D,$B5,$08,$14 ; AEF8 00 86 B3 08 0D B5 08 14  ........
-        .byte   $B5,$08,$1B,$B5,$00,$26,$B5,$08 ; AF00 B5 08 1B B5 00 26 B5 08  .....&..
-        .byte   $31,$B5,$08,$38,$B5,$08,$3F,$B5 ; AF08 31 B5 08 38 B5 08 3F B5  1..8..?.
-        .byte   $00,$57,$B4,$08,$4E,$B5,$08,$55 ; AF10 00 57 B4 08 4E B5 08 55  .W..N..U
-        .byte   $B5,$08,$5C,$B5,$00,$A3,$B4,$03 ; AF18 B5 08 5C B5 00 A3 B4 03  ..\.....
-        .byte   $86,$B3,$03,$73,$B3,$06,$C9,$B4 ; AF20 86 B3 03 73 B3 06 C9 B4  ...s....
-        .byte   $06,$DC,$B4,$07,$EF,$B4,$00,$02 ; AF28 06 DC B4 07 EF B4 00 02  ........
-        .byte   $B5,$08,$26,$B5,$08,$1B,$B5,$08 ; AF30 B5 08 26 B5 08 1B B5 08  ..&.....
-        .byte   $14,$B5,$00,$0D,$B5,$08,$57,$B4 ; AF38 14 B5 00 0D B5 08 57 B4  ......W.
-        .byte   $08,$3F,$B5,$08,$38,$B5,$00,$31 ; AF40 08 3F B5 08 38 B5 00 31  .?..8..1
-        .byte   $B5,$08,$A3,$B4,$08,$5C,$B5,$08 ; AF48 B5 08 A3 B4 08 5C B5 08  .....\..
-        .byte   $55,$B5,$00,$4E,$B5,$00,$6B,$B5 ; AF50 55 B5 00 4E B5 00 6B B5  U..N..k.
-        .byte   $00,$9A,$B5,$02,$AD,$B5,$02,$D0 ; AF58 00 9A B5 02 AD B5 02 D0  ........
-        .byte   $B5,$FF,$08,$F3,$B5,$08,$06,$B6 ; AF60 B5 FF 08 F3 B5 08 06 B6  ........
-        .byte   $FF,$20,$19,$B6,$00,$19,$B6,$08 ; AF68 FF 20 19 B6 00 19 B6 08  . ......
-        .byte   $2C,$B6,$08,$7D,$B6,$08,$B3,$B6 ; AF70 2C B6 08 7D B6 08 B3 B6  ,..}....
-        .byte   $08,$47,$B6,$08,$62,$B6,$08,$98 ; AF78 08 47 B6 08 62 B6 08 98  .G..b...
-        .byte   $B6,$FF,$00,$CE,$B6,$00,$D5,$B6 ; AF80 B6 FF 00 CE B6 00 D5 B6  ........
-        .byte   $00,$E3,$B6,$00,$DC,$B6,$10,$EA ; AF88 00 E3 B6 00 DC B6 10 EA  ........
-        .byte   $B6,$10,$39,$B8,$10,$F6,$B7,$10 ; AF90 B6 10 39 B8 10 F6 B7 10  ..9.....
-        .byte   $2D,$B7,$10,$B3,$B7,$10,$70,$B7 ; AF98 2D B7 10 B3 B7 10 70 B7  -.....p.
-        .byte   $FF,$08,$7C,$B8,$04,$8F,$B8,$08 ; AFA0 FF 08 7C B8 04 8F B8 08  ..|.....
-        .byte   $A2,$B8,$00,$8F,$B8,$08,$7C,$B8 ; AFA8 A2 B8 00 8F B8 08 7C B8  ......|.
-        .byte   $04,$8F,$B8,$08,$A2,$B8,$08,$8F ; AFB0 04 8F B8 08 A2 B8 08 8F  ........
-        .byte   $B8,$FF,$02,$DD,$B8,$02,$CA,$B8 ; AFB8 B8 FF 02 DD B8 02 CA B8  ........
-        .byte   $02,$C3,$B8,$02,$BC,$B8,$02,$B5 ; AFC0 02 C3 B8 02 BC B8 02 B5  ........
-        .byte   $B8,$02,$03,$B9,$02,$F0,$B8,$02 ; AFC8 B8 02 03 B9 02 F0 B8 02  ........
-        .byte   $0A,$B9,$00,$0A,$B9,$10,$11,$B9 ; AFD0 0A B9 00 0A B9 10 11 B9  ........
-        .byte   $08,$20,$B9,$08,$2F,$B9,$08,$3E ; AFD8 08 20 B9 08 2F B9 08 3E  . ../..>
-        .byte   $B9,$08,$4D,$B9,$08,$5C,$B9,$08 ; AFE0 B9 08 4D B9 08 5C B9 08  ..M..\..
-        .byte   $6B,$B9,$08,$7A,$B9,$FF,$04,$20 ; AFE8 6B B9 08 7A B9 FF 04 20  k..z... 
-        .byte   $B9,$04,$89,$B9,$04,$20,$B9,$04 ; AFF0 B9 04 89 B9 04 20 B9 04  ..... ..
-        .byte   $89,$B9,$03,$B5,$B8,$03,$0A,$B9 ; AFF8 89 B9 03 B5 B8 03 0A B9  ........
-        .byte   $03,$F0,$B8,$00,$F0,$B8,$0A,$98 ; B000 03 F0 B8 00 F0 B8 0A 98  ........
-        .byte   $B9,$0A,$B7,$B9,$0A,$D6,$B9,$0A ; B008 B9 0A B7 B9 0A D6 B9 0A  ........
-        .byte   $F5,$B9,$0A,$14,$BA,$0A,$33,$BA ; B010 F5 B9 0A 14 BA 0A 33 BA  ......3.
-        .byte   $FF,$04,$98,$B9,$04,$52,$BA,$04 ; B018 FF 04 98 B9 04 52 BA 04  .....R..
-        .byte   $98,$B9,$04,$52,$BA,$03,$B5,$B8 ; B020 98 B9 04 52 BA 03 B5 B8  ...R....
-        .byte   $03,$0A,$B9,$03,$F0,$B8,$00,$F0 ; B028 03 0A B9 03 F0 B8 00 F0  ........
-        .byte   $B8,$05,$71,$BA,$05,$84,$BA,$05 ; B030 B8 05 71 BA 05 84 BA 05  ..q.....
-        .byte   $71,$BA,$05,$97,$BA,$FF,$08,$AA ; B038 71 BA 05 97 BA FF 08 AA  q.......
-        .byte   $BA,$08,$BD,$BA,$08,$D0,$BA,$08 ; B040 BA 08 BD BA 08 D0 BA 08  ........
-        .byte   $09,$BB,$08,$E3,$BA,$08,$F6,$BA ; B048 09 BB 08 E3 BA 08 F6 BA  ........
-        .byte   $FF,$07,$1C,$BB,$07,$2F,$BB,$07 ; B050 FF 07 1C BB 07 2F BB 07  ...../..
-        .byte   $42,$BB,$07,$4D,$BB,$07,$58,$BB ; B058 42 BB 07 4D BB 07 58 BB  B..M..X.
-        .byte   $FF,$20,$6B,$BB,$00,$6B,$BB,$20 ; B060 FF 20 6B BB 00 6B BB 20  . k..k. 
-        .byte   $76,$BB,$00,$76,$BB,$20,$81,$BB ; B068 76 BB 00 76 BB 20 81 BB  v..v. ..
-        .byte   $00,$81,$BB,$20,$8C,$BB,$00,$8C ; B070 00 81 BB 20 8C BB 00 8C  ... ....
-        .byte   $BB,$20,$97,$BB,$00,$97,$BB,$20 ; B078 BB 20 97 BB 00 97 BB 20  . ..... 
-        .byte   $A2,$BB,$00,$A2,$BB,$00,$B1,$BB ; B080 A2 BB 00 A2 BB 00 B1 BB  ........
-        .byte   $00,$18,$BC,$18,$3B,$BC,$14,$5E ; B088 00 18 BC 18 3B BC 14 5E  ....;..^
-        .byte   $BC,$12,$79,$BC,$10,$8C,$BC,$06 ; B090 BC 12 79 BC 10 8C BC 06  ..y.....
-        .byte   $97,$BC,$06,$9E,$BC,$08,$AD,$BC ; B098 97 BC 06 9E BC 08 AD BC  ........
-        .byte   $08,$C0,$BC,$08,$D3,$BC,$08,$E6 ; B0A0 08 C0 BC 08 D3 BC 08 E6  ........
-        .byte   $BC,$06,$AD,$BC,$06,$F9,$BC,$06 ; B0A8 BC 06 AD BC 06 F9 BC 06  ........
-        .byte   $AD,$BC,$08,$9E,$BC,$08,$97,$BC ; B0B0 AD BC 08 9E BC 08 97 BC  ........
-        .byte   $00,$97,$BC,$00,$14,$BD,$06,$06 ; B0B8 00 97 BC 00 14 BD 06 06  ........
-        .byte   $F4,$F0,$00,$01,$FC,$F0,$01,$01 ; B0C0 F4 F0 00 01 FC F0 01 01  ........
-        .byte   $F4,$F8,$10,$01,$FC,$F8,$11,$01 ; B0C8 F4 F8 10 01 FC F8 11 01  ........
-        .byte   $04,$F8,$12,$01,$F4,$00,$50,$00 ; B0D0 04 F8 12 01 F4 00 50 00  ......P.
-        .byte   $FC,$00,$51,$00,$04,$00,$52,$00 ; B0D8 FC 00 51 00 04 00 52 00  ..Q...R.
-        .byte   $80,$06,$06,$F4,$F0,$00,$01,$FC ; B0E0 80 06 06 F4 F0 00 01 FC  ........
-        .byte   $F0,$01,$01,$F4,$F8,$10,$01,$FC ; B0E8 F0 01 01 F4 F8 10 01 FC  ........
-        .byte   $F8,$11,$01,$04,$F8,$12,$01,$F4 ; B0F0 F8 11 01 04 F8 12 01 F4  ........
-        .byte   $00,$50,$00,$FC,$00,$21,$00,$04 ; B0F8 00 50 00 FC 00 21 00 04  .P...!..
-        .byte   $00,$22,$00,$80,$06,$06,$F4,$F1 ; B100 00 22 00 80 06 06 F4 F1  ."......
-        .byte   $00,$01,$FC,$F1,$01,$01,$F4,$F9 ; B108 00 01 FC F1 01 01 F4 F9  ........
-        .byte   $10,$01,$FC,$F9,$11,$01,$04,$F9 ; B110 10 01 FC F9 11 01 04 F9  ........
-        .byte   $12,$01,$F4,$01,$30,$00,$FC,$01 ; B118 12 01 F4 01 30 00 FC 01  ....0...
-        .byte   $31,$00,$04,$01,$32,$00,$80,$06 ; B120 31 00 04 01 32 00 80 06  1...2...
-        .byte   $06,$F4,$F1,$00,$01,$FC,$F1,$01 ; B128 06 F4 F1 00 01 FC F1 01  ........
-        .byte   $01,$F4,$F9,$10,$01,$FC,$F9,$11 ; B130 01 F4 F9 10 01 FC F9 11  ........
-        .byte   $01,$04,$F9,$12,$01,$F4,$01,$40 ; B138 01 04 F9 12 01 F4 01 40  .......@
-        .byte   $00,$FC,$01,$41,$00,$04,$01,$52 ; B140 00 FC 01 41 00 04 01 52  ...A...R
-        .byte   $00,$80,$06,$06,$F4,$F0,$00,$01 ; B148 00 80 06 06 F4 F0 00 01  ........
-        .byte   $FC,$F0,$01,$01,$F4,$F8,$10,$01 ; B150 FC F0 01 01 F4 F8 10 01  ........
-        .byte   $FC,$F8,$11,$01,$04,$F8,$12,$01 ; B158 FC F8 11 01 04 F8 12 01  ........
-        .byte   $F4,$00,$20,$00,$FC,$00,$51,$00 ; B160 F4 00 20 00 FC 00 51 00  .. ...Q.
-        .byte   $04,$00,$52,$00,$80,$06,$06,$F4 ; B168 04 00 52 00 80 06 06 F4  ..R.....
-        .byte   $EF,$00,$01,$FC,$EF,$01,$01,$F4 ; B170 EF 00 01 FC EF 01 01 F4  ........
-        .byte   $F7,$10,$01,$FC,$F7,$11,$01,$04 ; B178 F7 10 01 FC F7 11 01 04  ........
-        .byte   $F7,$12,$01,$F4,$FF,$30,$00,$FC ; B180 F7 12 01 F4 FF 30 00 FC  .....0..
-        .byte   $FF,$02,$00,$04,$FF,$42,$00,$80 ; B188 FF 02 00 04 FF 42 00 80  .....B..
-        .byte   $03,$06,$FC,$F4,$34,$01,$F4,$FC ; B190 03 06 FC F4 34 01 F4 FC  ....4...
-        .byte   $43,$01,$FC,$FC,$44,$01,$F4,$04 ; B198 43 01 FC FC 44 01 F4 04  C...D...
-        .byte   $53,$01,$FC,$04,$54,$00,$04,$04 ; B1A0 53 01 FC 04 54 00 04 04  S...T...
-        .byte   $55,$01,$80,$03,$06,$FC,$F5,$04 ; B1A8 55 01 80 03 06 FC F5 04  U.......
-        .byte   $01,$F4,$FD,$13,$01,$FC,$FD,$14 ; B1B0 01 F4 FD 13 01 FC FD 14  ........
-        .byte   $01,$F4,$05,$23,$01,$FC,$05,$24 ; B1B8 01 F4 05 23 01 FC 05 24  ...#...$
-        .byte   $00,$04,$05,$25,$01,$80,$03,$06 ; B1C0 00 04 05 25 01 80 03 06  ...%....
-        .byte   $FC,$F4,$35,$01,$F4,$FC,$46,$01 ; B1C8 FC F4 35 01 F4 FC 46 01  ..5...F.
-        .byte   $FC,$FC,$45,$01,$F4,$04,$03,$01 ; B1D0 FC FC 45 01 F4 04 03 01  ..E.....
-        .byte   $FC,$04,$15,$00,$04,$04,$05,$01 ; B1D8 FC 04 15 00 04 04 05 01  ........
-        .byte   $80,$03,$06,$FC,$F4,$34,$01,$F4 ; B1E0 80 03 06 FC F4 34 01 F4  .....4..
-        .byte   $FC,$43,$01,$FC,$FC,$44,$01,$FC ; B1E8 FC 43 01 FC FC 44 01 FC  .C...D..
-        .byte   $04,$36,$00,$80,$03,$06,$F4,$F4 ; B1F0 04 36 00 80 03 06 F4 F4  .6......
-        .byte   $37,$01,$FC,$F4,$38,$01,$F4,$FC ; B1F8 37 01 FC F4 38 01 F4 FC  7...8...
-        .byte   $47,$01,$FC,$FC,$48,$01,$F4,$04 ; B200 47 01 FC FC 48 01 F4 04  G...H...
-        .byte   $57,$01,$FC,$04,$58,$00,$04,$04 ; B208 57 01 FC 04 58 00 04 04  W...X...
-        .byte   $3D,$01,$80,$03,$06,$F4,$F6,$39 ; B210 3D 01 80 03 06 F4 F6 39  =......9
-        .byte   $01,$FC,$F6,$3A,$01,$F4,$FE,$49 ; B218 01 FC F6 3A 01 F4 FE 49  ...:...I
-        .byte   $01,$FC,$FE,$4A,$01,$F4,$06,$59 ; B220 01 FC FE 4A 01 F4 06 59  ...J...Y
-        .byte   $01,$FC,$06,$5A,$00,$04,$06,$4D ; B228 01 FC 06 5A 00 04 06 4D  ...Z...M
-        .byte   $01,$80,$03,$06,$F4,$F5,$3B,$01 ; B230 01 80 03 06 F4 F5 3B 01  ......;.
-        .byte   $FC,$F5,$3C,$01,$F4,$FD,$4B,$01 ; B238 FC F5 3C 01 F4 FD 4B 01  ..<...K.
-        .byte   $FC,$FD,$4C,$01,$F4,$05,$5B,$01 ; B240 FC FD 4C 01 F4 05 5B 01  ..L...[.
-        .byte   $FC,$05,$5C,$00,$04,$05,$5D,$01 ; B248 FC 05 5C 00 04 05 5D 01  ..\...].
-        .byte   $80,$03,$06,$F4,$F4,$3B,$01,$FC ; B250 80 03 06 F4 F4 3B 01 FC  .....;..
-        .byte   $F4,$3C,$01,$F4,$FC,$4B,$01,$FC ; B258 F4 3C 01 F4 FC 4B 01 FC  .<...K..
-        .byte   $FC,$4C,$01,$FC,$04,$56,$00,$80 ; B260 FC 4C 01 FC 04 56 00 80  .L...V..
-        .byte   $06,$06,$F4,$F8,$60,$01,$FC,$F8 ; B268 06 06 F4 F8 60 01 FC F8  ....`...
-        .byte   $61,$01,$04,$F8,$62,$01,$F4,$00 ; B270 61 01 04 F8 62 01 F4 00  a...b...
-        .byte   $70,$03,$FC,$00,$71,$03,$04,$00 ; B278 70 03 FC 00 71 03 04 00  p...q...
-        .byte   $72,$03,$80,$06,$06,$FC,$F4,$0B ; B280 72 03 80 06 06 FC F4 0B  r.......
-        .byte   $02,$F4,$FC,$1A,$02,$FC,$FC,$1B ; B288 02 F4 FC 1A 02 FC FC 1B  ........
-        .byte   $02,$04,$FC,$1C,$02,$F4,$04,$2A ; B290 02 04 FC 1C 02 F4 04 2A  .......*
-        .byte   $02,$FC,$04,$2B,$02,$04,$04,$2C ; B298 02 FC 04 2B 02 04 04 2C  ...+...,
-        .byte   $02,$80,$06,$06,$F4,$F4,$0D,$00 ; B2A0 02 80 06 06 F4 F4 0D 00  ........
-        .byte   $FC,$F4,$0B,$02,$04,$F4,$0E,$00 ; B2A8 FC F4 0B 02 04 F4 0E 00  ........
-        .byte   $F4,$FC,$1A,$02,$FC,$FC,$1B,$02 ; B2B0 F4 FC 1A 02 FC FC 1B 02  ........
-        .byte   $04,$FC,$1C,$02,$F4,$04,$2A,$02 ; B2B8 04 FC 1C 02 F4 04 2A 02  ......*.
-        .byte   $FC,$04,$2B,$02,$04,$04,$2C,$02 ; B2C0 FC 04 2B 02 04 04 2C 02  ..+...,.
-        .byte   $80,$06,$06,$F4,$F4,$1D,$00,$FC ; B2C8 80 06 06 F4 F4 1D 00 FC  ........
-        .byte   $F4,$0B,$02,$04,$F4,$1E,$00,$F4 ; B2D0 F4 0B 02 04 F4 1E 00 F4  ........
-        .byte   $FC,$1A,$02,$FC,$FC,$1B,$02,$04 ; B2D8 FC 1A 02 FC FC 1B 02 04  ........
-        .byte   $FC,$1C,$02,$F4,$04,$2A,$02,$FC ; B2E0 FC 1C 02 F4 04 2A 02 FC  .....*..
-        .byte   $04,$2B,$02,$04,$04,$2C,$02,$80 ; B2E8 04 2B 02 04 04 2C 02 80  .+...,..
-        .byte   $06,$06,$F4,$F4,$0A,$00,$FC,$F4 ; B2F0 06 06 F4 F4 0A 00 FC F4  ........
-        .byte   $0B,$02,$04,$F4,$0C,$00,$F4,$FC ; B2F8 0B 02 04 F4 0C 00 F4 FC  ........
-        .byte   $1A,$02,$FC,$FC,$1B,$02,$04,$FC ; B300 1A 02 FC FC 1B 02 04 FC  ........
-        .byte   $1C,$02,$F4,$04,$2A,$02,$FC,$04 ; B308 1C 02 F4 04 2A 02 FC 04  ....*...
-        .byte   $2B,$02,$04,$04,$2C,$02,$80,$06 ; B310 2B 02 04 04 2C 02 80 06  +...,...
-        .byte   $06,$F4,$F8,$06,$02,$FC,$F8,$07 ; B318 06 F4 F8 06 02 FC F8 07  ........
-        .byte   $02,$04,$F8,$08,$02,$F4,$00,$16 ; B320 02 04 F8 08 02 F4 00 16  ........
-        .byte   $02,$FC,$00,$17,$02,$04,$00,$18 ; B328 02 FC 00 17 02 04 00 18  ........
-        .byte   $02,$80,$06,$06,$F4,$F8,$06,$02 ; B330 02 80 06 06 F4 F8 06 02  ........
-        .byte   $FC,$F8,$07,$02,$04,$F8,$08,$02 ; B338 FC F8 07 02 04 F8 08 02  ........
-        .byte   $F4,$00,$16,$02,$FC,$00,$17,$02 ; B340 F4 00 16 02 FC 00 17 02  ........
-        .byte   $04,$00,$09,$02,$80,$04,$04,$F8 ; B348 04 00 09 02 80 04 04 F8  ........
-        .byte   $F8,$80,$02,$00,$F8,$81,$02,$F8 ; B350 F8 80 02 00 F8 81 02 F8  ........
-        .byte   $00,$90,$02,$00,$00,$91,$02,$80 ; B358 00 90 02 00 00 91 02 80  ........
-        .byte   $04,$04,$F8,$F8,$82,$02,$00,$F8 ; B360 04 04 F8 F8 82 02 00 F8  ........
-        .byte   $83,$02,$F8,$00,$92,$02,$00,$00 ; B368 83 02 F8 00 92 02 00 00  ........
-        .byte   $93,$02,$80,$04,$04,$F8,$F8,$84 ; B370 93 02 80 04 04 F8 F8 84  ........
-        .byte   $02,$00,$F8,$85,$02,$F8,$00,$94 ; B378 02 00 F8 85 02 F8 00 94  ........
-        .byte   $02,$00,$00,$95,$02,$80,$04,$04 ; B380 02 00 00 95 02 80 04 04  ........
-        .byte   $F8,$F8,$86,$02,$00,$F8,$87,$02 ; B388 F8 F8 86 02 00 F8 87 02  ........
-        .byte   $F8,$00,$96,$02,$00,$00,$97,$02 ; B390 F8 00 96 02 00 00 97 02  ........
-        .byte   $80,$04,$04,$F8,$F9,$A8,$02,$00 ; B398 80 04 04 F8 F9 A8 02 00  ........
-        .byte   $F9,$A9,$02,$F8,$01,$B8,$02,$00 ; B3A0 F9 A9 02 F8 01 B8 02 00  ........
-        .byte   $01,$B9,$02,$80,$04,$04,$F8,$FA ; B3A8 01 B9 02 80 04 04 F8 FA  ........
-        .byte   $AA,$02,$00,$FA,$AB,$02,$F8,$02 ; B3B0 AA 02 00 FA AB 02 F8 02  ........
-        .byte   $BA,$02,$00,$02,$BB,$02,$80,$04 ; B3B8 BA 02 00 02 BB 02 80 04  ........
-        .byte   $04,$F8,$F9,$AC,$02,$00,$F9,$AD ; B3C0 04 F8 F9 AC 02 00 F9 AD  ........
-        .byte   $02,$F8,$01,$BC,$02,$00,$01,$BD ; B3C8 02 F8 01 BC 02 00 01 BD  ........
-        .byte   $02,$80,$04,$04,$F8,$F8,$AE,$02 ; B3D0 02 80 04 04 F8 F8 AE 02  ........
-        .byte   $00,$F8,$AF,$02,$F8,$00,$BE,$02 ; B3D8 00 F8 AF 02 F8 00 BE 02  ........
-        .byte   $00,$00,$BF,$02,$80,$04,$04,$F8 ; B3E0 00 00 BF 02 80 04 04 F8  ........
-        .byte   $F9,$88,$02,$00,$F9,$89,$02,$F8 ; B3E8 F9 88 02 00 F9 89 02 F8  ........
-        .byte   $01,$98,$02,$00,$01,$99,$02,$80 ; B3F0 01 98 02 00 01 99 02 80  ........
-        .byte   $04,$04,$F8,$FA,$8A,$02,$00,$FA ; B3F8 04 04 F8 FA 8A 02 00 FA  ........
-        .byte   $8B,$02,$F8,$02,$9A,$02,$00,$02 ; B400 8B 02 F8 02 9A 02 00 02  ........
-        .byte   $9B,$02,$80,$04,$04,$F8,$F9,$8C ; B408 9B 02 80 04 04 F8 F9 8C  ........
-        .byte   $02,$00,$F9,$8D,$02,$F8,$01,$9C ; B410 02 00 F9 8D 02 F8 01 9C  ........
-        .byte   $02,$00,$01,$9D,$02,$80,$04,$04 ; B418 02 00 01 9D 02 80 04 04  ........
-        .byte   $F8,$F8,$8E,$02,$00,$F8,$8F,$02 ; B420 F8 F8 8E 02 00 F8 8F 02  ........
-        .byte   $F8,$00,$9E,$02,$00,$00,$9F,$02 ; B428 F8 00 9E 02 00 00 9F 02  ........
-        .byte   $80,$04,$04,$F8,$F8,$A0,$02,$00 ; B430 80 04 04 F8 F8 A0 02 00  ........
-        .byte   $F8,$A1,$02,$F8,$00,$B0,$02,$00 ; B438 F8 A1 02 F8 00 B0 02 00  ........
-        .byte   $00,$B1,$02,$80,$04,$04,$F8,$F8 ; B440 00 B1 02 80 04 04 F8 F8  ........
-        .byte   $A2,$02,$00,$F8,$A3,$02,$F8,$00 ; B448 A2 02 00 F8 A3 02 F8 00  ........
-        .byte   $B2,$02,$00,$00,$B3,$02,$80,$04 ; B450 B2 02 00 00 B3 02 80 04  ........
-        .byte   $04,$F8,$F8,$A4,$02,$00,$F8,$A5 ; B458 04 F8 F8 A4 02 00 F8 A5  ........
-        .byte   $02,$F8,$00,$B4,$02,$00,$00,$B5 ; B460 02 F8 00 B4 02 00 00 B5  ........
-        .byte   $02,$80,$04,$04,$F8,$F8,$A6,$02 ; B468 02 80 04 04 F8 F8 A6 02  ........
-        .byte   $00,$F8,$A7,$02,$F8,$00,$B6,$02 ; B470 00 F8 A7 02 F8 00 B6 02  ........
-        .byte   $00,$00,$B7,$02,$80,$04,$04,$F8 ; B478 00 00 B7 02 80 04 04 F8  ........
-        .byte   $F8,$C0,$02,$00,$F8,$C1,$02,$F8 ; B480 F8 C0 02 00 F8 C1 02 F8  ........
-        .byte   $00,$D0,$02,$00,$00,$D1,$02,$80 ; B488 00 D0 02 00 00 D1 02 80  ........
-        .byte   $04,$04,$F8,$F8,$C2,$02,$00,$F8 ; B490 04 04 F8 F8 C2 02 00 F8  ........
-        .byte   $C3,$02,$F8,$00,$D2,$02,$00,$00 ; B498 C3 02 F8 00 D2 02 00 00  ........
-        .byte   $D3,$02,$80,$04,$04,$F8,$F8,$C4 ; B4A0 D3 02 80 04 04 F8 F8 C4  ........
-        .byte   $02,$00,$F8,$C5,$02,$F8,$00,$D4 ; B4A8 02 00 F8 C5 02 F8 00 D4  ........
-        .byte   $02,$00,$00,$D5,$02,$80,$04,$04 ; B4B0 02 00 00 D5 02 80 04 04  ........
-        .byte   $F8,$F8,$C6,$02,$00,$F8,$C7,$02 ; B4B8 F8 F8 C6 02 00 F8 C7 02  ........
-        .byte   $F8,$00,$D6,$02,$00,$00,$D7,$02 ; B4C0 F8 00 D6 02 00 00 D7 02  ........
-        .byte   $80,$04,$04,$F8,$FA,$84,$02,$00 ; B4C8 80 04 04 F8 FA 84 02 00  ........
-        .byte   $FA,$85,$02,$F8,$02,$C8,$02,$00 ; B4D0 FA 85 02 F8 02 C8 02 00  ........
-        .byte   $02,$C9,$02,$80,$04,$04,$F8,$FC ; B4D8 02 C9 02 80 04 04 F8 FC  ........
-        .byte   $84,$02,$00,$FC,$85,$02,$F8,$04 ; B4E0 84 02 00 FC 85 02 F8 04  ........
-        .byte   $D8,$02,$00,$04,$D9,$02,$80,$04 ; B4E8 D8 02 00 04 D9 02 80 04  ........
-        .byte   $04,$F8,$FA,$84,$02,$00,$FA,$85 ; B4F0 04 F8 FA 84 02 00 FA 85  ........
-        .byte   $02,$F8,$02,$CA,$02,$00,$02,$CB ; B4F8 02 F8 02 CA 02 00 02 CB  ........
-        .byte   $02,$80,$04,$04,$F8,$00,$DA,$02 ; B500 02 80 04 04 F8 00 DA 02  ........
-        .byte   $00,$00,$DB,$02,$80,$02,$02,$FC ; B508 00 00 DB 02 80 02 02 FC  ........
-        .byte   $00,$DE,$02,$80,$02,$02,$FC,$00 ; B510 00 DE 02 80 02 02 FC 00  ........
-        .byte   $CE,$02,$80,$02,$04,$FC,$F8,$CD ; B518 CE 02 80 02 04 FC F8 CD  ........
-        .byte   $02,$FC,$00,$DD,$02,$80,$02,$04 ; B520 02 FC 00 DD 02 80 02 04  ........
-        .byte   $FC,$F8,$CC,$02,$FC,$00,$DC,$02 ; B528 FC F8 CC 02 FC 00 DC 02  ........
-        .byte   $80,$03,$03,$FA,$00,$CF,$02,$80 ; B530 80 03 03 FA 00 CF 02 80  ........
-        .byte   $03,$03,$FA,$00,$E1,$02,$80,$04 ; B538 03 03 FA 00 E1 02 80 04  ........
-        .byte   $04,$F8,$F8,$E0,$02,$F8,$00,$F0 ; B540 04 F8 F8 E0 02 F8 00 F0  ........
-        .byte   $02,$00,$00,$F1,$02,$80,$03,$03 ; B548 02 00 00 F1 02 80 03 03  ........
-        .byte   $FA,$00,$DF,$02,$80,$03,$03,$FA ; B550 FA 00 DF 02 80 03 03 FA  ........
-        .byte   $00,$E3,$02,$80,$04,$04,$F8,$F8 ; B558 00 E3 02 80 04 04 F8 F8  ........
-        .byte   $E2,$02,$F8,$00,$F2,$02,$00,$00 ; B560 E2 02 F8 00 F2 02 00 00  ........
-        .byte   $F3,$02,$80,$0C,$0C,$F0,$F0,$04 ; B568 F3 02 80 0C 0C F0 F0 04  ........
-        .byte   $03,$F8,$F0,$05,$03,$00,$F0,$06 ; B570 03 F8 F0 05 03 00 F0 06  ........
-        .byte   $03,$F0,$F8,$14,$01,$F8,$F8,$15 ; B578 03 F0 F8 14 01 F8 F8 15  ........
-        .byte   $01,$00,$F8,$16,$01,$08,$F8,$17 ; B580 01 00 F8 16 01 08 F8 17  ........
-        .byte   $03,$F0,$00,$24,$00,$F8,$00,$25 ; B588 03 F0 00 24 00 F8 00 25  ...$...%
-        .byte   $00,$00,$00,$26,$00,$08,$00,$27 ; B590 00 00 00 26 00 08 00 27  ...&...'
-        .byte   $00,$80,$05,$04,$F8,$F8,$08,$01 ; B598 00 80 05 04 F8 F8 08 01  ........
-        .byte   $00,$F8,$09,$01,$F8,$00,$18,$03 ; B5A0 00 F8 09 01 F8 00 18 03  ........
-        .byte   $00,$00,$19,$03,$80,$0C,$04,$F0 ; B5A8 00 00 19 03 80 0C 04 F0  ........
-        .byte   $F8,$00,$02,$F8,$F8,$01,$01,$00 ; B5B0 F8 00 02 F8 F8 01 01 00  ........
-        .byte   $F8,$02,$01,$08,$F8,$03,$01,$F0 ; B5B8 F8 02 01 08 F8 03 01 F0  ........
-        .byte   $00,$10,$02,$F8,$00,$11,$02,$00 ; B5C0 00 10 02 F8 00 11 02 00  ........
-        .byte   $00,$12,$02,$08,$00,$13,$02,$80 ; B5C8 00 12 02 08 00 13 02 80  ........
-        .byte   $0C,$04,$F0,$F8,$00,$02,$F8,$F8 ; B5D0 0C 04 F0 F8 00 02 F8 F8  ........
-        .byte   $01,$01,$00,$F8,$02,$01,$08,$F8 ; B5D8 01 01 00 F8 02 01 08 F8  ........
-        .byte   $03,$01,$F0,$00,$10,$02,$F8,$00 ; B5E0 03 01 F0 00 10 02 F8 00  ........
-        .byte   $11,$02,$00,$00,$12,$02,$08,$00 ; B5E8 11 02 00 00 12 02 08 00  ........
-        .byte   $07,$02,$80,$03,$02,$F8,$F8,$0A ; B5F0 07 02 80 03 02 F8 F8 0A  ........
-        .byte   $01,$00,$F8,$0B,$01,$F8,$00,$1A ; B5F8 01 00 F8 0B 01 F8 00 1A  ........
-        .byte   $03,$00,$00,$1B,$03,$80,$03,$02 ; B600 03 00 00 1B 03 80 03 02  ........
-        .byte   $F8,$F8,$0C,$01,$00,$F8,$0D,$01 ; B608 F8 F8 0C 01 00 F8 0D 01  ........
-        .byte   $F8,$00,$1C,$03,$00,$00,$1D,$03 ; B610 F8 00 1C 03 00 00 1D 03  ........
-        .byte   $80,$00,$00,$08,$F8,$B0,$01,$00 ; B618 80 00 00 08 F8 B0 01 00  ........
-        .byte   $F8,$B1,$01,$F8,$00,$C0,$03,$00 ; B620 F8 B1 01 F8 00 C0 03 00  ........
-        .byte   $00,$C1,$03,$80,$00,$00,$F8,$F0 ; B628 00 C1 03 80 00 00 F8 F0  ........
-        .byte   $D0,$03,$00,$F0,$D1,$03,$F8,$F8 ; B630 D0 03 00 F0 D1 03 F8 F8  ........
-        .byte   $E0,$03,$00,$F8,$E1,$03,$F8,$00 ; B638 E0 03 00 F8 E1 03 F8 00  ........
-        .byte   $F0,$03,$00,$00,$F1,$03,$80,$00 ; B640 F0 03 00 00 F1 03 80 00  ........
-        .byte   $00,$F8,$F0,$D2,$03,$00,$F0,$D3 ; B648 00 F8 F0 D2 03 00 F0 D3  ........
-        .byte   $03,$F8,$F8,$E2,$03,$00,$F8,$E3 ; B650 03 F8 F8 E2 03 00 F8 E3  ........
-        .byte   $03,$F8,$00,$F2,$03,$00,$00,$F3 ; B658 03 F8 00 F2 03 00 00 F3  ........
-        .byte   $03,$80,$00,$00,$F8,$F0,$D4,$03 ; B660 03 80 00 00 F8 F0 D4 03  ........
-        .byte   $00,$F0,$D5,$03,$F8,$F8,$E4,$03 ; B668 00 F0 D5 03 F8 F8 E4 03  ........
-        .byte   $00,$F8,$E5,$03,$F8,$00,$F4,$03 ; B670 00 F8 E5 03 F8 00 F4 03  ........
-        .byte   $00,$00,$F5,$03,$80,$00,$00,$F8 ; B678 00 00 F5 03 80 00 00 F8  ........
-        .byte   $F0,$D6,$03,$00,$F0,$D7,$03,$F8 ; B680 F0 D6 03 00 F0 D7 03 F8  ........
-        .byte   $F8,$E6,$03,$00,$F8,$E7,$03,$F8 ; B688 F8 E6 03 00 F8 E7 03 F8  ........
-        .byte   $00,$F6,$03,$00,$00,$F7,$03,$80 ; B690 00 F6 03 00 00 F7 03 80  ........
-        .byte   $00,$00,$F8,$F0,$D8,$03,$00,$F0 ; B698 00 00 F8 F0 D8 03 00 F0  ........
-        .byte   $D9,$03,$F8,$F8,$E8,$03,$00,$F8 ; B6A0 D9 03 F8 F8 E8 03 00 F8  ........
-        .byte   $E9,$03,$F8,$00,$F8,$03,$00,$00 ; B6A8 E9 03 F8 00 F8 03 00 00  ........
-        .byte   $F9,$03,$80,$00,$00,$F8,$F0,$DA ; B6B0 F9 03 80 00 00 F8 F0 DA  ........
-        .byte   $03,$00,$F0,$DB,$03,$F8,$F8,$EA ; B6B8 03 00 F0 DB 03 F8 F8 EA  ........
-        .byte   $03,$00,$F8,$EB,$03,$F8,$00,$FA ; B6C0 03 00 F8 EB 03 F8 00 FA  ........
-        .byte   $03,$00,$00,$FB,$03,$80,$03,$03 ; B6C8 03 00 00 FB 03 80 03 03  ........
-        .byte   $FC,$FC,$23,$01,$80,$04,$03,$FC ; B6D0 FC FC 23 01 80 04 03 FC  ..#.....
-        .byte   $FC,$21,$00,$80,$04,$03,$FC,$FC ; B6D8 FC 21 00 80 04 03 FC FC  .!......
-        .byte   $20,$00,$80,$05,$05,$FC,$FC,$22 ; B6E0 20 00 80 05 05 FC FC 22   ......"
-        .byte   $01,$80,$0D,$06,$E8,$F0,$36,$02 ; B6E8 01 80 0D 06 E8 F0 36 02  ......6.
-        .byte   $F0,$F0,$37,$02,$F8,$F0,$32,$02 ; B6F0 F0 F0 37 02 F8 F0 32 02  ..7...2.
-        .byte   $00,$F0,$33,$02,$E8,$F8,$46,$02 ; B6F8 00 F0 33 02 E8 F8 46 02  ..3...F.
-        .byte   $F0,$F8,$47,$02,$F8,$F8,$42,$02 ; B700 F0 F8 47 02 F8 F8 42 02  ..G...B.
-        .byte   $00,$F8,$43,$02,$08,$F8,$44,$02 ; B708 00 F8 43 02 08 F8 44 02  ..C...D.
-        .byte   $10,$F8,$45,$02,$E8,$00,$56,$02 ; B710 10 F8 45 02 E8 00 56 02  ..E...V.
-        .byte   $F0,$00,$57,$02,$F8,$00,$52,$02 ; B718 F0 00 57 02 F8 00 52 02  ..W...R.
-        .byte   $00,$00,$53,$02,$08,$00,$54,$02 ; B720 00 00 53 02 08 00 54 02  ..S...T.
-        .byte   $10,$00,$55,$02,$80,$0D,$06,$E8 ; B728 10 00 55 02 80 0D 06 E8  ..U.....
-        .byte   $F0,$60,$02,$F0,$F0,$61,$02,$F8 ; B730 F0 60 02 F0 F0 61 02 F8  .`...a..
-        .byte   $F0,$32,$02,$00,$F0,$33,$02,$E8 ; B738 F0 32 02 00 F0 33 02 E8  .2...3..
-        .byte   $F8,$70,$02,$F0,$F8,$71,$02,$F8 ; B740 F8 70 02 F0 F8 71 02 F8  .p...q..
-        .byte   $F8,$42,$02,$00,$F8,$43,$02,$08 ; B748 F8 42 02 00 F8 43 02 08  .B...C..
-        .byte   $F8,$44,$02,$10,$F8,$45,$02,$E8 ; B750 F8 44 02 10 F8 45 02 E8  .D...E..
-        .byte   $00,$80,$02,$F0,$00,$81,$02,$F8 ; B758 00 80 02 F0 00 81 02 F8  ........
-        .byte   $00,$52,$02,$00,$00,$53,$02,$08 ; B760 00 52 02 00 00 53 02 08  .R...S..
-        .byte   $00,$54,$02,$10,$00,$55,$02,$80 ; B768 00 54 02 10 00 55 02 80  .T...U..
-        .byte   $0D,$06,$E8,$F0,$36,$02,$F0,$F0 ; B770 0D 06 E8 F0 36 02 F0 F0  ....6...
-        .byte   $37,$02,$F8,$F0,$38,$02,$00,$F0 ; B778 37 02 F8 F0 38 02 00 F0  7...8...
-        .byte   $39,$02,$E8,$F8,$46,$02,$F0,$F8 ; B780 39 02 E8 F8 46 02 F0 F8  9...F...
-        .byte   $47,$02,$F8,$F8,$48,$02,$00,$F8 ; B788 47 02 F8 F8 48 02 00 F8  G...H...
-        .byte   $49,$02,$08,$F8,$4A,$02,$10,$F8 ; B790 49 02 08 F8 4A 02 10 F8  I...J...
-        .byte   $4B,$02,$E8,$00,$56,$02,$F0,$00 ; B798 4B 02 E8 00 56 02 F0 00  K...V...
-        .byte   $57,$02,$F8,$00,$58,$02,$00,$00 ; B7A0 57 02 F8 00 58 02 00 00  W...X...
-        .byte   $59,$02,$08,$00,$5A,$02,$10,$00 ; B7A8 59 02 08 00 5A 02 10 00  Y...Z...
-        .byte   $5B,$02,$80,$0D,$06,$E8,$F0,$30 ; B7B0 5B 02 80 0D 06 E8 F0 30  [......0
-        .byte   $02,$F0,$F0,$31,$02,$F8,$F0,$38 ; B7B8 02 F0 F0 31 02 F8 F0 38  ...1...8
-        .byte   $02,$00,$F0,$39,$02,$E8,$F8,$40 ; B7C0 02 00 F0 39 02 E8 F8 40  ...9...@
-        .byte   $02,$F0,$F8,$41,$02,$F8,$F8,$48 ; B7C8 02 F0 F8 41 02 F8 F8 48  ...A...H
-        .byte   $02,$00,$F8,$49,$02,$08,$F8,$4A ; B7D0 02 00 F8 49 02 08 F8 4A  ...I...J
-        .byte   $02,$10,$F8,$4B,$02,$E8,$00,$50 ; B7D8 02 10 F8 4B 02 E8 00 50  ...K...P
-        .byte   $02,$F0,$00,$51,$02,$F8,$00,$58 ; B7E0 02 F0 00 51 02 F8 00 58  ...Q...X
-        .byte   $02,$00,$00,$59,$02,$08,$00,$5A ; B7E8 02 00 00 59 02 08 00 5A  ...Y...Z
-        .byte   $02,$10,$00,$5B,$02,$80,$0D,$06 ; B7F0 02 10 00 5B 02 80 0D 06  ...[....
-        .byte   $E8,$F0,$60,$02,$F0,$F0,$61,$02 ; B7F8 E8 F0 60 02 F0 F0 61 02  ..`...a.
-        .byte   $F8,$F0,$62,$02,$00,$F0,$63,$02 ; B800 F8 F0 62 02 00 F0 63 02  ..b...c.
-        .byte   $E8,$F8,$70,$02,$F0,$F8,$71,$02 ; B808 E8 F8 70 02 F0 F8 71 02  ..p...q.
-        .byte   $F8,$F8,$72,$02,$00,$F8,$73,$02 ; B810 F8 F8 72 02 00 F8 73 02  ..r...s.
-        .byte   $08,$F8,$74,$02,$10,$F8,$75,$02 ; B818 08 F8 74 02 10 F8 75 02  ..t...u.
-        .byte   $E8,$00,$80,$02,$F0,$00,$81,$02 ; B820 E8 00 80 02 F0 00 81 02  ........
-        .byte   $F8,$00,$82,$02,$00,$00,$83,$02 ; B828 F8 00 82 02 00 00 83 02  ........
-        .byte   $08,$00,$84,$02,$10,$00,$85,$02 ; B830 08 00 84 02 10 00 85 02  ........
-        .byte   $80,$0D,$06,$E8,$F0,$30,$02,$F0 ; B838 80 0D 06 E8 F0 30 02 F0  .....0..
-        .byte   $F0,$31,$02,$F8,$F0,$62,$02,$00 ; B840 F0 31 02 F8 F0 62 02 00  .1...b..
-        .byte   $F0,$63,$02,$E8,$F8,$40,$02,$F0 ; B848 F0 63 02 E8 F8 40 02 F0  .c...@..
-        .byte   $F8,$41,$02,$F8,$F8,$72,$02,$00 ; B850 F8 41 02 F8 F8 72 02 00  .A...r..
-        .byte   $F8,$73,$02,$08,$F8,$74,$02,$10 ; B858 F8 73 02 08 F8 74 02 10  .s...t..
-        .byte   $F8,$75,$02,$E8,$00,$50,$02,$F0 ; B860 F8 75 02 E8 00 50 02 F0  .u...P..
-        .byte   $00,$51,$02,$F8,$00,$82,$02,$00 ; B868 00 51 02 F8 00 82 02 00  .Q......
-        .byte   $00,$83,$02,$08,$00,$84,$02,$10 ; B870 00 83 02 08 00 84 02 10  ........
-        .byte   $00,$85,$02,$80,$05,$05,$F8,$F8 ; B878 00 85 02 80 05 05 F8 F8  ........
-        .byte   $2A,$00,$00,$F8,$2B,$00,$F8,$00 ; B880 2A 00 00 F8 2B 00 F8 00  *...+...
-        .byte   $3A,$00,$00,$00,$3B,$00,$80,$05 ; B888 3A 00 00 00 3B 00 80 05  :...;...
-        .byte   $05,$F8,$F8,$2C,$00,$00,$F8,$2D ; B890 05 F8 F8 2C 00 00 F8 2D  ...,...-
-        .byte   $00,$F8,$00,$3C,$00,$00,$00,$3D ; B898 00 F8 00 3C 00 00 00 3D  ...<...=
-        .byte   $00,$80,$05,$05,$F8,$F8,$2E,$00 ; B8A0 00 80 05 05 F8 F8 2E 00  ........
-        .byte   $00,$F8,$2F,$00,$F8,$00,$3E,$00 ; B8A8 00 F8 2F 00 F8 00 3E 00  ../...>.
-        .byte   $00,$00,$3F,$00,$80,$00,$00,$FC ; B8B0 00 00 3F 00 80 00 00 FC  ..?.....
-        .byte   $FC,$A4,$00,$80,$00,$00,$FC,$FC ; B8B8 FC A4 00 80 00 00 FC FC  ........
-        .byte   $A5,$00,$80,$00,$00,$FC,$FC,$A6 ; B8C0 A5 00 80 00 00 FC FC A6  ........
-        .byte   $00,$80,$00,$00,$F8,$F8,$96,$00 ; B8C8 00 80 00 00 F8 F8 96 00  ........
-        .byte   $00,$F8,$96,$40,$F8,$00,$96,$80 ; B8D0 00 F8 96 40 F8 00 96 80  ...@....
-        .byte   $00,$00,$96,$C0,$80,$00,$00,$F8 ; B8D8 00 00 96 C0 80 00 00 F8  ........
-        .byte   $F8,$97,$00,$00,$F8,$97,$40,$F8 ; B8E0 F8 97 00 00 F8 97 40 F8  ......@.
-        .byte   $00,$97,$80,$00,$00,$97,$C0,$80 ; B8E8 00 97 80 00 00 97 C0 80  ........
-        .byte   $00,$00,$F8,$F8,$99,$00,$00,$F8 ; B8F0 00 00 F8 F8 99 00 00 F8  ........
-        .byte   $9A,$00,$F8,$00,$A9,$00,$00,$00 ; B8F8 9A 00 F8 00 A9 00 00 00  ........
-        .byte   $AA,$00,$80,$00,$00,$FC,$FC,$A7 ; B900 AA 00 80 00 00 FC FC A7  ........
-        .byte   $00,$80,$00,$00,$FC,$FC,$98,$00 ; B908 00 80 00 00 FC FC 98 00  ........
-        .byte   $80,$05,$02,$F0,$FC,$4D,$03,$F8 ; B910 80 05 02 F0 FC 4D 03 F8  .....M..
-        .byte   $FC,$4E,$03,$00,$FC,$4F,$03,$80 ; B918 FC 4E 03 00 FC 4F 03 80  .N...O..
-        .byte   $05,$02,$F0,$FC,$5D,$03,$F8,$FC ; B920 05 02 F0 FC 5D 03 F8 FC  ....]...
-        .byte   $5E,$03,$00,$FC,$5F,$03,$80,$05 ; B928 5E 03 00 FC 5F 03 80 05  ^..._...
-        .byte   $02,$F0,$FC,$6D,$03,$F8,$FC,$6E ; B930 02 F0 FC 6D 03 F8 FC 6E  ...m...n
-        .byte   $03,$00,$FC,$6F,$03,$80,$05,$02 ; B938 03 00 FC 6F 03 80 05 02  ...o....
-        .byte   $F0,$FC,$7D,$03,$F8,$FC,$7E,$03 ; B940 F0 FC 7D 03 F8 FC 7E 03  ..}...~.
-        .byte   $00,$FC,$7F,$03,$80,$05,$02,$F0 ; B948 00 FC 7F 03 80 05 02 F0  ........
-        .byte   $FC,$7C,$03,$F8,$FC,$7E,$03,$00 ; B950 FC 7C 03 F8 FC 7E 03 00  .|...~..
-        .byte   $FC,$7F,$03,$80,$05,$02,$F0,$FC ; B958 FC 7F 03 80 05 02 F0 FC  ........
-        .byte   $6C,$03,$F8,$FC,$6E,$03,$00,$FC ; B960 6C 03 F8 FC 6E 03 00 FC  l...n...
-        .byte   $6F,$03,$80,$05,$02,$F0,$FC,$5C ; B968 6F 03 80 05 02 F0 FC 5C  o......\
-        .byte   $03,$F8,$FC,$5E,$03,$00,$FC,$5F ; B970 03 F8 FC 5E 03 00 FC 5F  ...^..._
-        .byte   $03,$80,$05,$02,$F0,$FC,$4C,$03 ; B978 03 80 05 02 F0 FC 4C 03  ......L.
-        .byte   $F8,$FC,$4E,$03,$00,$FC,$4F,$03 ; B980 F8 FC 4E 03 00 FC 4F 03  ..N...O.
-        .byte   $80,$05,$02,$F4,$FC,$5D,$01,$FC ; B988 80 05 02 F4 FC 5D 01 FC  .....]..
-        .byte   $FC,$5E,$01,$04,$FC,$5F,$01,$80 ; B990 FC 5E 01 04 FC 5F 01 80  .^..._..
-        .byte   $08,$04,$F0,$F4,$65,$02,$FE,$F4 ; B998 08 04 F0 F4 65 02 FE F4  ....e...
-        .byte   $76,$02,$F0,$FC,$78,$02,$F8,$FC ; B9A0 76 02 F0 FC 78 02 F8 FC  v...x...
-        .byte   $79,$02,$00,$FC,$6A,$02,$08,$FC ; B9A8 79 02 00 FC 6A 02 08 FC  y...j...
-        .byte   $6B,$02,$FD,$04,$77,$02,$80,$08 ; B9B0 6B 02 FD 04 77 02 80 08  k...w...
-        .byte   $04,$F0,$F4,$64,$02,$FF,$F4,$66 ; B9B8 04 F0 F4 64 02 FF F4 66  ...d...f
-        .byte   $02,$F0,$FC,$68,$02,$F8,$FC,$69 ; B9C0 02 F0 FC 68 02 F8 FC 69  ...h...i
-        .byte   $02,$00,$FC,$6A,$02,$08,$FC,$6B ; B9C8 02 00 FC 6A 02 08 FC 6B  ...j...k
-        .byte   $02,$FD,$04,$67,$02,$80,$08,$04 ; B9D0 02 FD 04 67 02 80 08 04  ...g....
-        .byte   $F0,$F4,$64,$02,$FE,$F4,$76,$02 ; B9D8 F0 F4 64 02 FE F4 76 02  ..d...v.
-        .byte   $F0,$FC,$68,$02,$F8,$FC,$69,$02 ; B9E0 F0 FC 68 02 F8 FC 69 02  ..h...i.
-        .byte   $00,$FC,$7A,$02,$08,$FC,$7B,$02 ; B9E8 00 FC 7A 02 08 FC 7B 02  ..z...{.
-        .byte   $FD,$04,$77,$02,$80,$08,$04,$F0 ; B9F0 FD 04 77 02 80 08 04 F0  ..w.....
-        .byte   $F4,$65,$02,$FF,$F4,$86,$02,$F0 ; B9F8 F4 65 02 FF F4 86 02 F0  .e......
-        .byte   $FC,$78,$02,$F8,$FC,$79,$02,$00 ; BA00 FC 78 02 F8 FC 79 02 00  .x...y..
-        .byte   $FC,$8A,$02,$08,$FC,$8B,$02,$FD ; BA08 FC 8A 02 08 FC 8B 02 FD  ........
-        .byte   $04,$87,$02,$80,$08,$04,$F0,$F4 ; BA10 04 87 02 80 08 04 F0 F4  ........
-        .byte   $64,$02,$FF,$F4,$86,$02,$F0,$FC ; BA18 64 02 FF F4 86 02 F0 FC  d.......
-        .byte   $88,$02,$F8,$FC,$89,$02,$00,$FC ; BA20 88 02 F8 FC 89 02 00 FC  ........
-        .byte   $8A,$02,$08,$FC,$8B,$02,$FD,$04 ; BA28 8A 02 08 FC 8B 02 FD 04  ........
-        .byte   $87,$02,$80,$08,$04,$F0,$F4,$64 ; BA30 87 02 80 08 04 F0 F4 64  .......d
-        .byte   $02,$FE,$F4,$76,$02,$F0,$FC,$88 ; BA38 02 FE F4 76 02 F0 FC 88  ...v....
-        .byte   $02,$F8,$FC,$89,$02,$00,$FC,$7A ; BA40 02 F8 FC 89 02 00 FC 7A  .......z
-        .byte   $02,$08,$FC,$7B,$02,$FD,$04,$77 ; BA48 02 08 FC 7B 02 FD 04 77  ...{...w
-        .byte   $02,$80,$08,$04,$F0,$F4,$65,$01 ; BA50 02 80 08 04 F0 F4 65 01  ......e.
-        .byte   $00,$F4,$76,$01,$F0,$FC,$78,$01 ; BA58 00 F4 76 01 F0 FC 78 01  ..v...x.
-        .byte   $F8,$FC,$79,$01,$00,$FC,$7A,$01 ; BA60 F8 FC 79 01 00 FC 7A 01  ..y...z.
-        .byte   $08,$FC,$A8,$01,$00,$04,$77,$01 ; BA68 08 FC A8 01 00 04 77 01  ......w.
-        .byte   $80,$06,$06,$F8,$F8,$8C,$03,$00 ; BA70 80 06 06 F8 F8 8C 03 00  ........
-        .byte   $F8,$8D,$03,$F8,$00,$9C,$03,$00 ; BA78 F8 8D 03 F8 00 9C 03 00  ........
-        .byte   $00,$9D,$03,$80,$06,$06,$F8,$F8 ; BA80 00 9D 03 80 06 06 F8 F8  ........
-        .byte   $8E,$03,$00,$F8,$8F,$03,$F8,$00 ; BA88 8E 03 00 F8 8F 03 F8 00  ........
-        .byte   $9E,$03,$00,$00,$9F,$03,$80,$06 ; BA90 9E 03 00 00 9F 03 80 06  ........
-        .byte   $06,$F8,$F8,$34,$03,$00,$F8,$35 ; BA98 06 F8 F8 34 03 00 F8 35  ...4...5
-        .byte   $03,$F8,$00,$28,$03,$00,$00,$29 ; BAA0 03 F8 00 28 03 00 00 29  ...(...)
-        .byte   $03,$80,$06,$06,$F8,$F8,$0E,$02 ; BAA8 03 80 06 06 F8 F8 0E 02  ........
-        .byte   $00,$F8,$0F,$02,$F8,$00,$1E,$02 ; BAB0 00 F8 0F 02 F8 00 1E 02  ........
-        .byte   $00,$00,$1F,$02,$80,$06,$06,$F8 ; BAB8 00 00 1F 02 80 06 06 F8  ........
-        .byte   $F8,$AE,$02,$00,$F8,$AF,$02,$F8 ; BAC0 F8 AE 02 00 F8 AF 02 F8  ........
-        .byte   $00,$BE,$02,$00,$00,$BF,$02,$80 ; BAC8 00 BE 02 00 00 BF 02 80  ........
-        .byte   $06,$06,$F8,$F8,$AC,$02,$00,$F8 ; BAD0 06 06 F8 F8 AC 02 00 F8  ........
-        .byte   $AD,$02,$F8,$00,$BC,$02,$00,$00 ; BAD8 AD 02 F8 00 BC 02 00 00  ........
-        .byte   $BD,$02,$80,$06,$06,$F8,$F8,$AE ; BAE0 BD 02 80 06 06 F8 F8 AE  ........
-        .byte   $02,$00,$F8,$AF,$02,$F8,$00,$CE ; BAE8 02 00 F8 AF 02 F8 00 CE  ........
-        .byte   $02,$00,$00,$CF,$02,$80,$06,$06 ; BAF0 02 00 00 CF 02 80 06 06  ........
-        .byte   $F8,$F8,$0E,$02,$00,$F8,$0F,$02 ; BAF8 F8 F8 0E 02 00 F8 0F 02  ........
-        .byte   $F8,$00,$DE,$02,$00,$00,$DF,$02 ; BB00 F8 00 DE 02 00 00 DF 02  ........
-        .byte   $80,$06,$06,$F8,$F8,$AC,$02,$00 ; BB08 80 06 06 F8 F8 AC 02 00  ........
-        .byte   $F8,$AD,$02,$F8,$00,$CC,$02,$00 ; BB10 F8 AD 02 F8 00 CC 02 00  ........
-        .byte   $00,$CD,$02,$80,$06,$06,$F8,$F8 ; BB18 00 CD 02 80 06 06 F8 F8  ........
-        .byte   $DC,$03,$00,$F8,$DD,$03,$F8,$00 ; BB20 DC 03 00 F8 DD 03 F8 00  ........
-        .byte   $EC,$03,$00,$00,$ED,$03,$80,$06 ; BB28 EC 03 00 00 ED 03 80 06  ........
-        .byte   $06,$F8,$F8,$FC,$03,$00,$F8,$FD ; BB30 06 F8 F8 FC 03 00 F8 FD  ........
-        .byte   $03,$F8,$00,$EE,$03,$00,$00,$EF ; BB38 03 F8 00 EE 03 00 00 EF  ........
-        .byte   $03,$80,$06,$06,$FB,$F8,$9B,$03 ; BB40 03 80 06 06 FB F8 9B 03  ........
-        .byte   $FB,$00,$AB,$03,$80,$06,$06,$FD ; BB48 FB 00 AB 03 80 06 06 FD  ........
-        .byte   $F8,$9B,$43,$FD,$00,$AB,$43,$80 ; BB50 F8 9B 43 FD 00 AB 43 80  ..C...C.
-        .byte   $06,$06,$F8,$F8,$FD,$43,$00,$F8 ; BB58 06 06 F8 F8 FD 43 00 F8  .....C..
-        .byte   $FC,$43,$F8,$00,$EF,$43,$00,$00 ; BB60 FC 43 F8 00 EF 43 00 00  .C...C..
-        .byte   $EE,$43,$80,$00,$00,$F8,$FC,$90 ; BB68 EE 43 80 00 00 F8 FC 90  .C......
-        .byte   $00,$00,$FC,$91,$00,$80,$00,$00 ; BB70 00 00 FC 91 00 80 00 00  ........
-        .byte   $F8,$FC,$A0,$00,$00,$FC,$A1,$00 ; BB78 F8 FC A0 00 00 FC A1 00  ........
-        .byte   $80,$00,$00,$F8,$FC,$92,$00,$00 ; BB80 80 00 00 F8 FC 92 00 00  ........
-        .byte   $FC,$93,$00,$80,$00,$00,$F8,$FC ; BB88 FC 93 00 80 00 00 F8 FC  ........
-        .byte   $A2,$00,$00,$FC,$A3,$00,$80,$00 ; BB90 A2 00 00 FC A3 00 80 00  ........
-        .byte   $00,$F8,$FC,$94,$00,$00,$FC,$95 ; BB98 00 F8 FC 94 00 00 FC 95  ........
-        .byte   $00,$80,$00,$00,$F4,$FC,$92,$00 ; BBA0 00 80 00 00 F4 FC 92 00  ........
-        .byte   $FC,$FC,$93,$00,$04,$FC,$91,$00 ; BBA8 FC FC 93 00 04 FC 91 00  ........
-        .byte   $80,$00,$00,$10,$D0,$91,$00,$08 ; BBB0 80 00 00 10 D0 91 00 08  ........
-        .byte   $D8,$90,$00,$10,$D8,$A0,$00,$00 ; BBB8 D8 90 00 10 D8 A0 00 00  ........
-        .byte   $E0,$A3,$00,$E8,$E8,$B0,$00,$F0 ; BBC0 E0 A3 00 E8 E8 B0 00 F0  ........
-        .byte   $E8,$B1,$00,$F8,$E8,$B2,$00,$00 ; BBC8 E8 B1 00 F8 E8 B2 00 00  ........
-        .byte   $E8,$B3,$00,$E8,$F0,$C0,$00,$F0 ; BBD0 E8 B3 00 E8 F0 C0 00 F0  ........
-        .byte   $F0,$C1,$00,$F8,$F0,$C2,$00,$00 ; BBD8 F0 C1 00 F8 F0 C2 00 00  ........
-        .byte   $F0,$C3,$00,$E8,$F8,$D0,$00,$F0 ; BBE0 F0 C3 00 E8 F8 D0 00 F0  ........
-        .byte   $F8,$D1,$00,$F8,$F8,$D2,$00,$00 ; BBE8 F8 D1 00 F8 F8 D2 00 00  ........
-        .byte   $F8,$D3,$00,$E0,$00,$F0,$00,$E8 ; BBF0 F8 D3 00 E0 00 F0 00 E8  ........
-        .byte   $00,$E0,$00,$F0,$00,$E1,$00,$F8 ; BBF8 00 E0 00 F0 00 E1 00 F8  ........
-        .byte   $00,$E2,$00,$00,$00,$E3,$00,$D8 ; BC00 00 E2 00 00 00 E3 00 D8  ........
-        .byte   $08,$A1,$00,$E0,$08,$A2,$00,$D0 ; BC08 08 A1 00 E0 08 A2 00 D0  ........
-        .byte   $10,$F1,$00,$D8,$10,$A0,$00,$80 ; BC10 10 F1 00 D8 10 A0 00 80  ........
-        .byte   $00,$00,$F3,$E8,$A4,$00,$F3,$F0 ; BC18 00 00 F3 E8 A4 00 F3 F0  ........
-        .byte   $B4,$00,$FB,$F0,$B5,$00,$03,$F0 ; BC20 B4 00 FB F0 B5 00 03 F0  ........
-        .byte   $B6,$00,$FB,$F8,$C5,$00,$03,$F8 ; BC28 B6 00 FB F8 C5 00 03 F8  ........
-        .byte   $C6,$00,$03,$00,$D6,$00,$0B,$00 ; BC30 C6 00 03 00 D6 00 0B 00  ........
-        .byte   $D7,$00,$80,$00,$00,$E8,$F0,$96 ; BC38 D7 00 80 00 00 E8 F0 96  ........
-        .byte   $00,$F0,$F0,$97,$00,$F8,$F0,$98 ; BC40 00 F0 F0 97 00 F8 F0 98  ........
-        .byte   $00,$00,$F0,$99,$00,$08,$F0,$9A ; BC48 00 00 F0 99 00 08 F0 9A  ........
-        .byte   $00,$10,$F0,$9B,$00,$F8,$F8,$A8 ; BC50 00 10 F0 9B 00 F8 F8 A8  ........
-        .byte   $00,$00,$F8,$A9,$00,$80,$00,$00 ; BC58 00 00 F8 A9 00 80 00 00  ........
-        .byte   $F0,$F0,$9C,$00,$F8,$F0,$9D,$00 ; BC60 F0 F0 9C 00 F8 F0 9D 00  ........
-        .byte   $00,$F0,$9E,$00,$08,$F0,$9F,$00 ; BC68 00 F0 9E 00 08 F0 9F 00  ........
-        .byte   $F8,$F8,$AD,$00,$00,$F8,$AE,$00 ; BC70 F8 F8 AD 00 00 F8 AE 00  ........
-        .byte   $80,$00,$00,$F0,$F7,$F3,$00,$F8 ; BC78 80 00 00 F0 F7 F3 00 F8  ........
-        .byte   $F7,$F4,$00,$00,$F7,$F5,$00,$08 ; BC80 F7 F4 00 00 F7 F5 00 08  ........
-        .byte   $F7,$F6,$00,$80,$00,$00,$F8,$F7 ; BC88 F7 F6 00 80 00 00 F8 F7  ........
-        .byte   $E4,$00,$00,$F7,$E5,$00,$80,$00 ; BC90 E4 00 00 F7 E5 00 80 00  ........
-        .byte   $00,$FC,$F4,$F2,$00,$80,$00,$00 ; BC98 00 FC F4 F2 00 80 00 00  ........
-        .byte   $F4,$F1,$E6,$00,$FC,$F1,$E7,$00 ; BCA0 F4 F1 E6 00 FC F1 E7 00  ........
-        .byte   $FC,$F9,$F7,$00,$80,$00,$00,$F8 ; BCA8 FC F9 F7 00 80 00 00 F8  ........
-        .byte   $EC,$A7,$00,$F8,$F4,$B7,$00,$00 ; BCB0 EC A7 00 F8 F4 B7 00 00  ........
-        .byte   $F4,$B8,$00,$F8,$FC,$C7,$00,$80 ; BCB8 F4 B8 00 F8 FC C7 00 80  ........
-        .byte   $00,$00,$F7,$F1,$AA,$00,$FF,$F1 ; BCC0 00 00 F7 F1 AA 00 FF F1  ........
-        .byte   $AB,$00,$F7,$F9,$BA,$00,$FF,$F9 ; BCC8 AB 00 F7 F9 BA 00 FF F9  ........
-        .byte   $BB,$00,$80,$00,$00,$F4,$F1,$BC ; BCD0 BB 00 80 00 00 F4 F1 BC  ........
-        .byte   $00,$FC,$F1,$BD,$00,$04,$F1,$BE ; BCD8 00 FC F1 BD 00 04 F1 BE  ........
-        .byte   $00,$FC,$F9,$CD,$00,$80,$00,$00 ; BCE0 00 FC F9 CD 00 80 00 00  ........
-        .byte   $F7,$F1,$BA,$80,$FF,$F1,$BB,$80 ; BCE8 F7 F1 BA 80 FF F1 BB 80  ........
-        .byte   $F7,$F9,$AA,$80,$FF,$F9,$AB,$80 ; BCF0 F7 F9 AA 80 FF F9 AB 80  ........
-        .byte   $80,$00,$00,$FC,$EA,$B9,$00,$F4 ; BCF8 80 00 00 FC EA B9 00 F4  ........
-        .byte   $F2,$C8,$00,$FC,$F2,$C9,$00,$04 ; BD00 F2 C8 00 FC F2 C9 00 04  ........
-        .byte   $F2,$CA,$00,$FC,$FA,$D9,$00,$FC ; BD08 F2 CA 00 FC FA D9 00 FC  ........
-        .byte   $02,$D8,$00,$80,$00,$00,$F4,$E8 ; BD10 02 D8 00 80 00 00 F4 E8  ........
-        .byte   $B2,$02,$FC,$E8,$B3,$02,$04,$E8 ; BD18 B2 02 FC E8 B3 02 04 E8  ........
-        .byte   $B4,$02,$F4,$F0,$C2,$02,$FC,$F0 ; BD20 B4 02 F4 F0 C2 02 FC F0  ........
-        .byte   $C3,$02,$04,$F0,$C4,$02,$F4,$F8 ; BD28 C3 02 04 F0 C4 02 F4 F8  ........
-        .byte   $B5,$02,$FC,$F8,$B6,$02,$04,$F8 ; BD30 B5 02 FC F8 B6 02 04 F8  ........
-        .byte   $B7,$02,$F4,$00,$C5,$02,$FC,$00 ; BD38 B7 02 F4 00 C5 02 FC 00  ........
-        .byte   $C6,$02,$04,$00,$C7,$02,$F4,$08 ; BD40 C6 02 04 00 C7 02 F4 08  ........
-        .byte   $B8,$02,$FC,$08,$B9,$02,$F4,$10 ; BD48 B8 02 FC 08 B9 02 F4 10  ........
-        .byte   $C8,$02,$FC,$10,$C9,$02,$80,$00 ; BD50 C8 02 FC 10 C9 02 80 00  ........
-        .byte   $00,$08,$00,$01,$01,$10,$00,$02 ; BD58 00 08 00 01 01 10 00 02  ........
-        .byte   $01,$18,$00,$03,$01,$20,$00,$04 ; BD60 01 18 00 03 01 20 00 04  ..... ..
-        .byte   $01,$08,$08,$11,$01,$10,$08,$12 ; BD68 01 08 08 11 01 10 08 12  ........
-        .byte   $01,$18,$08,$13,$01,$20,$08,$14 ; BD70 01 18 08 13 01 20 08 14  ..... ..
-        .byte   $01,$00,$10,$20,$01,$08,$10,$21 ; BD78 01 00 10 20 01 08 10 21  ... ...!
-        .byte   $01,$10,$10,$22,$01,$18,$10,$23 ; BD80 01 10 10 22 01 18 10 23  ..."...#
-        .byte   $01,$20,$10,$24,$01,$28,$10,$25 ; BD88 01 20 10 24 01 28 10 25  . .$.(.%
-        .byte   $01,$00,$18,$30,$01,$08,$18,$31 ; BD90 01 00 18 30 01 08 18 31  ...0...1
-        .byte   $00,$10,$18,$32,$00,$18,$18,$33 ; BD98 00 10 18 32 00 18 18 33  ...2...3
-        .byte   $00,$28,$18,$35,$01,$00,$20,$40 ; BDA0 00 28 18 35 01 00 20 40  .(.5.. @
-        .byte   $01,$28,$20,$45,$01,$00,$28,$50 ; BDA8 01 28 20 45 01 00 28 50  .( E..(P
-        .byte   $01,$28,$28,$55,$01,$00,$30,$60 ; BDB0 01 28 28 55 01 00 30 60  .((U..0`
-        .byte   $01,$28,$30,$65,$01,$00,$38,$70 ; BDB8 01 28 30 65 01 00 38 70  .(0e..8p
-        .byte   $01,$08,$38,$71,$03,$10,$38,$72 ; BDC0 01 08 38 71 03 10 38 72  ..8q..8r
-        .byte   $03,$18,$38,$73,$03,$20,$38,$74 ; BDC8 03 18 38 73 03 20 38 74  ..8s. 8t
-        .byte   $03,$28,$38,$75,$01,$48,$38,$62 ; BDD0 03 28 38 75 01 48 38 62  .(8u.H8b
-        .byte   $02,$50,$38,$63,$02,$00,$40,$80 ; BDD8 02 50 38 63 02 00 40 80  .P8c..@.
-        .byte   $01,$08,$40,$81,$03,$10,$40,$82 ; BDE0 01 08 40 81 03 10 40 82  ..@...@.
-        .byte   $03,$18,$40,$83,$03,$20,$40,$84 ; BDE8 03 18 40 83 03 20 40 84  ..@.. @.
-        .byte   $03,$28,$40,$85,$01,$00,$22,$34 ; BDF0 03 28 40 85 01 00 22 34  .(@..."4
-        .byte   $02,$08,$1F,$41,$00,$10,$1F,$42 ; BDF8 02 08 1F 41 00 10 1F 42  ...A...B
-        .byte   $00,$18,$1F,$43,$00,$20,$1F,$44 ; BE00 00 18 1F 43 00 20 1F 44  ...C. .D
-        .byte   $00,$28,$22,$34,$42,$08,$27,$51 ; BE08 00 28 22 34 42 08 27 51  .("4B.'Q
-        .byte   $00,$10,$27,$52,$00,$18,$27,$53 ; BE10 00 10 27 52 00 18 27 53  ..'R..'S
-        .byte   $00,$20,$27,$54,$00,$08,$2F,$61 ; BE18 00 20 27 54 00 08 2F 61  . 'T../a
-        .byte   $00,$20,$2F,$64,$00,$00,$40,$00 ; BE20 00 20 2F 64 00 00 40 00  . /d..@.
-        .byte   $03,$28,$40,$10,$03,$80,$00,$00 ; BE28 03 28 40 10 03 80 00 00  .(@.....
-        .byte   $0F,$00,$94,$01,$17,$00,$95,$01 ; BE30 0F 00 94 01 17 00 95 01  ........
-        .byte   $0F,$08,$A4,$01,$17,$08,$A5,$01 ; BE38 0F 08 A4 01 17 08 A5 01  ........
-        .byte   $FF,$10,$90,$01,$07,$10,$91,$01 ; BE40 FF 10 90 01 07 10 91 01  ........
-        .byte   $0F,$10,$92,$01,$17,$10,$93,$01 ; BE48 0F 10 92 01 17 10 93 01  ........
-        .byte   $07,$18,$A1,$01,$0F,$18,$A2,$01 ; BE50 07 18 A1 01 0F 18 A2 01  ........
-        .byte   $17,$18,$A3,$01,$FF,$20,$B0,$01 ; BE58 17 18 A3 01 FF 20 B0 01  ..... ..
-        .byte   $07,$20,$B1,$01,$0F,$20,$B2,$01 ; BE60 07 20 B1 01 0F 20 B2 01  . ... ..
-        .byte   $17,$20,$B3,$01,$07,$28,$C1,$01 ; BE68 17 20 B3 01 07 28 C1 01  . ...(..
-        .byte   $0F,$28,$C2,$01,$18,$28,$C3,$01 ; BE70 0F 28 C2 01 18 28 C3 01  .(...(..
-        .byte   $28,$17,$D0,$00,$30,$17,$D1,$00 ; BE78 28 17 D0 00 30 17 D1 00  (...0...
-        .byte   $38,$17,$D2,$00,$28,$1F,$E0,$00 ; BE80 38 17 D2 00 28 1F E0 00  8...(...
-        .byte   $30,$1F,$E1,$00,$38,$1F,$E2,$00 ; BE88 30 1F E1 00 38 1F E2 00  0...8...
-        .byte   $28,$27,$F0,$00,$30,$27,$F1,$00 ; BE90 28 27 F0 00 30 27 F1 00  ('..0'..
-        .byte   $38,$27,$F2,$00,$80,$00,$00,$10 ; BE98 38 27 F2 00 80 00 00 10  8'......
-        .byte   $B8,$4B,$02,$18,$B8,$4C,$01,$10 ; BEA0 B8 4B 02 18 B8 4C 01 10  .K...L..
-        .byte   $C0,$5B,$02,$18,$C0,$5C,$01,$20 ; BEA8 C0 5B 02 18 C0 5C 01 20  .[...\. 
-        .byte   $C0,$5D,$02,$08,$C8,$59,$02,$10 ; BEB0 C0 5D 02 08 C8 59 02 10  .]...Y..
-        .byte   $C8,$5A,$02,$18,$C8,$79,$01,$20 ; BEB8 C8 5A 02 18 C8 79 01 20  .Z...y. 
-        .byte   $C8,$6D,$02,$08,$D0,$58,$02,$18 ; BEC0 C8 6D 02 08 D0 58 02 18  .m...X..
-        .byte   $D0,$79,$01,$20,$D0,$7D,$02,$28 ; BEC8 D0 79 01 20 D0 7D 02 28  .y. .}.(
-        .byte   $D0,$6A,$02,$00,$D8,$57,$02,$18 ; BED0 D0 6A 02 00 D8 57 02 18  .j...W..
-        .byte   $D8,$79,$01,$28,$D8,$6B,$02,$30 ; BED8 D8 79 01 28 D8 6B 02 30  .y.(.k.0
-        .byte   $D8,$6C,$02,$00,$E0,$66,$02,$08 ; BEE0 D8 6C 02 00 E0 66 02 08  .l...f..
-        .byte   $E0,$67,$02,$10,$E0,$68,$02,$18 ; BEE8 E0 67 02 10 E0 68 02 18  .g...h..
-        .byte   $E0,$69,$01,$30,$E0,$7C,$02,$00 ; BEF0 E0 69 01 30 E0 7C 02 00  .i.0.|..
-        .byte   $E8,$76,$02,$08,$E8,$77,$02,$10 ; BEF8 E8 76 02 08 E8 77 02 10  .v...w..
-        .byte   $E8,$78,$02,$18,$E8,$79,$01,$30 ; BF00 E8 78 02 18 E8 79 01 30  .x...y.0
-        .byte   $E8,$7A,$02,$38,$E8,$7B,$02,$00 ; BF08 E8 7A 02 38 E8 7B 02 00  .z.8.{..
-        .byte   $F0,$86,$02,$08,$F0,$87,$02,$10 ; BF10 F0 86 02 08 F0 87 02 10  ........
-        .byte   $F0,$88,$02,$18,$F0,$89,$02,$20 ; BF18 F0 88 02 18 F0 89 02 20  ....... 
-        .byte   $F0,$8A,$02,$28,$F0,$8B,$02,$30 ; BF20 F0 8A 02 28 F0 8B 02 30  ...(...0
-        .byte   $F0,$8C,$01,$38,$F0,$8D,$01,$00 ; BF28 F0 8C 01 38 F0 8D 01 00  ...8....
-        .byte   $F8,$96,$00,$08,$F8,$97,$00,$10 ; BF30 F8 96 00 08 F8 97 00 10  ........
-        .byte   $F8,$98,$00,$18,$F8,$99,$00,$20 ; BF38 F8 98 00 18 F8 99 00 20  ....... 
-        .byte   $F8,$9A,$00,$28,$F8,$9B,$00,$80 ; BF40 F8 9A 00 28 F8 9B 00 80  ...(....
-LBF48:
-        .byte   $88                             ; BF48 88                       .
-LBF49:
-        .byte   $BF,$8C,$BF,$90,$BF,$94,$BF,$98 ; BF49 BF 8C BF 90 BF 94 BF 98  ........
-        .byte   $BF,$9C,$BF,$A0,$BF,$A4,$BF,$A8 ; BF51 BF 9C BF A0 BF A4 BF A8  ........
-        .byte   $BF,$AC,$BF,$B0,$BF,$B4,$BF,$B8 ; BF59 BF AC BF B0 BF B4 BF B8  ........
-        .byte   $BF,$BC,$BF,$C0,$BF,$C4,$BF,$C8 ; BF61 BF BC BF C0 BF C4 BF C8  ........
-        .byte   $BF,$CC,$BF,$D0,$BF,$D4,$BF,$D8 ; BF69 BF CC BF D0 BF D4 BF D8  ........
-        .byte   $BF,$DC,$BF,$E0,$BF,$E4,$BF,$E8 ; BF71 BF DC BF E0 BF E4 BF E8  ........
-        .byte   $BF,$EC,$BF,$F0,$BF,$F4,$BF,$F8 ; BF79 BF EC BF F0 BF F4 BF F8  ........
-        .byte   $BF,$FC,$BF,$00,$C0,$04,$C0,$02 ; BF81 BF FC BF 00 C0 04 C0 02  ........
-        .byte   $40,$08,$C0,$02,$40,$21,$C0,$03 ; BF89 40 08 C0 02 40 21 C0 03  @...@!..
-        .byte   $30,$08,$C0,$03,$30,$21,$C0,$03 ; BF91 30 08 C0 03 30 21 C0 03  0...0!..
-        .byte   $20,$3A,$C0,$03,$20,$5B,$C0,$04 ; BF99 20 3A C0 03 20 5B C0 04   :.. [..
-        .byte   $20,$08,$C0,$04,$20,$21,$C0,$04 ; BFA1 20 08 C0 04 20 21 C0 04   ... !..
-        .byte   $10,$3A,$C0,$04,$10,$5B,$C0,$03 ; BFA9 10 3A C0 04 10 5B C0 03  .:...[..
-        .byte   $10,$7C,$C0,$03,$10,$A5,$C0,$04 ; BFB1 10 7C C0 03 10 A5 C0 04  .|......
-        .byte   $10,$A5,$C0,$02,$10,$C6,$C0,$02 ; BFB9 10 A5 C0 02 10 C6 C0 02  ........
-        .byte   $10,$D7,$C0,$02,$10,$F8,$C0,$03 ; BFC1 10 D7 C0 02 10 F8 C0 03  ........
-        .byte   $08,$A5,$C0,$03,$08,$C6,$C0,$03 ; BFC9 08 A5 C0 03 08 C6 C0 03  ........
-        .byte   $08,$D7,$C0,$03,$08,$F8,$C0,$03 ; BFD1 08 D7 C0 03 08 F8 C0 03  ........
-        .byte   $08,$19,$C1,$03,$08,$3A,$C1,$03 ; BFD9 08 19 C1 03 08 3A C1 03  .....:..
-        .byte   $08,$5B,$C1,$03,$08,$7C,$C1,$04 ; BFE1 08 5B C1 03 08 7C C1 04  .[...|..
-        .byte   $04,$A5,$C0,$04,$04,$C6,$C0,$04 ; BFE9 04 A5 C0 04 04 C6 C0 04  ........
-        .byte   $04,$D7,$C0,$04,$04,$F8,$C0,$04 ; BFF1 04 D7 C0 04 04 F8 C0 04  ........
-        .byte   $04,$19,$C1,$04,$04,$3A,$C1,$04 ; BFF9 04 19 C1 04 04 3A C1 04  .....:..
-        .byte   $04,$5B,$C1,$04,$04,$7C,$C1,$00 ; C001 04 5B C1 04 04 7C C1 00  .[...|..
-        .byte   $01,$00,$01,$00,$01,$00,$01,$00 ; C009 01 00 01 00 01 00 01 00  ........
-        .byte   $01,$00,$01,$00,$01,$00,$01,$00 ; C011 01 00 01 00 01 00 01 00  ........
-        .byte   $01,$00,$01,$00,$01,$00,$01,$FF ; C019 01 00 01 00 01 00 01 FF  ........
-        .byte   $01,$01,$00,$01,$01,$00,$01,$01 ; C021 01 01 00 01 01 00 01 01  ........
-        .byte   $00,$01,$01,$00,$01,$01,$00,$01 ; C029 00 01 01 00 01 01 00 01  ........
-        .byte   $01,$00,$01,$01,$00,$01,$01,$03 ; C031 01 00 01 01 00 01 01 03  ........
-        .byte   $FF,$00,$00,$00,$00,$00,$00,$00 ; C039 FF 00 00 00 00 00 00 00  ........
-        .byte   $00,$00,$00,$00,$01,$00,$00,$00 ; C041 00 00 00 00 01 00 00 00  ........
-        .byte   $01,$00,$01,$00,$01,$00,$01,$00 ; C049 01 00 01 00 01 00 01 00  ........
-        .byte   $01,$01,$01,$01,$00,$01,$01,$01 ; C051 01 01 01 01 00 01 01 01  ........
-        .byte   $03,$FF,$00,$01,$02,$00,$01,$02 ; C059 03 FF 00 01 02 00 01 02  ........
-        .byte   $00,$01,$02,$03,$00,$01,$02,$00 ; C061 00 01 02 03 00 01 02 00  ........
-        .byte   $01,$02,$00,$01,$02,$03,$00,$01 ; C069 01 02 00 01 02 03 00 01  ........
-        .byte   $02,$00,$01,$02,$00,$01,$02,$00 ; C071 02 00 01 02 00 01 02 00  ........
-        .byte   $01,$03,$FF,$01,$01,$01,$01,$01 ; C079 01 03 FF 01 01 01 01 01  ........
-        .byte   $01,$01,$01,$01,$01,$01,$03,$01 ; C081 01 01 01 01 01 01 03 01  ........
-        .byte   $01,$01,$01,$01,$01,$01,$03,$01 ; C089 01 01 01 01 01 01 03 01  ........
-        .byte   $01,$01,$01,$01,$03,$01,$01,$01 ; C091 01 01 01 01 03 01 01 01  ........
-        .byte   $01,$01,$03,$01,$01,$01,$03,$01 ; C099 01 01 03 01 01 01 03 01  ........
-        .byte   $01,$01,$03,$FF,$02,$02,$02,$02 ; C0A1 01 01 03 FF 02 02 02 02  ........
-        .byte   $02,$02,$02,$02,$02,$02,$02,$02 ; C0A9 02 02 02 02 02 02 02 02  ........
-        .byte   $02,$02,$02,$02,$02,$02,$02,$02 ; C0B1 02 02 02 02 02 02 02 02  ........
-        .byte   $02,$02,$02,$02,$02,$02,$02,$02 ; C0B9 02 02 02 02 02 02 02 02  ........
-        .byte   $02,$02,$02,$02,$FF,$03,$03,$03 ; C0C1 02 02 02 02 FF 03 03 03  ........
-        .byte   $03,$03,$03,$03,$03,$03,$03,$03 ; C0C9 03 03 03 03 03 03 03 03  ........
-        .byte   $03,$03,$03,$03,$03,$FF,$02,$02 ; C0D1 03 03 03 03 03 FF 02 02  ........
-        .byte   $02,$03,$02,$02,$02,$03,$02,$02 ; C0D9 02 03 02 02 02 03 02 02  ........
-        .byte   $02,$03,$02,$02,$02,$03,$02,$02 ; C0E1 02 03 02 02 02 03 02 02  ........
-        .byte   $02,$03,$02,$02,$02,$03,$02,$02 ; C0E9 02 03 02 02 02 03 02 02  ........
-        .byte   $02,$03,$02,$02,$02,$03,$FF,$00 ; C0F1 02 03 02 02 02 03 FF 00  ........
-        .byte   $01,$02,$03,$00,$01,$02,$03,$00 ; C0F9 01 02 03 00 01 02 03 00  ........
-        .byte   $01,$02,$03,$00,$01,$02,$03,$00 ; C101 01 02 03 00 01 02 03 00  ........
-        .byte   $01,$02,$03,$00,$01,$02,$03,$00 ; C109 01 02 03 00 01 02 03 00  ........
-        .byte   $01,$02,$03,$00,$01,$02,$03,$FF ; C111 01 02 03 00 01 02 03 FF  ........
-        .byte   $00,$01,$00,$01,$00,$01,$00,$03 ; C119 00 01 00 01 00 01 00 03  ........
-        .byte   $00,$01,$00,$01,$00,$01,$00,$03 ; C121 00 01 00 01 00 01 00 03  ........
-        .byte   $00,$01,$00,$01,$00,$01,$00,$03 ; C129 00 01 00 01 00 01 00 03  ........
-        .byte   $00,$01,$00,$01,$00,$01,$00,$03 ; C131 00 01 00 01 00 01 00 03  ........
-        .byte   $FF,$00,$01,$02,$03,$04,$00,$01 ; C139 FF 00 01 02 03 04 00 01  ........
-        .byte   $02,$03,$04,$00,$01,$02,$03,$04 ; C141 02 03 04 00 01 02 03 04  ........
-        .byte   $00,$01,$02,$03,$04,$00,$01,$02 ; C149 00 01 02 03 04 00 01 02  ........
-        .byte   $03,$04,$00,$01,$02,$03,$04,$00 ; C151 03 04 00 01 02 03 04 00  ........
-        .byte   $01,$FF,$04,$04,$04,$04,$04,$04 ; C159 01 FF 04 04 04 04 04 04  ........
-        .byte   $04,$03,$04,$04,$04,$04,$04,$04 ; C161 04 03 04 04 04 04 04 04  ........
-        .byte   $04,$03,$04,$04,$04,$04,$04,$04 ; C169 04 03 04 04 04 04 04 04  ........
-        .byte   $04,$03,$04,$04,$04,$04,$04,$04 ; C171 04 03 04 04 04 04 04 04  ........
-        .byte   $04,$03,$FF,$04,$02,$04,$03,$04 ; C179 04 03 FF 04 02 04 03 04  ........
-        .byte   $02,$04,$03,$04,$02,$04,$03,$04 ; C181 02 04 03 04 02 04 03 04  ........
-        .byte   $02,$04,$03,$04,$02,$04,$03,$04 ; C189 02 04 03 04 02 04 03 04  ........
-        .byte   $02,$04,$03,$04,$02,$04,$03,$04 ; C191 02 04 03 04 02 04 03 04  ........
-        .byte   $02,$04,$03,$FF                 ; C199 02 04 03 FF              ....
+
+
+
+
+
+
+
+UnknownData2_0 = 0
+UnknownData2_1 = 1
+UnknownData2_2 = 2
+UnknownData2_3 = 3
+UnknownData2_4 = 4
+UnknownData2_5 = 5
+UnknownData2_6 = 6
+UnknownData2_7 = 7
+UnknownData2_8 = 8
+UnknownData2_9 = 9
+UnknownData2_10 = 10
+UnknownData2_11 = 11
+UnknownData2_12 = 12
+UnknownData2_13 = 13
+UnknownData2_14 = 14
+UnknownData2_15 = 15
+UnknownData2_16 = 16
+UnknownData2_17 = 17
+UnknownData2_18 = 18
+UnknownData2_19 = 19
+UnknownData2_20 = 20
+UnknownData2_21 = 21
+UnknownData2_22 = 22
+UnknownData2_23 = 23
+UnknownData2_24 = 24
+UnknownData2_25 = 25
+UnknownData2_26 = 26
+UnknownData2_27 = 27
+UnknownData2_28 = 28
+UnknownData2_29 = 29
+UnknownData2_30 = 30
+UnknownData2_31 = 31
+UnknownData2_32 = 32
+UnknownData2_33 = 33
+UnknownData2_34 = 34
+UnknownData2_35 = 35
+UnknownData2_36 = 36
+UnknownData2_37 = 37
+UnknownData2_38 = 38
+UnknownData2_39 = 39
+UnknownData2_40 = 40
+UnknownData2_41 = 41
+UnknownData2_42 = 42
+UnknownData2_43 = 43
+UnknownData2_44 = 44
+UnknownData2_45 = 45
+UnknownData2_46 = 46
+UnknownData2_47 = 47
+UnknownData2_48 = 48
+UnknownData2_49 = 49
+UnknownData2_50 = 50
+UnknownData2_51 = 51
+UnknownData2_52 = 52
+UnknownData2_53 = 53
+UnknownData2_54 = 54
+UnknownData2_55 = 55
+UnknownData2_56 = 56
+UnknownData2_57 = 57
+UnknownData2_58 = 58
+UnknownData2_59 = 59
+UnknownData2_60 = 60
+
+UnknownData2_Pointers:
+  .addr @UnknownData2_0
+  .addr @UnknownData2_1
+  .addr @UnknownData2_2
+  .addr @UnknownData2_3
+  .addr @UnknownData2_4
+  .addr @UnknownData2_5
+  .addr @UnknownData2_6
+  .addr @UnknownData2_7
+  .addr @UnknownData2_8
+  .addr @UnknownData2_9
+  .addr @UnknownData2_10
+  .addr @UnknownData2_11
+  .addr @UnknownData2_12
+  .addr @UnknownData2_13
+  .addr @UnknownData2_14
+  .addr @UnknownData2_15
+  .addr @UnknownData2_16
+  .addr @UnknownData2_17
+  .addr @UnknownData2_18
+  .addr @UnknownData2_19
+  .addr @UnknownData2_20
+  .addr @UnknownData2_21
+  .addr @UnknownData2_22
+  .addr @UnknownData2_23
+  .addr @UnknownData2_24
+  .addr @UnknownData2_25
+  .addr @UnknownData2_26
+  .addr @UnknownData2_27
+  .addr @UnknownData2_28
+  .addr @UnknownData2_29
+  .addr @UnknownData2_30
+  .addr @UnknownData2_31
+  .addr @UnknownData2_32
+  .addr @UnknownData2_33
+  .addr @UnknownData2_34
+  .addr @UnknownData2_35
+  .addr @UnknownData2_36
+  .addr @UnknownData2_37
+  .addr @UnknownData2_38
+  .addr @UnknownData2_39
+  .addr @UnknownData2_40
+  .addr @UnknownData2_41
+  .addr @UnknownData2_42
+  .addr @UnknownData2_43
+  .addr @UnknownData2_44
+  .addr @UnknownData2_45
+  .addr @UnknownData2_46
+  .addr @UnknownData2_47
+  .addr @UnknownData2_48
+  .addr @UnknownData2_49
+  .addr @UnknownData2_50
+  .addr @UnknownData2_51
+  .addr @UnknownData2_52
+  .addr @UnknownData2_53
+  .addr @UnknownData2_54
+  .addr @UnknownData2_55
+  .addr @UnknownData2_56
+  .addr @UnknownData2_57
+  .addr @UnknownData2_58
+  .addr @UnknownData2_59
+  .addr @UnknownData2_60
+
+
+@UnknownData2_3:
+@UnknownData2_28:
+@UnknownData2_38:
+@UnknownData2_39:
+@UnknownData2_47:
+@UnknownData2_49:
+@UnknownData2_58:
+@UnknownData2_59:
+.byte $00, $57, $bd
+@UnknownData2_7:
+.byte $00, $2e, $be
+@UnknownData2_12:
+.byte $00, $9d, $be
+@UnknownData2_4:
+.byte $00, $be, $b0
+@UnknownData2_5:
+.byte $00, $e1, $b1
+@UnknownData2_6:
+.byte $00, $51, $b2
+@UnknownData2_0:
+.byte $06, $e1, $b0, $09, $04, $b1, $09, $27, $b1, $05, $4a, $b1, $0c, $6d, $b1, $ff
+@UnknownData2_1:
+.byte $08, $90, $b1, $08, $ab, $b1, $08, $90, $b1, $08, $c6, $b1, $ff
+@UnknownData2_2:
+.byte $08, $32, $b2, $08, $13, $b2, $08, $32, $b2, $08, $f4, $b1, $ff
+@UnknownData2_13:
+.byte $00, $68, $b2
+@UnknownData2_16:
+.byte $07, $4d, $b3, $09, $60, $b3, $08, $73, $b3, $0c, $86, $b3, $ff
+@UnknownData2_17:
+.byte $07, $d2, $b3, $09, $f8, $b3, $06, $0b, $b4, $0c, $1e, $b4, $ff
+@UnknownData2_18:
+.byte $0c, $99, $b3, $0a, $ac, $b3, $0f, $bf, $b3, $0a, $d2, $b3, $ff
+@UnknownData2_19:
+.byte $09, $31, $b4, $08, $44, $b4, $06, $57, $b4, $0c, $6a, $b4, $ff
+@UnknownData2_20:
+.byte $09, $7d, $b4, $08, $90, $b4, $06, $a3, $b4, $0c, $b6, $b4, $ff
+@UnknownData2_21:
+.byte $07, $02, $b5, $07, $ef, $b4, $06, $dc, $b4, $06, $c9, $b4, $03, $73, $b3, $00, $86, $b3
+@UnknownData2_22:
+.byte $08, $0d, $b5, $08, $14, $b5, $08, $1b, $b5, $00, $26, $b5
+@UnknownData2_24:
+.byte $08, $31, $b5, $08, $38, $b5, $08, $3f, $b5, $00, $57, $b4
+@UnknownData2_25:
+.byte $08, $4e, $b5, $08, $55, $b5, $08, $5c, $b5, $00, $a3, $b4
+@UnknownData2_26:
+.byte $03, $86, $b3, $03, $73, $b3, $06, $c9, $b4, $06, $dc, $b4, $07, $ef, $b4, $00, $02, $b5
+@UnknownData2_27:
+.byte $08, $26, $b5, $08, $1b, $b5, $08, $14, $b5, $00, $0d, $b5
+@UnknownData2_29:
+.byte $08, $57, $b4, $08, $3f, $b5, $08, $38, $b5, $00, $31, $b5
+@UnknownData2_30:
+.byte $08, $a3, $b4, $08, $5c, $b5, $08, $55, $b5, $00, $4e, $b5
+@UnknownData2_32:
+.byte $00, $6b, $b5
+@UnknownData2_33:
+.byte $00, $9a, $b5
+@UnknownData2_34:
+.byte $02, $ad, $b5, $02, $d0, $b5, $ff
+@UnknownData2_35:
+.byte $08, $f3, $b5, $08, $06, $b6, $ff
+@UnknownData2_36:
+.byte $20, $19, $b6, $00, $19, $b6
+@UnknownData2_37:
+.byte $08, $2c, $b6, $08, $7d, $b6, $08, $b3, $b6, $08, $47, $b6, $08, $62, $b6, $08, $98, $b6, $ff
+@UnknownData2_40:
+.byte $00, $ce, $b6
+@UnknownData2_41:
+.byte $00, $d5, $b6
+@UnknownData2_42:
+.byte $00, $e3, $b6
+@UnknownData2_43:
+.byte $00, $dc, $b6
+@UnknownData2_48:
+.byte $10, $ea, $b6, $10, $39, $b8, $10, $f6, $b7, $10, $2d, $b7, $10, $b3, $b7, $10, $70, $b7, $ff
+@UnknownData2_56:
+.byte $08, $7c, $b8, $04, $8f, $b8, $08, $a2, $b8, $00, $8f, $b8
+@UnknownData2_23:
+.byte $08, $7c, $b8, $04, $8f, $b8, $08, $a2, $b8, $08, $8f, $b8, $ff
+@UnknownData2_57:
+.byte $02, $dd, $b8, $02, $ca, $b8, $02, $c3, $b8, $02, $bc, $b8, $02, $b5, $b8, $02, $03, $b9, $02, $f0, $b8, $02, $0a, $b9, $00, $0a, $b9
+@UnknownData2_60:
+.byte $10, $11, $b9, $08, $20, $b9, $08, $2f, $b9, $08, $3e, $b9, $08, $4d, $b9, $08, $5c, $b9, $08, $6b, $b9, $08, $7a, $b9, $ff
+@UnknownData2_14:
+.byte $04, $20, $b9, $04, $89, $b9, $04, $20, $b9, $04, $89, $b9, $03, $b5, $b8, $03, $0a, $b9, $03, $f0, $b8, $00, $f0, $b8
+@UnknownData2_31:
+.byte $0a, $98, $b9, $0a, $b7, $b9, $0a, $d6, $b9, $0a, $f5, $b9, $0a, $14, $ba, $0a, $33, $ba, $ff
+@UnknownData2_15:
+.byte $04, $98, $b9, $04, $52, $ba, $04, $98, $b9, $04, $52, $ba, $03, $b5, $b8, $03, $0a, $b9, $03, $f0, $b8, $00, $f0, $b8
+@UnknownData2_44:
+.byte $05, $71, $ba, $05, $84, $ba, $05, $71, $ba, $05, $97, $ba, $ff
+@UnknownData2_45:
+.byte $08, $aa, $ba, $08, $bd, $ba, $08, $d0, $ba, $08, $09, $bb, $08, $e3, $ba, $08, $f6, $ba, $ff
+@UnknownData2_46:
+.byte $07, $1c, $bb, $07, $2f, $bb, $07, $42, $bb, $07, $4d, $bb, $07, $58, $bb, $ff
+@UnknownData2_50:
+.byte $20, $6b, $bb, $00, $6b, $bb
+@UnknownData2_51:
+.byte $20, $76, $bb, $00, $76, $bb
+@UnknownData2_52:
+.byte $20, $81, $bb, $00, $81, $bb
+@UnknownData2_53:
+.byte $20, $8c, $bb, $00, $8c, $bb
+@UnknownData2_54:
+.byte $20, $97, $bb, $00, $97, $bb
+@UnknownData2_55:
+.byte $20, $a2, $bb, $00, $a2, $bb
+@UnknownData2_8:
+.byte $00, $b1, $bb
+@UnknownData2_9:
+.byte $00, $18, $bc
+@UnknownData2_10:
+.byte $18, $3b, $bc, $14, $5e, $bc, $12, $79, $bc, $10, $8c, $bc, $06, $97, $bc, $06, $9e, $bc, $08, $ad, $bc, $08, $c0, $bc, $08, $d3, $bc, $08, $e6, $bc, $06, $ad, $bc, $06, $f9, $bc, $06, $ad, $bc, $08, $9e, $bc, $08, $97, $bc, $00, $97, $bc
+@UnknownData2_11:
+.byte $00, $14, $bd, $06, $06, $f4, $f0, $00, $01, $fc, $f0, $01, $01, $f4, $f8, $10, $01, $fc, $f8, $11, $01, $04, $f8, $12, $01, $f4, $00, $50, $00, $fc, $00, $51, $00, $04, $00, $52, $00, $80, $06, $06, $f4, $f0, $00, $01, $fc, $f0, $01, $01, $f4, $f8, $10, $01, $fc, $f8, $11, $01, $04, $f8, $12, $01, $f4, $00, $50, $00, $fc, $00, $21, $00, $04, $00, $22, $00, $80, $06, $06, $f4, $f1, $00, $01, $fc, $f1, $01, $01, $f4, $f9, $10, $01, $fc, $f9, $11, $01, $04, $f9, $12, $01, $f4, $01, $30, $00, $fc, $01, $31, $00, $04, $01, $32, $00, $80, $06, $06, $f4, $f1, $00, $01, $fc, $f1, $01, $01, $f4, $f9, $10, $01, $fc, $f9, $11, $01, $04, $f9, $12, $01, $f4, $01, $40, $00, $fc, $01, $41, $00, $04, $01, $52, $00, $80, $06, $06, $f4, $f0, $00, $01, $fc, $f0, $01, $01, $f4, $f8, $10, $01, $fc, $f8, $11, $01, $04, $f8, $12, $01, $f4, $00, $20, $00, $fc, $00, $51, $00, $04, $00, $52, $00, $80, $06, $06, $f4, $ef, $00, $01, $fc, $ef, $01, $01, $f4, $f7, $10, $01, $fc, $f7, $11, $01, $04, $f7, $12, $01, $f4, $ff, $30, $00, $fc, $ff, $02, $00, $04, $ff, $42, $00, $80, $03, $06, $fc, $f4, $34, $01, $f4, $fc, $43, $01, $fc, $fc, $44, $01, $f4, $04, $53, $01, $fc, $04, $54, $00, $04, $04, $55, $01, $80, $03, $06, $fc, $f5, $04, $01, $f4, $fd, $13, $01, $fc, $fd, $14, $01, $f4, $05, $23, $01, $fc, $05, $24, $00, $04, $05, $25, $01, $80, $03, $06, $fc, $f4, $35, $01, $f4, $fc, $46, $01, $fc, $fc, $45, $01, $f4, $04, $03, $01, $fc, $04, $15, $00, $04, $04, $05, $01, $80, $03, $06, $fc, $f4, $34, $01, $f4, $fc, $43, $01, $fc, $fc, $44, $01, $fc, $04, $36, $00, $80, $03, $06, $f4, $f4, $37, $01, $fc, $f4, $38, $01, $f4, $fc, $47, $01, $fc, $fc, $48, $01, $f4, $04, $57, $01, $fc, $04, $58, $00, $04, $04, $3d, $01, $80, $03, $06, $f4, $f6, $39, $01, $fc, $f6, $3a, $01, $f4, $fe, $49, $01, $fc, $fe, $4a, $01, $f4, $06, $59, $01, $fc, $06, $5a, $00, $04, $06, $4d, $01, $80, $03, $06, $f4, $f5, $3b, $01, $fc, $f5, $3c, $01, $f4, $fd, $4b, $01, $fc, $fd, $4c, $01, $f4, $05, $5b, $01, $fc, $05, $5c, $00, $04, $05, $5d, $01, $80, $03, $06, $f4, $f4, $3b, $01, $fc, $f4, $3c, $01, $f4, $fc, $4b, $01, $fc, $fc, $4c, $01, $fc, $04, $56, $00, $80, $06, $06, $f4, $f8, $60, $01, $fc, $f8, $61, $01, $04, $f8, $62, $01, $f4, $00, $70, $03, $fc, $00, $71, $03, $04, $00, $72, $03, $80, $06, $06, $fc, $f4, $0b, $02, $f4, $fc, $1a, $02, $fc, $fc, $1b, $02, $04, $fc, $1c, $02, $f4, $04, $2a, $02, $fc, $04, $2b, $02, $04, $04, $2c, $02, $80, $06, $06, $f4, $f4, $0d, $00, $fc, $f4, $0b, $02, $04, $f4, $0e, $00, $f4, $fc, $1a, $02, $fc, $fc, $1b, $02, $04, $fc, $1c, $02, $f4, $04, $2a, $02, $fc, $04, $2b, $02, $04, $04, $2c, $02, $80, $06, $06, $f4, $f4, $1d, $00, $fc, $f4, $0b, $02, $04, $f4, $1e, $00, $f4, $fc, $1a, $02, $fc, $fc, $1b, $02, $04, $fc, $1c, $02, $f4, $04, $2a, $02, $fc, $04, $2b, $02, $04, $04, $2c, $02, $80, $06, $06, $f4, $f4, $0a, $00, $fc, $f4, $0b, $02, $04, $f4, $0c, $00, $f4, $fc, $1a, $02, $fc, $fc, $1b, $02, $04, $fc, $1c, $02, $f4, $04, $2a, $02, $fc, $04, $2b, $02, $04, $04, $2c, $02, $80, $06, $06, $f4, $f8, $06, $02, $fc, $f8, $07, $02, $04, $f8, $08, $02, $f4, $00, $16, $02, $fc, $00, $17, $02, $04, $00, $18, $02, $80, $06, $06, $f4, $f8, $06, $02, $fc, $f8, $07, $02, $04, $f8, $08, $02, $f4, $00, $16, $02, $fc, $00, $17, $02, $04, $00, $09, $02, $80, $04, $04, $f8, $f8, $80, $02, $00, $f8, $81, $02, $f8, $00, $90, $02, $00, $00, $91, $02, $80, $04, $04, $f8, $f8, $82, $02, $00, $f8, $83, $02, $f8, $00, $92, $02, $00, $00, $93, $02, $80, $04, $04, $f8, $f8, $84, $02, $00, $f8, $85, $02, $f8, $00, $94, $02, $00, $00, $95, $02, $80, $04, $04, $f8, $f8, $86, $02, $00, $f8, $87, $02, $f8, $00, $96, $02, $00, $00, $97, $02, $80, $04, $04, $f8, $f9, $a8, $02, $00, $f9, $a9, $02, $f8, $01, $b8, $02, $00, $01, $b9, $02, $80, $04, $04, $f8, $fa, $aa, $02, $00, $fa, $ab, $02, $f8, $02, $ba, $02, $00, $02, $bb, $02, $80, $04, $04, $f8, $f9, $ac, $02, $00, $f9, $ad, $02, $f8, $01, $bc, $02, $00, $01, $bd, $02, $80, $04, $04, $f8, $f8, $ae, $02, $00, $f8, $af, $02, $f8, $00, $be, $02, $00, $00, $bf, $02, $80, $04, $04, $f8, $f9, $88, $02, $00, $f9, $89, $02, $f8, $01, $98, $02, $00, $01, $99, $02, $80, $04, $04, $f8, $fa, $8a, $02, $00, $fa, $8b, $02, $f8, $02, $9a, $02, $00, $02, $9b, $02, $80, $04, $04, $f8, $f9, $8c, $02, $00, $f9, $8d, $02, $f8, $01, $9c, $02, $00, $01, $9d, $02, $80, $04, $04, $f8, $f8, $8e, $02, $00, $f8, $8f, $02, $f8, $00, $9e, $02, $00, $00, $9f, $02, $80, $04, $04, $f8, $f8, $a0, $02, $00, $f8, $a1, $02, $f8, $00, $b0, $02, $00, $00, $b1, $02, $80, $04, $04, $f8, $f8, $a2, $02, $00, $f8, $a3, $02, $f8, $00, $b2, $02, $00, $00, $b3, $02, $80, $04, $04, $f8, $f8, $a4, $02, $00, $f8, $a5, $02, $f8, $00, $b4, $02, $00, $00, $b5, $02, $80, $04, $04, $f8, $f8, $a6, $02, $00, $f8, $a7, $02, $f8, $00, $b6, $02, $00, $00, $b7, $02, $80, $04, $04, $f8, $f8, $c0, $02, $00, $f8, $c1, $02, $f8, $00, $d0, $02, $00, $00, $d1, $02, $80, $04, $04, $f8, $f8, $c2, $02, $00, $f8, $c3, $02, $f8, $00, $d2, $02, $00, $00, $d3, $02, $80, $04, $04, $f8, $f8, $c4, $02, $00, $f8, $c5, $02, $f8, $00, $d4, $02, $00, $00, $d5, $02, $80, $04, $04, $f8, $f8, $c6, $02, $00, $f8, $c7, $02, $f8, $00, $d6, $02, $00, $00, $d7, $02, $80, $04, $04, $f8, $fa, $84, $02, $00, $fa, $85, $02, $f8, $02, $c8, $02, $00, $02, $c9, $02, $80, $04, $04, $f8, $fc, $84, $02, $00, $fc, $85, $02, $f8, $04, $d8, $02, $00, $04, $d9, $02, $80, $04, $04, $f8, $fa, $84, $02, $00, $fa, $85, $02, $f8, $02, $ca, $02, $00, $02, $cb, $02, $80, $04, $04, $f8, $00, $da, $02, $00, $00, $db, $02, $80, $02, $02, $fc, $00, $de, $02, $80, $02, $02, $fc, $00, $ce, $02, $80, $02, $04, $fc, $f8, $cd, $02, $fc, $00, $dd, $02, $80, $02, $04, $fc, $f8, $cc, $02, $fc, $00, $dc, $02, $80, $03, $03, $fa, $00, $cf, $02, $80, $03, $03, $fa, $00, $e1, $02, $80, $04, $04, $f8, $f8, $e0, $02, $f8, $00, $f0, $02, $00, $00, $f1, $02, $80, $03, $03, $fa, $00, $df, $02, $80, $03, $03, $fa, $00, $e3, $02, $80, $04, $04, $f8, $f8, $e2, $02, $f8, $00, $f2, $02, $00, $00, $f3, $02, $80, $0c, $0c, $f0, $f0, $04, $03, $f8, $f0, $05, $03, $00, $f0, $06, $03, $f0, $f8, $14, $01, $f8, $f8, $15, $01, $00, $f8, $16, $01, $08, $f8, $17, $03, $f0, $00, $24, $00, $f8, $00, $25, $00, $00, $00, $26, $00, $08, $00, $27, $00, $80, $05, $04, $f8, $f8, $08, $01, $00, $f8, $09, $01, $f8, $00, $18, $03, $00, $00, $19, $03, $80, $0c, $04, $f0, $f8, $00, $02, $f8, $f8, $01, $01, $00, $f8, $02, $01, $08, $f8, $03, $01, $f0, $00, $10, $02, $f8, $00, $11, $02, $00, $00, $12, $02, $08, $00, $13, $02, $80, $0c, $04, $f0, $f8, $00, $02, $f8, $f8, $01, $01, $00, $f8, $02, $01, $08, $f8, $03, $01, $f0, $00, $10, $02, $f8, $00, $11, $02, $00, $00, $12, $02, $08, $00, $07, $02, $80, $03, $02, $f8, $f8, $0a, $01, $00, $f8, $0b, $01, $f8, $00, $1a, $03, $00, $00, $1b, $03, $80, $03, $02, $f8, $f8, $0c, $01, $00, $f8, $0d, $01, $f8, $00, $1c, $03, $00, $00, $1d, $03, $80, $00, $00, $08, $f8, $b0, $01, $00, $f8, $b1, $01, $f8, $00, $c0, $03, $00, $00, $c1, $03, $80, $00, $00, $f8, $f0, $d0, $03, $00, $f0, $d1, $03, $f8, $f8, $e0, $03, $00, $f8, $e1, $03, $f8, $00, $f0, $03, $00, $00, $f1, $03, $80, $00, $00, $f8, $f0, $d2, $03, $00, $f0, $d3, $03, $f8, $f8, $e2, $03, $00, $f8, $e3, $03, $f8, $00, $f2, $03, $00, $00, $f3, $03, $80, $00, $00, $f8, $f0, $d4, $03, $00, $f0, $d5, $03, $f8, $f8, $e4, $03, $00, $f8, $e5, $03, $f8, $00, $f4, $03, $00, $00, $f5, $03, $80, $00, $00, $f8, $f0, $d6, $03, $00, $f0, $d7, $03, $f8, $f8, $e6, $03, $00, $f8, $e7, $03, $f8, $00, $f6, $03, $00, $00, $f7, $03, $80, $00, $00, $f8, $f0, $d8, $03, $00, $f0, $d9, $03, $f8, $f8, $e8, $03, $00, $f8, $e9, $03, $f8, $00, $f8, $03, $00, $00, $f9, $03, $80, $00, $00, $f8, $f0, $da, $03, $00, $f0, $db, $03, $f8, $f8, $ea, $03, $00, $f8, $eb, $03, $f8, $00, $fa, $03, $00, $00, $fb, $03, $80, $03, $03, $fc, $fc, $23, $01, $80, $04, $03, $fc, $fc, $21, $00, $80, $04, $03, $fc, $fc, $20, $00, $80, $05, $05, $fc, $fc, $22, $01, $80, $0d, $06, $e8, $f0, $36, $02, $f0, $f0, $37, $02, $f8, $f0, $32, $02, $00, $f0, $33, $02, $e8, $f8, $46, $02, $f0, $f8, $47, $02, $f8, $f8, $42, $02, $00, $f8, $43, $02, $08, $f8, $44, $02, $10, $f8, $45, $02, $e8, $00, $56, $02, $f0, $00, $57, $02, $f8, $00, $52, $02, $00, $00, $53, $02, $08, $00, $54, $02, $10, $00, $55, $02, $80, $0d, $06, $e8, $f0, $60, $02, $f0, $f0, $61, $02, $f8, $f0, $32, $02, $00, $f0, $33, $02, $e8, $f8, $70, $02, $f0, $f8, $71, $02, $f8, $f8, $42, $02, $00, $f8, $43, $02, $08, $f8, $44, $02, $10, $f8, $45, $02, $e8, $00, $80, $02, $f0, $00, $81, $02, $f8, $00, $52, $02, $00, $00, $53, $02, $08, $00, $54, $02, $10, $00, $55, $02, $80, $0d, $06, $e8, $f0, $36, $02, $f0, $f0, $37, $02, $f8, $f0, $38, $02, $00, $f0, $39, $02, $e8, $f8, $46, $02, $f0, $f8, $47, $02, $f8, $f8, $48, $02, $00, $f8, $49, $02, $08, $f8, $4a, $02, $10, $f8, $4b, $02, $e8, $00, $56, $02, $f0, $00, $57, $02, $f8, $00, $58, $02, $00, $00, $59, $02, $08, $00, $5a, $02, $10, $00, $5b, $02, $80, $0d, $06, $e8, $f0, $30, $02, $f0, $f0, $31, $02, $f8, $f0, $38, $02, $00, $f0, $39, $02, $e8, $f8, $40, $02, $f0, $f8, $41, $02, $f8, $f8, $48, $02, $00, $f8, $49, $02, $08, $f8, $4a, $02, $10, $f8, $4b, $02, $e8, $00, $50, $02, $f0, $00, $51, $02, $f8, $00, $58, $02, $00, $00, $59, $02, $08, $00, $5a, $02, $10, $00, $5b, $02, $80, $0d, $06, $e8, $f0, $60, $02, $f0, $f0, $61, $02, $f8, $f0, $62, $02, $00, $f0, $63, $02, $e8, $f8, $70, $02, $f0, $f8, $71, $02, $f8, $f8, $72, $02, $00, $f8, $73, $02, $08, $f8, $74, $02, $10, $f8, $75, $02, $e8, $00, $80, $02, $f0, $00, $81, $02, $f8, $00, $82, $02, $00, $00, $83, $02, $08, $00, $84, $02, $10, $00, $85, $02, $80, $0d, $06, $e8, $f0, $30, $02, $f0, $f0, $31, $02, $f8, $f0, $62, $02, $00, $f0, $63, $02, $e8, $f8, $40, $02, $f0, $f8, $41, $02, $f8, $f8, $72, $02, $00, $f8, $73, $02, $08, $f8, $74, $02, $10, $f8, $75, $02, $e8, $00, $50, $02, $f0, $00, $51, $02, $f8, $00, $82, $02, $00, $00, $83, $02, $08, $00, $84, $02, $10, $00, $85, $02, $80, $05, $05, $f8, $f8, $2a, $00, $00, $f8, $2b, $00, $f8, $00, $3a, $00, $00, $00, $3b, $00, $80, $05, $05, $f8, $f8, $2c, $00, $00, $f8, $2d, $00, $f8, $00, $3c, $00, $00, $00, $3d, $00, $80, $05, $05, $f8, $f8, $2e, $00, $00, $f8, $2f, $00, $f8, $00, $3e, $00, $00, $00, $3f, $00, $80, $00, $00, $fc, $fc, $a4, $00, $80, $00, $00, $fc, $fc, $a5, $00, $80, $00, $00, $fc, $fc, $a6, $00, $80, $00, $00, $f8, $f8, $96, $00, $00, $f8, $96, $40, $f8, $00, $96, $80, $00, $00, $96, $c0, $80, $00, $00, $f8, $f8, $97, $00, $00, $f8, $97, $40, $f8, $00, $97, $80, $00, $00, $97, $c0, $80, $00, $00, $f8, $f8, $99, $00, $00, $f8, $9a, $00, $f8, $00, $a9, $00, $00, $00, $aa, $00, $80, $00, $00, $fc, $fc, $a7, $00, $80, $00, $00, $fc, $fc, $98, $00, $80, $05, $02, $f0, $fc, $4d, $03, $f8, $fc, $4e, $03, $00, $fc, $4f, $03, $80, $05, $02, $f0, $fc, $5d, $03, $f8, $fc, $5e, $03, $00, $fc, $5f, $03, $80, $05, $02, $f0, $fc, $6d, $03, $f8, $fc, $6e, $03, $00, $fc, $6f, $03, $80, $05, $02, $f0, $fc, $7d, $03, $f8, $fc, $7e, $03, $00, $fc, $7f, $03, $80, $05, $02, $f0, $fc, $7c, $03, $f8, $fc, $7e, $03, $00, $fc, $7f, $03, $80, $05, $02, $f0, $fc, $6c, $03, $f8, $fc, $6e, $03, $00, $fc, $6f, $03, $80, $05, $02, $f0, $fc, $5c, $03, $f8, $fc, $5e, $03, $00, $fc, $5f, $03, $80, $05, $02, $f0, $fc, $4c, $03, $f8, $fc, $4e, $03, $00, $fc, $4f, $03, $80, $05, $02, $f4, $fc, $5d, $01, $fc, $fc, $5e, $01, $04, $fc, $5f, $01, $80, $08, $04, $f0, $f4, $65, $02, $fe, $f4, $76, $02, $f0, $fc, $78, $02, $f8, $fc, $79, $02, $00, $fc, $6a, $02, $08, $fc, $6b, $02, $fd, $04, $77, $02, $80, $08, $04, $f0, $f4, $64, $02, $ff, $f4, $66, $02, $f0, $fc, $68, $02, $f8, $fc, $69, $02, $00, $fc, $6a, $02, $08, $fc, $6b, $02, $fd, $04, $67, $02, $80, $08, $04, $f0, $f4, $64, $02, $fe, $f4, $76, $02, $f0, $fc, $68, $02, $f8, $fc, $69, $02, $00, $fc, $7a, $02, $08, $fc, $7b, $02, $fd, $04, $77, $02, $80, $08, $04, $f0, $f4, $65, $02, $ff, $f4, $86, $02, $f0, $fc, $78, $02, $f8, $fc, $79, $02, $00, $fc, $8a, $02, $08, $fc, $8b, $02, $fd, $04, $87, $02, $80, $08, $04, $f0, $f4, $64, $02, $ff, $f4, $86, $02, $f0, $fc, $88, $02, $f8, $fc, $89, $02, $00, $fc, $8a, $02, $08, $fc, $8b, $02, $fd, $04, $87, $02, $80, $08, $04, $f0, $f4, $64, $02, $fe, $f4, $76, $02, $f0, $fc, $88, $02, $f8, $fc, $89, $02, $00, $fc, $7a, $02, $08, $fc, $7b, $02, $fd, $04, $77, $02, $80, $08, $04, $f0, $f4, $65, $01, $00, $f4, $76, $01, $f0, $fc, $78, $01, $f8, $fc, $79, $01, $00, $fc, $7a, $01, $08, $fc, $a8, $01, $00, $04, $77, $01, $80, $06, $06, $f8, $f8, $8c, $03, $00, $f8, $8d, $03, $f8, $00, $9c, $03, $00, $00, $9d, $03, $80, $06, $06, $f8, $f8, $8e, $03, $00, $f8, $8f, $03, $f8, $00, $9e, $03, $00, $00, $9f, $03, $80, $06, $06, $f8, $f8, $34, $03, $00, $f8, $35, $03, $f8, $00, $28, $03, $00, $00, $29, $03, $80, $06, $06, $f8, $f8, $0e, $02, $00, $f8, $0f, $02, $f8, $00, $1e, $02, $00, $00, $1f, $02, $80, $06, $06, $f8, $f8, $ae, $02, $00, $f8, $af, $02, $f8, $00, $be, $02, $00, $00, $bf, $02, $80, $06, $06, $f8, $f8, $ac, $02, $00, $f8, $ad, $02, $f8, $00, $bc, $02, $00, $00, $bd, $02, $80, $06, $06, $f8, $f8, $ae, $02, $00, $f8, $af, $02, $f8, $00, $ce, $02, $00, $00, $cf, $02, $80, $06, $06, $f8, $f8, $0e, $02, $00, $f8, $0f, $02, $f8, $00, $de, $02, $00, $00, $df, $02, $80, $06, $06, $f8, $f8, $ac, $02, $00, $f8, $ad, $02, $f8, $00, $cc, $02, $00, $00, $cd, $02, $80, $06, $06, $f8, $f8, $dc, $03, $00, $f8, $dd, $03, $f8, $00, $ec, $03, $00, $00, $ed, $03, $80, $06, $06, $f8, $f8, $fc, $03, $00, $f8, $fd, $03, $f8, $00, $ee, $03, $00, $00, $ef, $03, $80, $06, $06, $fb, $f8, $9b, $03, $fb, $00, $ab, $03, $80, $06, $06, $fd, $f8, $9b, $43, $fd, $00, $ab, $43, $80, $06, $06, $f8, $f8, $fd, $43, $00, $f8, $fc, $43, $f8, $00, $ef, $43, $00, $00, $ee, $43, $80, $00, $00, $f8, $fc, $90, $00, $00, $fc, $91, $00, $80, $00, $00, $f8, $fc, $a0, $00, $00, $fc, $a1, $00, $80, $00, $00, $f8, $fc, $92, $00, $00, $fc, $93, $00, $80, $00, $00, $f8, $fc, $a2, $00, $00, $fc, $a3, $00, $80, $00, $00, $f8, $fc, $94, $00, $00, $fc, $95, $00, $80, $00, $00, $f4, $fc, $92, $00, $fc, $fc, $93, $00, $04, $fc, $91, $00, $80, $00, $00, $10, $d0, $91, $00, $08, $d8, $90, $00, $10, $d8, $a0, $00, $00, $e0, $a3, $00, $e8, $e8, $b0, $00, $f0, $e8, $b1, $00, $f8, $e8, $b2, $00, $00, $e8, $b3, $00, $e8, $f0, $c0, $00, $f0, $f0, $c1, $00, $f8, $f0, $c2, $00, $00, $f0, $c3, $00, $e8, $f8, $d0, $00, $f0, $f8, $d1, $00, $f8, $f8, $d2, $00, $00, $f8, $d3, $00, $e0, $00, $f0, $00, $e8, $00, $e0, $00, $f0, $00, $e1, $00, $f8, $00, $e2, $00, $00, $00, $e3, $00, $d8, $08, $a1, $00, $e0, $08, $a2, $00, $d0, $10, $f1, $00, $d8, $10, $a0, $00, $80, $00, $00, $f3, $e8, $a4, $00, $f3, $f0, $b4, $00, $fb, $f0, $b5, $00, $03, $f0, $b6, $00, $fb, $f8, $c5, $00, $03, $f8, $c6, $00, $03, $00, $d6, $00, $0b, $00, $d7, $00, $80, $00, $00, $e8, $f0, $96, $00, $f0, $f0, $97, $00, $f8, $f0, $98, $00, $00, $f0, $99, $00, $08, $f0, $9a, $00, $10, $f0, $9b, $00, $f8, $f8, $a8, $00, $00, $f8, $a9, $00, $80, $00, $00, $f0, $f0, $9c, $00, $f8, $f0, $9d, $00, $00, $f0, $9e, $00, $08, $f0, $9f, $00, $f8, $f8, $ad, $00, $00, $f8, $ae, $00, $80, $00, $00, $f0, $f7, $f3, $00, $f8, $f7, $f4, $00, $00, $f7, $f5, $00, $08, $f7, $f6, $00, $80, $00, $00, $f8, $f7, $e4, $00, $00, $f7, $e5, $00, $80, $00, $00, $fc, $f4, $f2, $00, $80, $00, $00, $f4, $f1, $e6, $00, $fc, $f1, $e7, $00, $fc, $f9, $f7, $00, $80, $00, $00, $f8, $ec, $a7, $00, $f8, $f4, $b7, $00, $00, $f4, $b8, $00, $f8, $fc, $c7, $00, $80, $00, $00, $f7, $f1, $aa, $00, $ff, $f1, $ab, $00, $f7, $f9, $ba, $00, $ff, $f9, $bb, $00, $80, $00, $00, $f4, $f1, $bc, $00, $fc, $f1, $bd, $00, $04, $f1, $be, $00, $fc, $f9, $cd, $00, $80, $00, $00, $f7, $f1, $ba, $80, $ff, $f1, $bb, $80, $f7, $f9, $aa, $80, $ff, $f9, $ab, $80, $80, $00, $00, $fc, $ea, $b9, $00, $f4, $f2, $c8, $00, $fc, $f2, $c9, $00, $04, $f2, $ca, $00, $fc, $fa, $d9, $00, $fc, $02, $d8, $00, $80, $00, $00, $f4, $e8, $b2, $02, $fc, $e8, $b3, $02, $04, $e8, $b4, $02, $f4, $f0, $c2, $02, $fc, $f0, $c3, $02, $04, $f0, $c4, $02, $f4, $f8, $b5, $02, $fc, $f8, $b6, $02, $04, $f8, $b7, $02, $f4, $00, $c5, $02, $fc, $00, $c6, $02, $04, $00, $c7, $02, $f4, $08, $b8, $02, $fc, $08, $b9, $02, $f4, $10, $c8, $02, $fc, $10, $c9, $02, $80, $00, $00, $08, $00, $01, $01, $10, $00, $02, $01, $18, $00, $03, $01, $20, $00, $04, $01, $08, $08, $11, $01, $10, $08, $12, $01, $18, $08, $13, $01, $20, $08, $14, $01, $00, $10, $20, $01, $08, $10, $21, $01, $10, $10, $22, $01, $18, $10, $23, $01, $20, $10, $24, $01, $28, $10, $25, $01, $00, $18, $30, $01, $08, $18, $31, $00, $10, $18, $32, $00, $18, $18, $33, $00, $28, $18, $35, $01, $00, $20, $40, $01, $28, $20, $45, $01, $00, $28, $50, $01, $28, $28, $55, $01, $00, $30, $60, $01, $28, $30, $65, $01, $00, $38, $70, $01, $08, $38, $71, $03, $10, $38, $72, $03, $18, $38, $73, $03, $20, $38, $74, $03, $28, $38, $75, $01, $48, $38, $62, $02, $50, $38, $63, $02, $00, $40, $80, $01, $08, $40, $81, $03, $10, $40, $82, $03, $18, $40, $83, $03, $20, $40, $84, $03, $28, $40, $85, $01, $00, $22, $34, $02, $08, $1f, $41, $00, $10, $1f, $42, $00, $18, $1f, $43, $00, $20, $1f, $44, $00, $28, $22, $34, $42, $08, $27, $51, $00, $10, $27, $52, $00, $18, $27, $53, $00, $20, $27, $54, $00, $08, $2f, $61, $00, $20, $2f, $64, $00, $00, $40, $00, $03, $28, $40, $10, $03, $80, $00, $00, $0f, $00, $94, $01, $17, $00, $95, $01, $0f, $08, $a4, $01, $17, $08, $a5, $01, $ff, $10, $90, $01, $07, $10, $91, $01, $0f, $10, $92, $01, $17, $10, $93, $01, $07, $18, $a1, $01, $0f, $18, $a2, $01, $17, $18, $a3, $01, $ff, $20, $b0, $01, $07, $20, $b1, $01, $0f, $20, $b2, $01, $17, $20, $b3, $01, $07, $28, $c1, $01, $0f, $28, $c2, $01, $18, $28, $c3, $01, $28, $17, $d0, $00, $30, $17, $d1, $00, $38, $17, $d2, $00, $28, $1f, $e0, $00, $30, $1f, $e1, $00, $38, $1f, $e2, $00, $28, $27, $f0, $00, $30, $27, $f1, $00, $38, $27, $f2, $00, $80, $00, $00, $10, $b8, $4b, $02, $18, $b8, $4c, $01, $10, $c0, $5b, $02, $18, $c0, $5c, $01, $20, $c0, $5d, $02, $08, $c8, $59, $02, $10, $c8, $5a, $02, $18, $c8, $79, $01, $20, $c8, $6d, $02, $08, $d0, $58, $02, $18, $d0, $79, $01, $20, $d0, $7d, $02, $28, $d0, $6a, $02, $00, $d8, $57, $02, $18, $d8, $79, $01, $28, $d8, $6b, $02, $30, $d8, $6c, $02, $00, $e0, $66, $02, $08, $e0, $67, $02, $10, $e0, $68, $02, $18, $e0, $69, $01, $30, $e0, $7c, $02, $00, $e8, $76, $02, $08, $e8, $77, $02, $10, $e8, $78, $02, $18, $e8, $79, $01, $30, $e8, $7a, $02, $38, $e8, $7b, $02, $00, $f0, $86, $02, $08, $f0, $87, $02, $10, $f0, $88, $02, $18, $f0, $89, $02, $20, $f0, $8a, $02, $28, $f0, $8b, $02, $30, $f0, $8c, $01, $38, $f0, $8d, $01, $00, $f8, $96, $00, $08, $f8, $97, $00, $10, $f8, $98, $00, $18, $f8, $99, $00, $20, $f8, $9a, $00, $28, $f8, $9b, $00, $80
+
+UnknownData3_00 = 0
+UnknownData3_01 = 1
+UnknownData3_02 = 2
+UnknownData3_03 = 3
+UnknownData3_04 = 4
+UnknownData3_05 = 5
+UnknownData3_06 = 6
+UnknownData3_07 = 7
+UnknownData3_08 = 8
+UnknownData3_09 = 9
+UnknownData3_10 = 10
+UnknownData3_11 = 11
+UnknownData3_12 = 12
+UnknownData3_13 = 13
+UnknownData3_14 = 14
+UnknownData3_15 = 15
+UnknownData3_16 = 16
+UnknownData3_17 = 17
+UnknownData3_18 = 18
+UnknownData3_19 = 19
+UnknownData3_20 = 20
+UnknownData3_21 = 21
+UnknownData3_22 = 22
+UnknownData3_23 = 23
+UnknownData3_24 = 24
+UnknownData3_25 = 25
+UnknownData3_26 = 26
+UnknownData3_27 = 27
+UnknownData3_28 = 28
+UnknownData3_29 = 29
+UnknownData3_30 = 30
+UnknownData3_31 = 31
+
+UnknownData3_Pointers:
+  .addr @UnknownData3_00 
+  .addr @UnknownData3_01 
+  .addr @UnknownData3_02 
+  .addr @UnknownData3_03 
+  .addr @UnknownData3_04 
+  .addr @UnknownData3_05 
+  .addr @UnknownData3_06 
+  .addr @UnknownData3_07 
+  .addr @UnknownData3_08 
+  .addr @UnknownData3_09 
+  .addr @UnknownData3_10
+  .addr @UnknownData3_11
+  .addr @UnknownData3_12
+  .addr @UnknownData3_13
+  .addr @UnknownData3_14
+  .addr @UnknownData3_15
+  .addr @UnknownData3_16
+  .addr @UnknownData3_17
+  .addr @UnknownData3_18
+  .addr @UnknownData3_19
+  .addr @UnknownData3_20
+  .addr @UnknownData3_21
+  .addr @UnknownData3_22
+  .addr @UnknownData3_23
+  .addr @UnknownData3_24
+  .addr @UnknownData3_25
+  .addr @UnknownData3_26
+  .addr @UnknownData3_27
+  .addr @UnknownData3_28
+  .addr @UnknownData3_29
+  .addr @UnknownData3_30
+  .addr @UnknownData3_31
+
+@UnknownData3_00:
+.byte $02, $40, $08, $c0
+@UnknownData3_01:
+.byte $02, $40, $21, $c0
+@UnknownData3_02:
+.byte $03, $30, $08, $c0
+@UnknownData3_03:
+.byte $03, $30, $21, $c0
+@UnknownData3_04:
+.byte $03, $20, $3a, $c0
+@UnknownData3_05:
+.byte $03, $20, $5b, $c0
+@UnknownData3_06:
+.byte $04, $20, $08, $c0
+@UnknownData3_07:
+.byte $04, $20, $21, $c0
+@UnknownData3_08:
+.byte $04, $10, $3a, $c0
+@UnknownData3_09:
+.byte $04, $10, $5b, $c0
+@UnknownData3_10:
+.byte $03, $10, $7c, $c0
+@UnknownData3_11:
+.byte $03, $10, $a5, $c0
+@UnknownData3_12:
+.byte $04, $10, $a5, $c0
+@UnknownData3_13:
+.byte $02, $10, $c6, $c0
+@UnknownData3_14:
+.byte $02, $10, $d7, $c0
+@UnknownData3_15:
+.byte $02, $10, $f8, $c0
+@UnknownData3_16:
+.byte $03, $08, $a5, $c0
+@UnknownData3_17:
+.byte $03, $08, $c6, $c0
+@UnknownData3_18:
+.byte $03, $08, $d7, $c0
+@UnknownData3_19:
+.byte $03, $08, $f8, $c0
+@UnknownData3_20:
+.byte $03, $08, $19, $c1
+@UnknownData3_21:
+.byte $03, $08, $3a, $c1
+@UnknownData3_22:
+.byte $03, $08, $5b, $c1
+@UnknownData3_23:
+.byte $03, $08, $7c, $c1
+@UnknownData3_24:
+.byte $04, $04, $a5, $c0
+@UnknownData3_25:
+.byte $04, $04, $c6, $c0
+@UnknownData3_26:
+.byte $04, $04, $d7, $c0
+@UnknownData3_27:
+.byte $04, $04, $f8, $c0
+@UnknownData3_28:
+.byte $04, $04, $19, $c1
+@UnknownData3_29:
+.byte $04, $04, $3a, $c1
+@UnknownData3_30:
+.byte $04, $04, $5b, $c1
+@UnknownData3_31:
+.byte $04, $04, $7c, $c1, $00, $01, $00, $01, $00, $01, $00, $01, $00, $01, $00, $01, $00, $01, $00, $01, $00, $01, $00, $01, $00, $01, $00, $01, $ff, $01, $01, $00, $01, $01, $00, $01, $01, $00, $01, $01, $00, $01, $01, $00, $01, $01, $00, $01, $01, $00, $01, $01, $03, $ff, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $01, $00, $00, $00, $01, $00, $01, $00, $01, $00, $01, $00, $01, $01, $01, $01, $00, $01, $01, $01, $03, $ff, $00, $01, $02, $00, $01, $02, $00, $01, $02, $03, $00, $01, $02, $00, $01, $02, $00, $01, $02, $03, $00, $01, $02, $00, $01, $02, $00, $01, $02, $00, $01, $03, $ff, $01, $01, $01, $01, $01, $01, $01, $01, $01, $01, $01, $03, $01, $01, $01, $01, $01, $01, $01, $03, $01, $01, $01, $01, $01, $03, $01, $01, $01, $01, $01, $03, $01, $01, $01, $03, $01, $01, $01, $03, $ff, $02, $02, $02, $02, $02, $02, $02, $02, $02, $02, $02, $02, $02, $02, $02, $02, $02, $02, $02, $02, $02, $02, $02, $02, $02, $02, $02, $02, $02, $02, $02, $02, $ff, $03, $03, $03, $03, $03, $03, $03, $03, $03, $03, $03, $03, $03, $03, $03, $03, $ff, $02, $02, $02, $03, $02, $02, $02, $03, $02, $02, $02, $03, $02, $02, $02, $03, $02, $02, $02, $03, $02, $02, $02, $03, $02, $02, $02, $03, $02, $02, $02, $03, $ff, $00, $01, $02, $03, $00, $01, $02, $03, $00, $01, $02, $03, $00, $01, $02, $03, $00, $01, $02, $03, $00, $01, $02, $03, $00, $01, $02, $03, $00, $01, $02, $03, $ff, $00, $01, $00, $01, $00, $01, $00, $03, $00, $01, $00, $01, $00, $01, $00, $03, $00, $01, $00, $01, $00, $01, $00, $03, $00, $01, $00, $01, $00, $01, $00, $03, $ff, $00, $01, $02, $03, $04, $00, $01, $02, $03, $04, $00, $01, $02, $03, $04, $00, $01, $02, $03, $04, $00, $01, $02, $03, $04, $00, $01, $02, $03, $04, $00, $01, $ff, $04, $04, $04, $04, $04, $04, $04, $03, $04, $04, $04, $04, $04, $04, $04, $03, $04, $04, $04, $04, $04, $04, $04, $03, $04, $04, $04, $04, $04, $04, $04, $03, $ff, $04, $02, $04, $03, $04, $02, $04, $03, $04, $02, $04, $03, $04, $02, $04, $03, $04, $02, $04, $03, $04, $02, $04, $03, $04, $02, $04, $03, $04, $02, $04, $03, $ff
+
 
 
 RomGraphicsTitleScreen = 0
@@ -6811,10 +6557,10 @@ RomGraphics7 = 7
 RomGraphics8 = 8
 RomGraphics9 = 9
 RomGraphicsA = 10
-RomGraphicsB = 11
+RomGraphicsStatusPowerLabel = 11
 RomGraphicsC = 12
 RomGraphicsD = 13
-RomGraphicsE = 14
+RomGraphicsGetReadyScreen = 14
 
 RomGraphicsPtrs:
 .addr @RomGraphicsTitleScreen
@@ -6828,10 +6574,10 @@ RomGraphicsPtrs:
 .addr @RomGraphics8
 .addr @RomGraphics9
 .addr @RomGraphicsA
-.addr @RomGraphicsB
+.addr @RomGraphicsStatusPowerLabel
 .addr @RomGraphicsC
 .addr @RomGraphicsD
-.addr @RomGraphicsE
+.addr @RomGraphicsGetReadyScreen
 
 @RomGraphicsTitleScreen:
 .byte $00, $20, $FF, $FF, $20, $10, $02, $FF, $01, $D7, $20, $A5, $B5, $FF, $0E, $01, $01, $FF, $05, $62, $01, $61, $A2, $A0, $02, $B2, $A4, $D0, $01, $01, $D3, $FF, $0D, $01, $01, $FF, $05, $72, $01, $71, $B2, $01, $E0, $01, $B4, $01, $01, $E2, $E3, $22, $23, $FF, $0B, $01, $01, $FF, $05, $82, $01, $81, $01, $01, $F0, $01, $C4, $01, $01, $F2, $F3, $FF, $0A, $60, $90, $91, $01, $01, $02, $68, $69, $6A, $6B, $92, $01, $01, $01, $01, $01, $65, $D4, $D5, $01, $01, $C5, $FF, $0A, $70, $01, $A1, $01, $A3, $02, $78, $79, $7A, $7B, $02, $62, $01, $63, $64, $01, $75, $E4, $E5, $F5, $01, $01, $FF, $0A, $80, $B0, $01, $01, $B3, $02, $88, $89, $8A, $8B, $02, $72, $01, $73, $74, $01, $85, $F4, $01, $01, $01, $66, $FF, $0B, $C0, $C1, $C2, $C3, $02, $98, $99, $9A, $9B, $02, $93, $94, $83, $84, $94, $95, $B1, $D1, $D2, $E1, $F1, $FF, $0B, $86, $87, $A6, $A7, $02, $A8, $A9, $AA, $AB, $02, $8C, $8D, $8E, $8F, $02, $02, $02, $02, $02, $02, $02, $02, $02, $02, $FF, $08, $96, $97, $B6, $B7, $02, $B8, $B9, $BA, $BB, $02, $9C, $9D, $9E, $9F, $FF, $0D, $5C, $5D, $5D, $5F, $5C, $5D, $5E, $5F, $6C, $6D, $6E, $6F, $7C, $7D, $7E, $7F, $5C, $5D, $5E, $5F, $5C, $5D, $5E, $5F, $5C, $5D, $5E, $5F, $5C, $5D, $5E, $5F, $04, $05, $06, $07, $04, $05, $06, $07, $04, $05, $06, $07, $04, $05, $06, $07, $04, $05, $06, $07, $04, $05, $06, $07, $04, $05, $06, $07, $04, $05, $06, $07, $14, $15, $16, $17, $14, $15, $16, $17, $14, $15, $16, $17, $14, $15, $16, $17, $14, $15, $16, $17, $14, $15, $16, $17, $14, $15, $16, $17, $14, $15, $16, $17, $FF, $01, $86, $22, $40, $31, $39, $38, $37, $20, $4C, $4A, $4E, $20, $54, $4F, $59, $53, $2C, $4C, $54, $44, $2E, $FF, $13, $54, $4D, $26, $40, $31, $39, $38, $37, $FF, $0F, $55, $4E, $49, $56, $45, $52, $53, $41, $4C, $20, $43, $49, $54, $59, $20, $53, $54, $55, $44, $49, $4F, $53, $2C, $49, $4E, $43, $2E, $FF, $08, $41, $4C, $4C, $20, $52, $49, $47, $48, $54, $53, $20, $52, $45, $53, $45, $52, $56, $45, $44, $2E, $FF, $09, $4C, $49, $43, $45, $4E, $53, $45, $44, $20, $42, $59, $20, $4D, $45, $52, $43, $48, $41, $4E, $44, $49, $53, $49, $4E, $47, $FF, $07, $43, $4F, $52, $50, $4F, $52, $41, $54, $49, $4F, $4E, $20, $4F, $46, $20, $41, $4D, $45, $52, $49, $43, $41, $2C, $49, $4E, $43, $2E, $FF, $06, $4C, $49, $43, $45, $4E, $53, $45, $44, $20, $42, $59, $20, $4E, $49, $4E, $54, $45, $4E, $44, $4F, $20, $4F, $46, $FF, $0F, $41, $4D, $45, $52, $49, $43, $41, $2C, $49, $4E, $43, $2E, $FF, $01, $C0, $23, $FF, $FF, $12, $01, $AA, $FF, $01, $D2, $23, $6A, $9A, $AA, $AA, $AA, $AA, $AA, $0A, $46, $19, $0A, $AA, $AA, $AA, $FF, $FF, $20, $01, $00, $FF, $00
@@ -6855,13 +6601,13 @@ RomGraphicsPtrs:
 .byte $8A, $21, $42, $4F, $4E, $55, $53, $20, $53, $43, $45, $4E, $45, $21, $FF, $01, $20, $23, $FF, $FF, $20, $01, $01, $FF, $00
 @RomGraphicsA:
 .byte $06, $21, $42, $4F, $4E, $55, $53, $20, $53, $43, $45, $4E, $45, $20, $52, $45, $53, $55, $4C, $54, $53, $2E, $FF, $01, $20, $23, $FF, $FF, $20, $01, $01, $FF, $00
-@RomGraphicsB:
+@RomGraphicsStatusPowerLabel:
 .byte $6F, $2B, $18, $19, $1A, $FF, $00
 @RomGraphicsC:
 .byte $6F, $2B, $0B, $0C, $FF, $1E, $1B, $1C, $FF, $00
 @RomGraphicsD:
 .byte $20, $20, $FF, $FF, $20, $1D, $07, $FF, $01, $5D, $20, $09, $0A, $0B, $FF, $0A, $09, $0F, $07, $36, $38, $39, $3A, $3B, $FF, $13, $09, $0A, $0F, $FF, $04, $36, $37, $38, $39, $39, $3A, $3B, $0F, $FF, $10, $36, $38, $39, $3A, $3B, $FF, $07, $09, $0A, $0B, $0C, $0D, $0E, $0F, $FF, $17, $36, $37, $38, $39, $3A, $3B, $FF, $06, $36, $37, $3B, $FF, $05, $09, $0F, $FF, $06, $36, $37, $3B, $FF, $05, $36, $37, $38, $39, $3A, $3B, $0F, $FF, $1C, $36, $37, $3B, $FF, $0E, $36, $37, $37, $3B, $FF, $06, $09, $0A, $0E, $0F, $FF, $09, $46, $47, $49, $47, $47, $48, $49, $4A, $4A, $FF, $03, $46, $47, $49, $4A, $FF, $0B, $46, $47, $49, $4A, $FF, $08, $46, $47, $49, $4A, $FF, $04, $46, $47, $48, $49, $4A, $FF, $2F, $6E, $6F, $9D, $6E, $6F, $9D, $6E, $6F, $07, $9D, $6E, $6F, $FF, $14, $7E, $7F, $9E, $7E, $7F, $9E, $7E, $7F, $07, $9E, $7E, $7F, $FF, $03, $19, $1A, $1B, $1C, $1D, $1E, $1F, $1C, $1D, $1D, $1F, $1C, $1D, $1D, $1C, $1D, $1D, $8E, $8F, $9F, $8E, $8F, $9F, $8E, $8F, $07, $9F, $8E, $8F, $FF, $03, $29, $2A, $2B, $2C, $2D, $2E, $2F, $2C, $2D, $2E, $2F, $2C, $2D, $2E, $2C, $2D, $2E, $FF, $FF, $0C, $01, $3D, $FF, $FF, $0C, $01, $4D, $AC, $07, $AC, $AD, $AC, $07, $AC, $AC, $07, $AD, $AC, $AD, $5E, $FF, $01, $0C, $22, $3E, $FF, $FF, $13, $01, $3F, $FF, $01, $2C, $22, $4E, $FF, $FF, $13, $01, $4F, $FF, $FF, $13, $01, $5F, $FF, $01, $64, $22, $AC, $07, $AD, $FF, $03, $AC, $07, $AD, $07, $07, $AC, $AD, $AC, $07, $AC, $07, $07, $AC, $07, $07, $AC, $AD, $07, $07, $AC, $AD, $AD, $07, $07, $AC, $07, $BE, $07, $07, $AC, $FF, $03, $AC, $07, $07, $AD, $07, $07, $AD, $AC, $07, $07, $AC, $07, $AD, $07, $AC, $07, $BE, $07, $AD, $AC, $07, $07, $BC, $BD, $07, $07, $BC, $BD, $07, $BF, $BE, $07, $07, $BC, $BD, $07, $07, $BE, $07, $BC, $BD, $07, $BE, $07, $BC, $BD, $07, $07, $BE, $BF, $07, $07, $BC, $BD, $FF, $09, $BF, $FF, $06, $BC, $BD, $FF, $10, $AE, $AF, $07, $07, $BC, $BD, $FF, $03, $AE, $AF, $FF, $08, $AE, $AF, $07, $07, $BC, $BD, $FF, $0D, $AE, $AF, $FF, $07, $AE, $AF, $FF, $04, $AE, $AF, $07, $07, $AE, $AF, $FF, $01, $C0, $23, $FF, $FF, $18, $01, $FF, $FF, $01, $D8, $23, $FF, $FF, $08, $01, $55, $FF, $01, $E0, $23, $FF, $FF, $20, $01, $AA, $FF, $00
-@RomGraphicsE:
+@RomGraphicsGetReadyScreen:
 .byte $AB, $20, $76, $74, $15, $00, $13, $74, $70, $73, $0F, $6A, $FF, $53, $89, $8A, $8B, $03, $03, $80, $81, $90, $91, $02, $03, $03, $03, $03, $03, $03, $FF, $10, $03, $03, $03, $03, $82, $83, $84, $85, $86, $87, $03, $88, $89, $8A, $8B, $03, $FF, $10, $03, $03, $98, $99, $92, $03, $94, $95, $96, $97, $03, $98, $99, $9A, $9B, $03, $FF, $10, $03, $03, $03, $03, $A2, $A3, $A4, $A5, $A6, $A7, $A8, $03, $03, $03, $03, $03, $FF, $10, $03, $03, $B0, $B1, $B2, $B3, $B4, $B5, $B6, $B7, $B8, $B9, $03, $03, $98, $99, $FF, $10, $03, $03, $C0, $C1, $C2, $C3, $C4, $C5, $C6, $C7, $C8, $C9, $03, $03, $03, $03, $FF, $10, $DA, $DB, $D0, $D1, $D2, $D3, $D4, $D5, $D6, $D7, $D8, $D9, $DA, $DB, $DA, $DB, $FF, $10, $03, $03, $E0, $E1, $E2, $E3, $E4, $E5, $E6, $E7, $E8, $E9, $EA, $03, $03, $03, $FF, $10, $03, $03, $03, $F1, $F2, $F3, $F4, $F5, $F6, $F7, $03, $03, $03, $03, $03, $03, $FF, $53, $7B, $78, $17, $74, $14, $6B, $FF, $37, $77, $78, $3B, $14, $72, $06, $13, $74, $6B, $FF, $01, $20, $23, $FF, $FF, $20, $01, $01, $FF, $01, $D2, $23, $AA, $22, $88, $AA, $FF, $04, $5A, $DA, $FA, $5A, $FF, $04, $05, $0D, $0F, $05, $FF, $00
 
 
@@ -6940,46 +6686,80 @@ UnknownData:
 .byte   $12,$02,$3C,$0C,$1C,$02,$16,$21 ; CDF1 12 02 3C 0C 1C 02 16 21  ..<....!
 .byte   $06,$02,$30,$0F,$0F,$02,$20,$10 ; CDF9 06 02 30 0F 0F 02 20 10  ..0... .
 .byte   $0F,$02,$3C,$0C,$1C,$02,$20,$16 ; CE01 0F 02 3C 0C 1C 02 20 16  ..<... .
-.byte   $06,$02,$20,$21,$12,$0F,$20,$15 ; CE09 06 02 20 21 12 0F 20 15  .. !.. .
-.byte   $27,$0F,$20,$17,$07,$0F,$12,$21 ; CE11 27 0F 20 17 07 0F 12 21  '. ....!
-.byte   $20,$0F,$20,$08,$1A,$0F,$20,$16 ; CE19 20 0F 20 08 1A 0F 20 16   . ... .
-.byte   $10,$0F,$20,$0F,$27,$0F,$20,$03 ; CE21 10 0F 20 0F 27 0F 20 03  .. .'. .
-.byte   $00,$0F,$0F,$27,$17,$0F,$20,$16 ; CE29 00 0F 0F 27 17 0F 20 16  ...'.. .
-.byte   $27,$0F,$11,$02,$2C,$0F,$11,$18 ; CE31 27 0F 11 02 2C 0F 11 18  '...,...
-.byte   $28,$0F,$20,$21,$11,$0F,$20,$16 ; CE39 28 0F 20 21 11 0F 20 16  (. !.. .
-.byte   $10,$0F,$20,$0F,$27,$0F,$20,$03 ; CE41 10 0F 20 0F 27 0F 20 03  .. .'. .
-.byte   $00,$0F,$0F,$27,$17,$0F,$20,$16 ; CE49 00 0F 0F 27 17 0F 20 16  ...'.. .
-.byte   $27,$0F,$12,$0C,$21,$0F,$0C,$07 ; CE51 27 0F 12 0C 21 0F 0C 07  '...!...
-.byte   $17,$0F,$20,$21,$12,$0F,$20,$16 ; CE59 17 0F 20 21 12 0F 20 16  .. !.. .
-.byte   $10,$0F,$20,$0F,$27,$0F,$20,$03 ; CE61 10 0F 20 0F 27 0F 20 03  .. .'. .
-.byte   $00,$0F,$0F,$27,$17,$0F,$20,$21 ; CE69 00 0F 0F 27 17 0F 20 21  ...'.. !
-.byte   $10,$0F,$00,$00,$00,$0F,$21,$17 ; CE71 10 0F 00 00 00 0F 21 17  ......!.
-.byte   $1A,$0F,$20,$12,$02,$0F,$20,$17 ; CE79 1A 0F 20 12 02 0F 20 17  .. ... .
-.byte   $0F,$0F,$20,$0F,$00,$0F,$20,$26 ; CE81 0F 0F 20 0F 00 0F 20 26  .. ... &
-.byte   $0F,$0F,$16,$26,$0F,$0F,$20,$26 ; CE89 0F 0F 16 26 0F 0F 20 26  ...&.. &
-.byte   $16,$0F,$20,$0C,$23,$0F,$00,$00 ; CE91 16 0F 20 0C 23 0F 00 00  .. .#...
-.byte   $00,$0F,$26,$0C,$1C,$0F,$25,$20 ; CE99 00 0F 26 0C 1C 0F 25 20  ..&...% 
-.byte   $05,$0F,$13,$23,$33,$0F,$16,$26 ; CEA1 05 0F 13 23 33 0F 16 26  ...#3..&
-.byte   $36,$0F,$19,$29,$39,$0F,$20,$12 ; CEA9 36 0F 19 29 39 0F 20 12  6..)9. .
-.byte   $26,$0F,$0A,$12,$17,$0F,$20,$1C ; CEB1 26 0F 0A 12 17 0F 20 1C  &..... .
-.byte   $13,$0F,$20,$12,$22,$0F,$20,$0F ; CEB9 13 0F 20 12 22 0F 20 0F  .. .". .
-.byte   $06,$0F,$20,$0F,$26,$0F,$20,$0F ; CEC1 06 0F 20 0F 26 0F 20 0F  .. .&. .
-.byte   $00,$0F,$20,$0F,$0F,$0F,$20,$15 ; CEC9 00 0F 20 0F 0F 0F 20 15  .. ... .
-.byte   $27,$0F,$12,$10,$00,$0F,$18,$08 ; CED1 27 0F 12 10 00 0F 18 08  '.......
-.byte   $28,$0F,$12,$08,$28,$0F,$20,$06 ; CED9 28 0F 12 08 28 0F 20 06  (...(. .
-.byte   $00,$0F,$25,$16,$12,$0F,$00,$00 ; CEE1 00 0F 25 16 12 0F 00 00  ..%.....
-.byte   $00,$0F,$00,$00,$00,$0F,$20,$12 ; CEE9 00 0F 00 00 00 0F 20 12  ...... .
-.byte   $26,$0F,$20,$16,$1C,$0F,$20,$10 ; CEF1 26 0F 20 16 1C 0F 20 10  &. ... .
-.byte   $12,$0F,$06,$10,$1C,$0F,$20,$06 ; CEF9 12 0F 06 10 1C 0F 20 06  ...... .
-.byte   $00,$0F,$25,$16,$12,$0F,$00,$00 ; CF01 00 0F 25 16 12 0F 00 00  ..%.....
-.byte   $00,$0F,$00,$00,$00             ; CF09 00 0F 00 00 00           .....
-; ----------------------------------------------------------------------------
+.byte   $06,$02,$20,$21,$12
+
+; a bunch of palettes here
+.byte $0F,$20,$15,$27
+.byte $0F,$20,$17,$07
+.byte $0F,$12,$21,$20
+.byte $0F,$20,$08,$1A
+.byte $0F,$20,$16,$10
+.byte $0F,$20,$0F,$27
+.byte $0F,$20,$03,$00
+.byte $0F,$0F,$27,$17
+.byte $0F,$20,$16,$27
+.byte $0F,$11,$02,$2C
+.byte $0F,$11,$18,$28
+.byte $0F,$20,$21,$11
+.byte $0F,$20,$16,$10
+.byte $0F,$20,$0F,$27
+.byte $0F,$20,$03,$00
+.byte $0F,$0F,$27,$17
+.byte $0F,$20,$16,$27
+.byte $0F,$12,$0C,$21
+.byte $0F,$0C,$07,$17
+.byte $0F,$20,$21,$12
+.byte $0F,$20,$16,$10
+.byte $0F,$20,$0F,$27
+.byte $0F,$20,$03,$00
+.byte $0F,$0F,$27,$17
+.byte $0F,$20,$21,$10
+.byte $0F,$00,$00,$00
+.byte $0F,$21,$17,$1A
+.byte $0F,$20,$12,$02
+.byte $0F,$20,$17,$0F
+.byte $0F,$20,$0F,$00
+.byte $0F,$20,$26,$0F
+.byte $0F,$16,$26,$0F
+.byte $0F,$20,$26,$16
+.byte $0F,$20,$0C,$23
+.byte $0F,$00,$00,$00
+.byte $0F,$26,$0C,$1C
+.byte $0F,$25,$20,$05
+.byte $0F,$13,$23,$33
+.byte $0F,$16,$26,$36
+.byte $0F,$19,$29,$39
+.byte $0F,$20,$12,$26
+.byte $0F,$0A,$12,$17
+.byte $0F,$20,$1C,$13
+.byte $0F,$20,$12,$22
+.byte $0F,$20,$0F,$06
+.byte $0F,$20,$0F,$26
+.byte $0F,$20,$0F,$00
+.byte $0F,$20,$0F,$0F
+.byte $0F,$20,$15,$27
+.byte $0F,$12,$10,$00
+.byte $0F,$18,$08,$28
+.byte $0F,$12,$08,$28
+.byte $0F,$20,$06,$00
+.byte $0F,$25,$16,$12
+.byte $0F,$00,$00,$00
+.byte $0F,$00,$00,$00
+.byte $0F,$20,$12,$26
+.byte $0F,$20,$16,$1C
+.byte $0F,$20,$10,$12
+.byte $0F,$06,$10,$1C
+.byte $0F,$20,$06,$00
+.byte $0F,$25,$16,$12
+.byte $0F,$00,$00,$00
+.byte $0F,$00,$00,$00
+
 LCF0E:
         jsr     PPUDisableNMI                           ; CF0E 20 EA 8B                  ..
         lda     #$FF                            ; CF11 A9 FF                    ..
         jsr     LE2CD                           ; CF13 20 CD E2                  ..
         jsr     L977C                           ; CF16 20 7C 97                  |.
-        jsr     L8E12                           ; CF19 20 12 8E                  ..
+        jsr     ClearScreenAndSprites                           ; CF19 20 12 8E                  ..
         jsr     DrawStatusLine                           ; CF1C 20 8F A7                  ..
         lda     #$07                            ; CF1F A9 07                    ..
         jsr     L8EBD                           ; CF21 20 BD 8E                  ..
@@ -7000,14 +6780,14 @@ LCF0E:
         lda     #$B4                            ; CF4A A9 B4                    ..
         sta     $12                             ; CF4C 85 12                    ..
 LCF4E:
-        jsr     L8C40                           ; CF4E 20 40 8C                  @.
+        jsr     WaitFor1Frame                           ; CF4E 20 40 8C                  @.
         ldy     #$02                            ; CF51 A0 02                    ..
-        jsr     L8C60                           ; CF53 20 60 8C                  `.
+        jsr     WaitForYSpins                           ; CF53 20 60 8C                  `.
         jsr     L8B83                           ; CF56 20 83 8B                  ..
         dec     $12                             ; CF59 C6 12                    ..
         bne     LCF4E                           ; CF5B D0 F1                    ..
         jsr     PPUDisableNMI                           ; CF5D 20 EA 8B                  ..
-        jsr     L8E12                           ; CF60 20 12 8E                  ..
+        jsr     ClearScreenAndSprites                           ; CF60 20 12 8E                  ..
         jsr     DrawStatusLine                           ; CF63 20 8F A7                  ..
         lda     #RomGraphics5                            ; CF66 A9 05                    ..
         jsr     DrawROMGraphics                           ; CF68 20 69 8D                  i.
@@ -7022,11 +6802,11 @@ LCF4E:
         lda     #$00                            ; CF7F A9 00                    ..
         sta     SCROLL_X                           ; CF81 8D 20 03                 . .
         sta     $0323                           ; CF84 8D 23 03                 .#.
-        sta     Camera_X_Lo                           ; CF87 8D 38 03                 .8.
-        sta     Camera_Y_Lo                           ; CF8A 8D 3A 03                 .:.
-        sta     Camera_Y_Hi                           ; CF8D 8D 3B 03                 .;.
+        sta     CameraX                           ; CF87 8D 38 03                 .8.
+        sta     CameraY                           ; CF8A 8D 3A 03                 .:.
+        sta     CameraY+1                           ; CF8D 8D 3B 03                 .;.
         lda     #$10                            ; CF90 A9 10                    ..
-        sta     Camera_X_Hi                           ; CF92 8D 39 03                 .9.
+        sta     CameraX+1                           ; CF92 8D 39 03                 .9.
         lda     #$20                            ; CF95 A9 20                    . 
         sta     SCROLL_Y                           ; CF97 8D 22 03                 .".
         lda     #$48                            ; CF9A A9 48                    .H
@@ -7056,7 +6836,7 @@ LCF4E:
         jsr     PPUEnableNMI                           ; CFD0 20 DE 8B                  ..
         jsr     L8BC2                           ; CFD3 20 C2 8B                  ..
 LCFD6:
-        jsr     L8C40                           ; CFD6 20 40 8C                  @.
+        jsr     WaitFor1Frame                           ; CFD6 20 40 8C                  @.
         jsr     ReadJoypads                           ; CFD9 20 87 8C                  ..
         jsr     LD1B6                           ; CFDC 20 B6 D1                  ..
         jsr     L9B8D                           ; CFDF 20 8D 9B                  ..
@@ -7212,9 +6992,9 @@ LD0FB:
 LD11F:
         sta     $12                             ; D11F 85 12                    ..
 LD121:
-        jsr     L8C40                           ; D121 20 40 8C                  @.
+        jsr     WaitFor1Frame                           ; D121 20 40 8C                  @.
         ldy     #$02                            ; D124 A0 02                    ..
-        jsr     L8C60                           ; D126 20 60 8C                  `.
+        jsr     WaitForYSpins                           ; D126 20 60 8C                  `.
         jsr     L8B5F                           ; D129 20 5F 8B                  _.
         lda     #$01                            ; D12C A9 01                    ..
         sta     $0302                           ; D12E 8D 02 03                 ...
@@ -7268,7 +7048,7 @@ LD1B6:
         sta     $40                             ; D1B8 85 40                    .@
         lda     #$06                            ; D1BA A9 06                    ..
         sta     $41                             ; D1BC 85 41                    .A
-        jsr     LoadDataIntoZP                           ; D1BE 20 54 97                  T.
+        jsr     LoadWorkingData                           ; D1BE 20 54 97                  T.
         bit     $20                             ; D1C1 24 20                    $ 
         bmi     LD1E7                           ; D1C3 30 22                    0"
         lda     #$C0                            ; D1C5 A9 C0                    ..
@@ -7286,7 +7066,7 @@ LD1B6:
         sta     $31                             ; D1DD 85 31                    .1
         lda     #$22                            ; D1DF A9 22                    ."
         jsr     L97AD                           ; D1E1 20 AD 97                  ..
-        jmp     StoreDataFromZP                           ; D1E4 4C 61 97                 La.
+        jmp     StoreWorkingData                           ; D1E4 4C 61 97                 La.
 
 ; ----------------------------------------------------------------------------
 LD1E7:
@@ -7372,7 +7152,7 @@ LD271:
         lda     #$80                            ; D276 A9 80                    ..
         sta     $06A0,x                         ; D278 9D A0 06                 ...
 LD27B:
-        jmp     StoreDataFromZP                           ; D27B 4C 61 97                 La.
+        jmp     StoreWorkingData                           ; D27B 4C 61 97                 La.
 
 ; ----------------------------------------------------------------------------
 LD27E:
@@ -7389,9 +7169,9 @@ LD28E:
         lda     ($40),y                         ; D290 B1 40                    .@
         bpl     LD29F                           ; D292 10 0B                    ..
         inc     $00                             ; D294 E6 00                    ..
-        jsr     LoadDataIntoZP                           ; D296 20 54 97                  T.
+        jsr     LoadWorkingData                           ; D296 20 54 97                  T.
         jsr     LD317                           ; D299 20 17 D3                  ..
-        jsr     StoreDataFromZP                           ; D29C 20 61 97                  a.
+        jsr     StoreWorkingData                           ; D29C 20 61 97                  a.
 LD29F:
         jsr     L976E                           ; D29F 20 6E 97                  n.
         dec     $46                             ; D2A2 C6 46                    .F
@@ -7839,7 +7619,7 @@ LD762:
         jsr     LE2CD                           ; D764 20 CD E2                  ..
         jsr     PPUDisableNMI                           ; D767 20 EA 8B                  ..
         jsr     PPUDisableRendering                           ; D76A 20 B6 8B                  ..
-        jsr     L8E12                           ; D76D 20 12 8E                  ..
+        jsr     ClearScreenAndSprites                           ; D76D 20 12 8E                  ..
         lda     #$04                            ; D770 A9 04                    ..
         jsr     L8EBD                           ; D772 20 BD 8E                  ..
         lda     #$03                            ; D775 A9 03                    ..
@@ -7853,7 +7633,7 @@ LD762:
         ldx     #$00                            ; D78A A2 00                    ..
 LD78C:
         lda     LD890,x                         ; D78C BD 90 D8                 ...
-        sta     Sprite_PosY,x                         ; D78F 9D 00 02                 ...
+        sta     SpritePosY,x                         ; D78F 9D 00 02                 ...
         inx                                     ; D792 E8                       .
         cpx     #$20                            ; D793 E0 20                    . 
         bcc     LD78C                           ; D795 90 F5                    ..
@@ -7868,13 +7648,13 @@ LD79B:
 LD7A4:
         lda     LD8B0,y                         ; D7A4 B9 B0 D8                 ...
         iny                                     ; D7A7 C8                       .
-        sta     Sprite_Tile + (SPR*8),x                         ; D7A8 9D 21 02                 .!.
+        sta     SpriteTile + (SPR*8),x                         ; D7A8 9D 21 02                 .!.
         lda     LD8B0,y                         ; D7AB B9 B0 D8                 ...
         iny                                     ; D7AE C8                       .
-        sta     Sprite_Attr + (SPR*8),x                         ; D7AF 9D 22 02                 .".
+        sta     SpriteAttr + (SPR*8),x                         ; D7AF 9D 22 02                 .".
         lda     LD8B0,y                         ; D7B2 B9 B0 D8                 ...
         iny                                     ; D7B5 C8                       .
-        sta     Sprite_PosX + (SPR*8),x                         ; D7B6 9D 23 02                 .#.
+        sta     SpritePosX + (SPR*8),x                         ; D7B6 9D 23 02                 .#.
         inx                                     ; D7B9 E8                       .
         inx                                     ; D7BA E8                       .
         inx                                     ; D7BB E8                       .
@@ -7901,9 +7681,9 @@ LD7D6:
         jsr     PPUEnableNMI                           ; D7E6 20 DE 8B                  ..
         jsr     L8BC2                           ; D7E9 20 C2 8B                  ..
 LD7EC:
-        jsr     L8C40                           ; D7EC 20 40 8C                  @.
+        jsr     WaitFor1Frame                           ; D7EC 20 40 8C                  @.
         ldy     #$01                            ; D7EF A0 01                    ..
-        jsr     L8C60                           ; D7F1 20 60 8C                  `.
+        jsr     WaitForYSpins                           ; D7F1 20 60 8C                  `.
         jsr     LDA3A                           ; D7F4 20 3A DA                  :.
         jsr     LDBFA                           ; D7F7 20 FA DB                  ..
         jsr     LD963                           ; D7FA 20 63 D9                  c.
@@ -7935,7 +7715,7 @@ LD831:
         lda     $0393                           ; D831 AD 93 03                 ...
         clc                                     ; D834 18                       .
         adc     #$06                            ; D835 69 06                    i.
-        sta     Sprite_Tile + (SPR*7)                           ; D837 8D 1D 02                 ...
+        sta     SpriteTile + (SPR*7)                           ; D837 8D 1D 02                 ...
         jsr     LD862                           ; D83A 20 62 D8                  b.
         bit     $0306                           ; D83D 2C 06 03                 ,..
         bmi     LD84C                           ; D840 30 0A                    0.
@@ -7947,9 +7727,9 @@ LD84C:
         lda     #$40                            ; D84C A9 40                    .@
         sta     $12                             ; D84E 85 12                    ..
 LD850:
-        jsr     L8C40                           ; D850 20 40 8C                  @.
+        jsr     WaitFor1Frame                           ; D850 20 40 8C                  @.
         ldy     #$02                            ; D853 A0 02                    ..
-        jsr     L8C60                           ; D855 20 60 8C                  `.
+        jsr     WaitForYSpins                           ; D855 20 60 8C                  `.
         jsr     LF600                           ; D858 20 00 F6                  ..
         dec     $12                             ; D85B C6 12                    ..
         bne     LD850                           ; D85D D0 F1                    ..
@@ -7960,7 +7740,7 @@ LD862:
         lda     $23                             ; D862 A5 23                    .#
         bne     LD86C                           ; D864 D0 06                    ..
         lda     #$F0                            ; D866 A9 F0                    ..
-        sta     Sprite_PosY + (SPR * 44) ;$02B0                           ; D868 8D B0 02                 ...
+        sta     SpritePosY + (SPR * 44) ;$02B0                           ; D868 8D B0 02                 ...
         rts                                     ; D86B 60                       `
 
 ; ----------------------------------------------------------------------------
@@ -8012,7 +7792,7 @@ LD94F:
         lda     LD91C,y                         ; D952 B9 1C D9                 ...
         iny                                     ; D955 C8                       .
 LD956:
-        sta     Sprite_PosY + (SPR*8),x                         ; D956 9D 20 02                 . .
+        sta     SpritePosY + (SPR*8),x                         ; D956 9D 20 02                 . .
         inx                                     ; D959 E8                       .
         inx                                     ; D95A E8                       .
         inx                                     ; D95B E8                       .
@@ -8119,9 +7899,9 @@ LD9EB:
         ldy     #$00                            ; DA19 A0 00                    ..
 LDA1B:
         lda     LDA32,y                         ; DA1B B9 32 DA                 .2.
-        sta     Sprite_Tile + (SPR * 8),x                         ; DA1E 9D 21 02                 .!.
+        sta     SpriteTile + (SPR * 8),x                         ; DA1E 9D 21 02                 .!.
         lda     LDA33,y                         ; DA21 B9 33 DA                 .3.
-        sta     Sprite_Attr + (SPR * 8),x                         ; DA24 9D 22 02                 .".
+        sta     SpriteAttr + (SPR * 8),x                         ; DA24 9D 22 02                 .".
         inx                                     ; DA27 E8                       .
         inx                                     ; DA28 E8                       .
         inx                                     ; DA29 E8                       .
@@ -8469,7 +8249,7 @@ LDC5D:
         and     #$FF                            ; DC5E 29 FF                    ).
         bmi     LDC6F                           ; DC60 30 0D                    0.
         adc     $22                             ; DC62 65 22                    e"
-        sta     Sprite_PosX + (SPR * 46),x                         ; DC64 9D BB 02                 ...
+        sta     SpritePosX + (SPR * 46),x                         ; DC64 9D BB 02                 ...
         lda     $23                             ; DC67 A5 23                    .#
         adc     #$00                            ; DC69 69 00                    i.
         beq     LDC7A                           ; DC6B F0 0D                    ..
@@ -8477,7 +8257,7 @@ LDC5D:
 ; ----------------------------------------------------------------------------
 LDC6F:
         adc     $22                             ; DC6F 65 22                    e"
-        sta     Sprite_PosX + (SPR * 46),x                         ; DC71 9D BB 02                 ...
+        sta     SpritePosX + (SPR * 46),x                         ; DC71 9D BB 02                 ...
         lda     $23                             ; DC74 A5 23                    .#
         adc     #$FF                            ; DC76 69 FF                    i.
         bne     LDCA6                           ; DC78 D0 2C                    .,
@@ -8489,16 +8269,16 @@ LDC7A:
 ; ----------------------------------------------------------------------------
 LDC86:
         adc     $24                             ; DC86 65 24                    e$
-        sta     Sprite_PosY + (SPR * 46),x                         ; DC88 9D B8 02                 ...
+        sta     SpritePosY + (SPR * 46),x                         ; DC88 9D B8 02                 ...
         lda     #$FF                            ; DC8B A9 FF                    ..
         adc     $25                             ; DC8D 65 25                    e%
         bne     LDCA6                           ; DC8F D0 15                    ..
         iny                                     ; DC91 C8                       .
         lda     ($26),y                         ; DC92 B1 26                    .&
         iny                                     ; DC94 C8                       .
-        sta     Sprite_Tile + (SPR * 46),x                         ; DC95 9D B9 02                 ...
+        sta     SpriteTile + (SPR * 46),x                         ; DC95 9D B9 02                 ...
         lda     $01                             ; DC98 A5 01                    ..
-        sta     Sprite_Attr + (SPR * 46),x                         ; DC9A 9D BA 02                 ...
+        sta     SpriteAttr + (SPR * 46),x                         ; DC9A 9D BA 02                 ...
         inx                                     ; DC9D E8                       .
         inx                                     ; DC9E E8                       .
         inx                                     ; DC9F E8                       .
@@ -8515,7 +8295,7 @@ LDCAB:
         beq     LDCBB                           ; DCAD F0 0C                    ..
         lda     #$F0                            ; DCAF A9 F0                    ..
 LDCB1:
-        sta     Sprite_PosY + (SPR * 46),x                         ; DCB1 9D B8 02                 ...
+        sta     SpritePosY + (SPR * 46),x                         ; DCB1 9D B8 02                 ...
         inx                                     ; DCB4 E8                       .
         inx                                     ; DCB5 E8                       .
         inx                                     ; DCB6 E8                       .
@@ -8530,7 +8310,7 @@ LDCBB:
 ; ----------------------------------------------------------------------------
 LDCC1:
         jsr     PPUDisableNMI                           ; DCC1 20 EA 8B                  ..
-        jsr     L8E12                           ; DCC4 20 12 8E                  ..
+        jsr     ClearScreenAndSprites                           ; DCC4 20 12 8E                  ..
         jsr     DrawStatusLine                           ; DCC7 20 8F A7                  ..
         lda     #RomGraphics5                            ; DCCA A9 05                    ..
         jsr     DrawROMGraphics                           ; DCCC 20 69 8D                  i.
@@ -8545,18 +8325,18 @@ LDCC1:
         lda     #$00                            ; DCE3 A9 00                    ..
         sta     SCROLL_X                           ; DCE5 8D 20 03                 . .
         sta     $0323                           ; DCE8 8D 23 03                 .#.
-        sta     Camera_X_Lo                           ; DCEB 8D 38 03                 .8.
-        sta     Camera_X_Hi                           ; DCEE 8D 39 03                 .9.
-        sta     Camera_Y_Hi                           ; DCF1 8D 3B 03                 .;.
+        sta     CameraX                           ; DCEB 8D 38 03                 .8.
+        sta     CameraX+1                           ; DCEE 8D 39 03                 .9.
+        sta     CameraY+1                           ; DCF1 8D 3B 03                 .;.
         lda     #$20                            ; DCF4 A9 20                    . 
         sta     SCROLL_Y                           ; DCF6 8D 22 03                 .".
-        sta     Camera_Y_Lo                           ; DCF9 8D 3A 03                 .:.
+        sta     CameraY                           ; DCF9 8D 3A 03                 .:.
         jsr     L977C                           ; DCFC 20 7C 97                  |.
         sta     $0302                           ; DCFF 8D 02 03                 ...
         jsr     PPUEnableNMI                           ; DD02 20 DE 8B                  ..
         jsr     L8BC2                           ; DD05 20 C2 8B                  ..
 LDD08:
-        jsr     L8C40                           ; DD08 20 40 8C                  @.
+        jsr     WaitFor1Frame                           ; DD08 20 40 8C                  @.
         jsr     LDE92                           ; DD0B 20 92 DE                  ..
         jsr     L9A37                           ; DD0E 20 37 9A                  7.
         lda     $0680                           ; DD11 AD 80 06                 ...
@@ -8566,7 +8346,7 @@ LDD08:
         lda     PPUCTRL_MIRROR                           ; DD1C AD 0E 03                 ...
         ora     #$18                            ; DD1F 09 18                    ..
         sta     PPUCTRL_MIRROR                           ; DD21 8D 0E 03                 ...
-        jsr     L8E12                           ; DD24 20 12 8E                  ..
+        jsr     ClearScreenAndSprites                           ; DD24 20 12 8E                  ..
         lda     #$05                            ; DD27 A9 05                    ..
         jsr     L8EBD                           ; DD29 20 BD 8E                  ..
         lda     #$03                            ; DD2C A9 03                    ..
@@ -8577,10 +8357,10 @@ LDD08:
         sta     SCROLL_X                           ; DD38 8D 20 03                 . .
         sta     SCROLL_Y                           ; DD3B 8D 22 03                 .".
         sta     $0323                           ; DD3E 8D 23 03                 .#.
-        sta     Camera_X_Lo                           ; DD41 8D 38 03                 .8.
-        sta     Camera_X_Hi                           ; DD44 8D 39 03                 .9.
-        sta     Camera_Y_Lo                           ; DD47 8D 3A 03                 .:.
-        sta     Camera_Y_Hi                           ; DD4A 8D 3B 03                 .;.
+        sta     CameraX                           ; DD41 8D 38 03                 .8.
+        sta     CameraX+1                           ; DD44 8D 39 03                 .9.
+        sta     CameraY                           ; DD47 8D 3A 03                 .:.
+        sta     CameraY+1                           ; DD4A 8D 3B 03                 .;.
         jsr     L977C                           ; DD4D 20 7C 97                  |.
         lda     #$01                            ; DD50 A9 01                    ..
         sta     $0302                           ; DD52 8D 02 03                 ...
@@ -8589,13 +8369,13 @@ LDD08:
         lda     #$00                            ; DD5B A9 00                    ..
         sta     $0301                           ; DD5D 8D 01 03                 ...
 LDD60:
-        jsr     L8C40                           ; DD60 20 40 8C                  @.
+        jsr     WaitFor1Frame                           ; DD60 20 40 8C                  @.
         jsr     LDDC5                           ; DD63 20 C5 DD                  ..
         jsr     L9A37                           ; DD66 20 37 9A                  7.
         lda     $0680                           ; DD69 AD 80 06                 ...
         bne     LDD60                           ; DD6C D0 F2                    ..
         ldy     #$3C                            ; DD6E A0 3C                    .<
-        jsr     L8C50                           ; DD70 20 50 8C                  P.
+        jsr     WaitForYFrames                           ; DD70 20 50 8C                  P.
         jsr     LA8A1                           ; DD73 20 A1 A8                  ..
         .byte   $A9,$DD                         ; DD76 A9 DD                    ..
 ; ----------------------------------------------------------------------------
@@ -8609,7 +8389,7 @@ LDD60:
         lda     #$04                            ; DD85 A9 04                    ..
         jsr     LE2CD                           ; DD87 20 CD E2                  ..
 LDD8A:
-        jsr     L8C40                           ; DD8A 20 40 8C                  @.
+        jsr     WaitFor1Frame                           ; DD8A 20 40 8C                  @.
         lda     $0574                           ; DD8D AD 74 05                 .t.
         bmi     LDD8A                           ; DD90 30 F8                    0.
         jsr     ReadJoypads                           ; DD92 20 87 8C                  ..
@@ -8628,7 +8408,7 @@ LDDC5:
         sta     $40                             ; DDC7 85 40                    .@
         lda     #$06                            ; DDC9 A9 06                    ..
         sta     $41                             ; DDCB 85 41                    .A
-        jsr     LoadDataIntoZP                           ; DDCD 20 54 97                  T.
+        jsr     LoadWorkingData                           ; DDCD 20 54 97                  T.
         bit     $20                             ; DDD0 24 20                    $ 
         bmi     LDE00                           ; DDD2 30 2C                    0,
         lda     #$C0                            ; DDD4 A9 C0                    ..
@@ -8651,7 +8431,7 @@ LDDC5:
         sta     $33                             ; DDF6 85 33                    .3
         lda     #$08                            ; DDF8 A9 08                    ..
         jsr     L97AD                           ; DDFA 20 AD 97                  ..
-        jmp     StoreDataFromZP                           ; DDFD 4C 61 97                 La.
+        jmp     StoreWorkingData                           ; DDFD 4C 61 97                 La.
 
 ; ----------------------------------------------------------------------------
 LDE00:
@@ -8667,7 +8447,7 @@ LDE00:
         lda     #$80                            ; DE14 A9 80                    ..
         sta     $35                             ; DE16 85 35                    .5
 LDE18:
-        jmp     StoreDataFromZP                           ; DE18 4C 61 97                 La.
+        jmp     StoreWorkingData                           ; DE18 4C 61 97                 La.
 
 ; ----------------------------------------------------------------------------
 LDE1B:
@@ -8694,7 +8474,7 @@ LDE1B:
         sta     $36                             ; DE43 85 36                    .6
         lda     #$09                            ; DE45 A9 09                    ..
         jsr     L97AD                           ; DE47 20 AD 97                  ..
-        jmp     StoreDataFromZP                           ; DE4A 4C 61 97                 La.
+        jmp     StoreWorkingData                           ; DE4A 4C 61 97                 La.
 
 ; ----------------------------------------------------------------------------
 LDE4D:
@@ -8703,7 +8483,7 @@ LDE4D:
         lda     $36                             ; DE51 A5 36                    .6
         beq     LDE5A                           ; DE53 F0 05                    ..
         dec     $36                             ; DE55 C6 36                    .6
-        jmp     StoreDataFromZP                           ; DE57 4C 61 97                 La.
+        jmp     StoreWorkingData                           ; DE57 4C 61 97                 La.
 
 ; ----------------------------------------------------------------------------
 LDE5A:
@@ -8717,7 +8497,7 @@ LDE5A:
         lda     #$80                            ; DE6A A9 80                    ..
         sta     $35                             ; DE6C 85 35                    .5
 LDE6E:
-        jmp     StoreDataFromZP                           ; DE6E 4C 61 97                 La.
+        jmp     StoreWorkingData                           ; DE6E 4C 61 97                 La.
 
 ; ----------------------------------------------------------------------------
 LDE71:
@@ -8728,7 +8508,7 @@ LDE71:
         sta     $34                             ; DE7A 85 34                    .4
         lda     #$0A                            ; DE7C A9 0A                    ..
         jsr     L97AD                           ; DE7E 20 AD 97                  ..
-        jmp     StoreDataFromZP                           ; DE81 4C 61 97                 La.
+        jmp     StoreWorkingData                           ; DE81 4C 61 97                 La.
 
 ; ----------------------------------------------------------------------------
 LDE84:
@@ -8738,7 +8518,7 @@ LDE84:
         lda     #$00                            ; DE8B A9 00                    ..
         sta     $20                             ; DE8D 85 20                    . 
 LDE8F:
-        jmp     StoreDataFromZP                           ; DE8F 4C 61 97                 La.
+        jmp     StoreWorkingData                           ; DE8F 4C 61 97                 La.
 
 ; ----------------------------------------------------------------------------
 LDE92:
@@ -8746,9 +8526,9 @@ LDE92:
         sta     $40                             ; DE94 85 40                    .@
         lda     #$06                            ; DE96 A9 06                    ..
         sta     $41                             ; DE98 85 41                    .A
-        jsr     LoadDataIntoZP                           ; DE9A 20 54 97                  T.
+        jsr     LoadWorkingData                           ; DE9A 20 54 97                  T.
         jsr     LDEA3                           ; DE9D 20 A3 DE                  ..
-        jmp     StoreDataFromZP                           ; DEA0 4C 61 97                 La.
+        jmp     StoreWorkingData                           ; DEA0 4C 61 97                 La.
 
 ; ----------------------------------------------------------------------------
 LDEA3:
@@ -8905,31 +8685,32 @@ LDED4:
         .byte   $D6,$F4,$F8,$E5,$FC,$F8,$E6,$04 ; E284 D6 F4 F8 E5 FC F8 E6 04  ........
         .byte   $F8,$E7,$80,$FC,$E8,$C6,$FC,$F0 ; E28C F8 E7 80 FC E8 C6 FC F0  ........
         .byte   $D6,$FC,$F8,$C5,$80             ; E294 D6 FC F8 C5 80           .....
+
 ; ----------------------------------------------------------------------------
 SoundSystemInit:
-        lda     #$00                            ; E299 A9 00                    ..
-        sta     SND_MASTERCTRL                           ; E29B 8D 15 40                 ..@
-        lda     #$30                            ; E29E A9 30                    .0
-        sta     SND_SQUARE1_TIMER                           ; E2A0 8D 00 40                 ..@
-        sta     SND_SQUARE2_TIMER                           ; E2A3 8D 04 40                 ..@
-        sta     SND_NOISE_TIMER                           ; E2A6 8D 0C 40                 ..@
-        lda     #$80                            ; E2A9 A9 80                    ..
-        sta     SND_TRIANGLE_TIMER                           ; E2AB 8D 08 40                 ..@
-        lda     #$08                            ; E2AE A9 08                    ..
-        sta     SND_SQUARE1_LENGTH                           ; E2B0 8D 01 40                 ..@
-        sta     SND_SQUARE2_LENGTH                           ; E2B3 8D 05 40                 ..@
-        lda     #$00                            ; E2B6 A9 00                    ..
-        sta     $0566                           ; E2B8 8D 66 05                 .f.
-        lda     #$FF                            ; E2BB A9 FF                    ..
-        ldx     #$00                            ; E2BD A2 00                    ..
-LE2BF:
-        sta     $056C,x                         ; E2BF 9D 6C 05                 .l.
-        inx                                     ; E2C2 E8                       .
-        cpx     #$08                            ; E2C3 E0 08                    ..
-        bcc     LE2BF                           ; E2C5 90 F8                    ..
-        lda     #$0F                            ; E2C7 A9 0F                    ..
-        sta     SND_MASTERCTRL                           ; E2C9 8D 15 40                 ..@
-        rts                                     ; E2CC 60                       `
+        lda #$00
+        sta SND_MASTERCTRL
+        lda #$30
+        sta SND_SQUARE1_TIMER
+        sta SND_SQUARE2_TIMER
+        sta SND_NOISE_TIMER
+        lda #$80
+        sta SND_TRIANGLE_TIMER
+        lda #$08
+        sta SND_SQUARE1_LENGTH
+        sta SND_SQUARE2_LENGTH
+        lda #$00
+        sta $0566
+        lda #$FF
+        ldx #$00
+@Clear:
+        sta $056C,x
+        inx
+        cpx #$08
+        bcc @Clear
+        lda #$0F
+        sta SND_MASTERCTRL
+        rts
 
 ; ----------------------------------------------------------------------------
 LE2CD:
@@ -8939,9 +8720,9 @@ LE2CD:
         bcs     LE331                           ; E2D4 B0 5B                    .[
         asl     a                               ; E2D6 0A                       .
         tax                                     ; E2D7 AA                       .
-        lda     LE8BE,x                         ; E2D8 BD BE E8                 ...
+        lda     AudioPointers,x                         ; E2D8 BD BE E8                 ...
         sta     $F0                             ; E2DB 85 F0                    ..
-        lda     LE8BF,x                         ; E2DD BD BF E8                 ...
+        lda     AudioPointers+1,x                         ; E2DD BD BF E8                 ...
         sta     $F1                             ; E2E0 85 F1                    ..
         ldy     #$00                            ; E2E2 A0 00                    ..
 LE2E4:
@@ -9725,17 +9506,44 @@ LE8A7:
         .byte   $6A,$E4,$64,$3A,$5F,$E2,$59,$D7 ; E8A7 6A E4 64 3A 5F E2 59 D7  j.d:_.Y.
         .byte   $54,$14,$50,$95,$4B,$57,$47,$56 ; E8AF 54 14 50 95 4B 57 47 56  T.P.KWGV
         .byte   $43,$8F,$3F,$FD,$3B,$A0,$38     ; E8B7 43 8F 3F FD 3B A0 38     C.?.;.8
-LE8BE:
-        .byte   $9A                             ; E8BE 9A                       .
-LE8BF:
-        .byte   $E9,$F9,$E9,$31,$F2,$11,$ED,$9C ; E8BF E9 F9 E9 31 F2 11 ED 9C  ...1....
-        .byte   $EE,$D0,$EA,$F7,$F4,$92,$F3,$64 ; E8C7 EE D0 EA F7 F4 92 F3 64  .......d
-        .byte   $F3,$3C,$F3,$82,$F3,$12,$F3,$F5 ; E8CF F3 3C F3 82 F3 12 F3 F5  .<......
-        .byte   $F3,$D3,$F3,$F9,$EC,$05,$F4,$01 ; E8D7 F3 D3 F3 F9 EC 05 F4 01  ........
-        .byte   $F3,$05,$F4,$66,$EB,$FC,$E8,$68 ; E8DF F3 05 F4 66 EB FC E8 68  ...f...h
-        .byte   $F4,$C7,$F4,$E4,$F4,$EF,$F2,$32 ; E8E7 F4 C7 F4 E4 F4 EF F2 32  .......2
-        .byte   $F4,$60,$EC,$1A,$EC,$90,$EC,$9A ; E8EF F4 60 EC 1A EC 90 EC 9A  .`......
-        .byte   $E9,$9A,$EB,$04,$EC,$FF         ; E8F7 E9 9A EB 04 EC FF        ......
+
+
+
+AudioPointers:
+        .addr Audio00
+        .addr Audio01
+        .addr Audio02
+        .addr Audio03
+        .addr Audio04
+        .addr Audio05
+        .addr Audio06
+        .addr Audio07
+        .addr Audio08
+        .addr Audio09
+        .addr Audio10
+        .addr Audio11
+        .addr Audio12
+        .addr Audio13
+        .addr Audio14
+        .addr Audio15
+        .addr Audio16
+        .addr Audio15
+        .addr Audio17
+        .addr NoAudio
+        .addr Audio19
+        .addr Audio20
+        .addr Audio21
+        .addr Audio22
+        .addr Audio23
+        .addr Audio24
+        .addr Audio25
+        .addr Audio26
+        .addr Audio00
+        .addr Audio27
+        .addr Audio28
+NoAudio:
+        .byte $FF
+
 LE8FD:
         .byte   $11                             ; E8FD 11                       .
 LE8FE:
@@ -9755,392 +9563,504 @@ LE8FE:
         .byte   $F8,$F7,$06,$1F,$1D,$1B,$1A,$1C ; E966 F8 F7 06 1F 1D 1B 1A 1C  ........
         .byte   $1A,$18,$00,$1A,$17,$14,$18,$14 ; E96E 1A 18 00 1A 17 14 18 14  ........
         .byte   $16,$04                         ; E976 16 04                    ..
+
+
+
 LE978:
-        .byte   $04,$06,$08,$0C,$10,$18,$20,$30 ; E978 04 06 08 0C 10 18 20 30  ...... 0
-        .byte   $40,$60,$80,$0A,$14,$03,$02,$01 ; E980 40 60 80 0A 14 03 02 01  @`......
-        .byte   $03,$04,$06,$09,$0C,$12,$18,$24 ; E988 03 04 06 09 0C 12 18 24  .......$
-        .byte   $30,$48,$60,$08,$09,$03,$02,$01 ; E990 30 48 60 08 09 03 02 01  0H`.....
-        .byte   $9A,$E9,$00,$A4,$E9,$01,$DC,$E9 ; E998 9A E9 00 A4 E9 01 DC E9  ........
-        .byte   $02,$EB,$E9,$FF,$EC,$08,$ED,$00 ; E9A0 02 EB E9 FF EC 08 ED 00  ........
-        .byte   $EE,$0D,$F0,$00,$F2,$C2,$E0,$E1 ; E9A8 EE 0D F0 00 F2 C2 E0 E1  ........
-        .byte   $E9,$EF,$FE,$E0,$E1,$E9,$EF,$FE ; E9B0 E9 EF FE E0 E1 E9 EF FE  ........
-        .byte   $E0,$E1,$E9,$EF,$FE,$E0,$E1,$E9 ; E9B8 E0 E1 E9 EF FE E0 E1 E9  ........
-        .byte   $EF,$FE,$E0,$E1,$E9,$EF,$02,$E0 ; E9C0 EF FE E0 E1 E9 EF 02 E0  ........
-        .byte   $E1,$E9,$EF,$02,$E0,$E1,$E9,$EF ; E9C8 E1 E9 EF 02 E0 E1 E9 EF  ........
-        .byte   $02,$E0,$E1,$E9,$EF,$02,$E0,$E1 ; E9D0 02 E0 E1 E9 EF 02 E0 E1  ........
-        .byte   $E9,$F8,$A4,$E9,$80,$3F,$F8,$A4 ; E9D8 E9 F8 A4 E9 80 3F F8 A4  .....?..
-        .byte   $E9,$82,$22,$32,$22,$27,$22,$32 ; E9E0 E9 82 22 32 22 27 22 32  .."2"'"2
-        .byte   $22,$27,$FA,$EC,$04,$8A,$57,$17 ; E9E8 22 27 FA EC 04 8A 57 17  "'....W.
-        .byte   $55,$15,$54,$14,$53,$13,$F8,$EB ; E9F0 55 15 54 14 53 13 F8 EB  U.T.S...
-        .byte   $E9,$00,$03,$EA,$01,$61,$EA,$02 ; E9F8 E9 00 03 EA 01 61 EA 02  .....a..
-        .byte   $C1,$EA,$FF,$EC,$07,$ED,$00,$EE ; EA00 C1 EA FF EC 07 ED 00 EE  ........
-        .byte   $07,$F0,$09,$F2,$CA,$C1,$84,$16 ; EA08 07 F0 09 F2 CA C1 84 16  ........
-        .byte   $15,$14,$58,$88,$18,$17,$16,$F9 ; EA10 15 14 58 88 18 17 16 F9  ..X.....
-        .byte   $EC,$05,$F2,$48,$82,$1A,$19,$18 ; EA18 EC 05 F2 48 82 1A 19 18  ...H....
-        .byte   $17,$16,$85,$3F,$88,$3F,$86,$3F ; EA20 17 16 85 3F 88 3F 86 3F  ...?.?.?
-        .byte   $84,$EF,$04,$18,$18,$EF,$FB,$18 ; EA28 84 EF 04 18 18 EF FB 18  ........
-        .byte   $18,$EF,$FA,$18,$18,$EF,$07,$82 ; EA30 18 EF FA 18 18 EF 07 82  ........
-        .byte   $13,$84,$18,$82,$1A,$EF,$FA,$23 ; EA38 13 84 18 82 1A EF FA 23  .......#
-        .byte   $EF,$06,$85,$3F,$84,$3F,$82,$23 ; EA40 EF 06 85 3F 84 3F 82 23  ...?.?.#
-        .byte   $22,$21,$22,$18,$3F,$86,$3F,$84 ; EA48 22 21 22 18 3F 86 3F 84  "!".?.?.
-        .byte   $EF,$04,$18,$18,$EF,$FB,$18,$18 ; EA50 EF 04 18 18 EF FB 18 18  ........
-        .byte   $EF,$FA,$18,$18,$EF,$07,$F8,$03 ; EA58 EF FA 18 18 EF 07 F8 03  ........
-        .byte   $EA,$EC,$07,$ED,$40,$EE,$07,$F0 ; EA60 EA EC 07 ED 40 EE 07 F0  ....@...
-        .byte   $09,$F2,$CA,$C1,$87,$1A,$84,$61 ; EA68 09 F2 CA C1 87 1A 84 61  .......a
-        .byte   $88,$61,$8A,$21,$F9,$EC,$05,$F2 ; EA70 88 61 8A 21 F9 EC 05 F2  .a.!....
-        .byte   $48,$82,$23,$3F,$3F,$3F,$23,$85 ; EA78 48 82 23 3F 3F 3F 23 85  H.#???#.
-        .byte   $3F,$84,$3F,$1A,$18,$82,$13,$3F ; EA80 3F 84 3F 1A 18 82 13 3F  ?.?....?
-        .byte   $86,$3F,$84,$EF,$04,$21,$21,$EF ; EA88 86 3F 84 EF 04 21 21 EF  .?...!!.
-        .byte   $FB,$21,$21,$EF,$FA,$21,$21,$EF ; EA90 FB 21 21 EF FA 21 21 EF  .!!..!!.
-        .byte   $07,$82,$18,$84,$21,$82,$23,$EF ; EA98 07 82 18 84 21 82 23 EF  ....!.#.
-        .byte   $FA,$28,$EF,$06,$85,$3F,$84,$3F ; EAA0 FA 28 EF 06 85 3F 84 3F  .(...?.?
-        .byte   $1A,$18,$82,$13,$3F,$86,$3F,$84 ; EAA8 1A 18 82 13 3F 86 3F 84  ....?.?.
-        .byte   $EF,$04,$21,$21,$EF,$FB,$21,$21 ; EAB0 EF 04 21 21 EF FB 21 21  ..!!..!!
-        .byte   $EF,$FA,$21,$21,$EF,$07,$F8,$61 ; EAB8 EF FA 21 21 EF 07 F8 61  ..!!...a
-        .byte   $EA,$E0,$64,$F5,$F2,$81,$CF,$86 ; EAC0 EA E0 64 F5 F2 81 CF 86  ..d.....
-        .byte   $0A,$F9,$CF,$07,$F9,$F8,$C1,$EA ; EAC8 0A F9 CF 07 F9 F8 C1 EA  ........
-        .byte   $00,$DA,$EA,$01,$08,$EB,$02,$36 ; EAD0 00 DA EA 01 08 EB 02 36  .......6
-        .byte   $EB,$FF,$EC,$06,$ED,$00,$EE,$05 ; EAD8 EB FF EC 06 ED 00 EE 05  ........
-        .byte   $F0,$0C,$F2,$C3,$94,$12,$22,$15 ; EAE0 F0 0C F2 C3 94 12 22 15  ......".
-        .byte   $25,$96,$17,$94,$19,$62,$22,$32 ; EAE8 25 96 17 94 19 62 22 32  %....b"2
-        .byte   $25,$35,$96,$27,$94,$29,$3F,$92 ; EAF0 25 35 96 27 94 29 3F 92  %5.'.)?.
-        .byte   $32,$30,$3F,$27,$25,$3F,$27,$25 ; EAF8 32 30 3F 27 25 3F 27 25  20?'%?'%
-        .byte   $27,$25,$94,$24,$20,$20,$22,$FF ; EB00 27 25 94 24 20 20 22 FF  '%.$  ".
-        .byte   $EC,$06,$ED,$00,$EE,$05,$F0,$0C ; EB08 EC 06 ED 00 EE 05 F0 0C  ........
-        .byte   $F2,$C3,$94,$09,$19,$12,$22,$96 ; EB10 F2 C3 94 09 19 12 22 96  ......".
-        .byte   $14,$94,$15,$19,$19,$29,$22,$32 ; EB18 14 94 15 19 19 29 22 32  .....)"2
-        .byte   $96,$24,$94,$25,$3F,$92,$2B,$29 ; EB20 96 24 94 25 3F 92 2B 29  .$.%?.+)
-        .byte   $3F,$24,$22,$3F,$22,$22,$22,$22 ; EB28 3F 24 22 3F 22 22 22 22  ?$"?""""
-        .byte   $94,$20,$17,$17,$19,$FF,$E0,$64 ; EB30 94 20 17 17 19 FF E0 64  . .....d
-        .byte   $F5,$94,$12,$12,$22,$12,$96,$20 ; EB38 F5 94 12 12 22 12 96 20  ....".. 
-        .byte   $94,$19,$57,$17,$96,$15,$14,$94 ; EB40 94 19 57 17 96 15 14 94  ..W.....
-        .byte   $15,$96,$10,$92,$12,$12,$96,$3F ; EB48 15 96 10 92 12 12 96 3F  .......?
-        .byte   $92,$12,$12,$96,$3F,$94,$10,$92 ; EB50 92 12 12 96 3F 94 10 92  ....?...
-        .byte   $10,$3F,$F3,$8E,$72,$70,$6A,$68 ; EB58 10 3F F3 8E 72 70 6A 68  .?..rpjh
-        .byte   $66,$65,$64,$63,$62,$FF,$00,$72 ; EB60 66 65 64 63 62 FF 00 72  fedcb..r
-        .byte   $EB,$01,$70,$EB,$03,$8E,$EB,$FF ; EB68 EB 01 70 EB 03 8E EB FF  ..p.....
-        .byte   $82,$3F,$EC,$04,$ED,$00,$EE,$02 ; EB70 82 3F EC 04 ED 00 EE 02  .?......
-        .byte   $F0,$20,$CF,$8F,$60,$5E,$5C,$5A ; EB78 F0 20 CF 8F 60 5E 5C 5A  . ..`^\Z
-        .byte   $58,$56,$54,$52,$50,$48,$46,$44 ; EB80 58 56 54 52 50 48 46 44  XVTRPHFD
-        .byte   $02,$F1,$F7,$F9,$00,$FF,$EC,$05 ; EB88 02 F1 F7 F9 00 FF EC 05  ........
-        .byte   $EE,$02,$81,$49,$4A,$4B,$4C,$4D ; EB90 EE 02 81 49 4A 4B 4C 4D  ...IJKLM
-        .byte   $0E,$FF,$00,$A4,$EB,$01,$C2,$EB ; EB98 0E FF 00 A4 EB 01 C2 EB  ........
-        .byte   $02,$E0,$EB,$FF,$EC,$07,$ED,$80 ; EBA0 02 E0 EB FF EC 07 ED 80  ........
-        .byte   $EE,$02,$F0,$00,$F2,$F2,$94,$25 ; EBA8 EE 02 F0 00 F2 F2 94 25  .......%
-        .byte   $24,$23,$22,$20,$1B,$20,$22,$25 ; EBB0 24 23 22 20 1B 20 22 25  $#" . "%
-        .byte   $24,$27,$26,$29,$28,$29,$2B,$98 ; EBB8 24 27 26 29 28 29 2B 98  $'&)()+.
-        .byte   $30,$FF,$EC,$07,$ED,$80,$EE,$02 ; EBC0 30 FF EC 07 ED 80 EE 02  0.......
-        .byte   $F0,$00,$F2,$F2,$94,$20,$20,$1A ; EBC8 F0 00 F2 F2 94 20 20 1A  .....  .
-        .byte   $1A,$17,$17,$17,$1B,$20,$20,$22 ; EBD0 1A 17 17 17 1B 20 20 22  .....  "
-        .byte   $22,$24,$24,$25,$27,$98,$27,$FF ; EBD8 22 24 24 25 27 98 27 FF  "$$%'.'.
-        .byte   $E0,$64,$F5,$94,$10,$17,$0A,$15 ; EBE0 E0 64 F5 94 10 17 0A 15  .d......
-        .byte   $07,$12,$07,$07,$10,$17,$12,$19 ; EBE8 07 12 07 07 10 17 12 19  ........
-        .byte   $14,$1B,$15,$17,$F3,$9F,$20,$1B ; EBF0 14 1B 15 17 F3 9F 20 1B  ...... .
-        .byte   $1A,$19,$18,$17,$16,$15,$14,$13 ; EBF8 1A 19 18 17 16 15 14 13  ........
-        .byte   $12,$11,$10,$FF,$00,$0D,$EC,$01 ; EC00 12 11 10 FF 00 0D EC 01  ........
-        .byte   $0B,$EC,$FF,$F0,$01,$EC,$04,$ED ; EC08 0B EC FF F0 01 EC 04 ED  ........
-        .byte   $00,$C3,$82,$15,$80,$3F,$F9,$EE ; EC10 00 C3 82 15 80 3F F9 EE  .....?..
-        .byte   $0F,$FF,$00,$24,$EC,$01,$3C,$EC ; EC18 0F FF 00 24 EC 01 3C EC  ...$..<.
-        .byte   $02,$54,$EC,$FF,$EC,$05,$ED,$00 ; EC20 02 54 EC FF EC 05 ED 00  .T......
-        .byte   $EE,$04,$F0,$0C,$F2,$C1,$94,$19 ; EC28 EE 04 F0 0C F2 C1 94 19  ........
-        .byte   $1B,$19,$15,$19,$1B,$20,$22,$20 ; EC30 1B 19 15 19 1B 20 22 20  ..... " 
-        .byte   $1B,$3F,$20,$FF,$EC,$05,$ED,$00 ; EC38 1B 3F 20 FF EC 05 ED 00  .? .....
-        .byte   $EE,$04,$F0,$0C,$F2,$C1,$94,$15 ; EC40 EE 04 F0 0C F2 C1 94 15  ........
-        .byte   $17,$15,$12,$15,$17,$19,$1B,$17 ; EC48 17 15 12 15 17 19 1B 17  ........
-        .byte   $17,$3F,$17,$FF,$E0,$64,$F5,$98 ; EC50 17 3F 17 FF E0 64 F5 98  .?...d..
-        .byte   $15,$17,$94,$20,$17,$3F,$20,$FF ; EC58 15 17 94 20 17 3F 20 FF  ... .? .
-        .byte   $04,$01,$65,$EC,$FF,$EC,$06,$ED ; EC60 04 01 65 EC FF EC 06 ED  ..e.....
-        .byte   $80,$F0,$18,$EE,$00,$C3,$8F,$10 ; EC68 80 F0 18 EE 00 C3 8F 10  ........
-        .byte   $20,$EF,$03,$F9,$EE,$00,$C3,$8F ; EC70 20 EF 03 F9 EE 00 C3 8F   .......
-        .byte   $14,$24,$EF,$03,$F9,$EE,$00,$C3 ; EC78 14 24 EF 03 F9 EE 00 C3  .$......
-        .byte   $8F,$17,$27,$EF,$03,$F9,$EE,$00 ; EC80 8F 17 27 EF 03 F9 EE 00  ..'.....
-        .byte   $C3,$8F,$20,$30,$EF,$03,$F9,$FF ; EC88 C3 8F 20 30 EF 03 F9 FF  .. 0....
-        .byte   $00,$9A,$EC,$01,$BE,$EC,$02,$E2 ; EC90 00 9A EC 01 BE EC 02 E2  ........
-        .byte   $EC,$FF,$EC,$05,$ED,$C0,$F0,$0C ; EC98 EC FF EC 05 ED C0 F0 0C  ........
-        .byte   $F2,$C1,$EE,$03,$C1,$84,$17,$9B ; ECA0 F2 C1 EE 03 C1 84 17 9B  ........
-        .byte   $19,$84,$3F,$9B,$19,$84,$3F,$9B ; ECA8 19 84 3F 9B 19 84 3F 9B  ..?...?.
-        .byte   $19,$96,$22,$F9,$98,$20,$22,$84 ; ECB0 19 96 22 F9 98 20 22 84  ..".. ".
-        .byte   $29,$9B,$27,$96,$29,$FF,$EC,$05 ; ECB8 29 9B 27 96 29 FF EC 05  ).'.)...
-        .byte   $ED,$C0,$F0,$0C,$F2,$C1,$EE,$03 ; ECC0 ED C0 F0 0C F2 C1 EE 03  ........
-        .byte   $C1,$84,$14,$9B,$14,$84,$3F,$9B ; ECC8 C1 84 14 9B 14 84 3F 9B  ......?.
-        .byte   $14,$84,$3F,$9B,$14,$96,$19,$F9 ; ECD0 14 84 3F 9B 14 96 19 F9  ..?.....
-        .byte   $98,$19,$1B,$84,$24,$9B,$24,$96 ; ECD8 98 19 1B 84 24 9B 24 96  ....$.$.
-        .byte   $24,$FF,$E0,$64,$F5,$C7,$96,$09 ; ECE0 24 FF E0 64 F5 C7 96 09  $..d....
-        .byte   $F9,$98,$15,$17,$84,$09,$9B,$19 ; ECE8 F9 98 15 17 84 09 9B 19  ........
-        .byte   $84,$09,$9B,$19,$07,$09,$07,$09 ; ECF0 84 09 9B 19 07 09 07 09  ........
-        .byte   $FF,$04,$01,$FE,$EC,$FF,$EC,$06 ; ECF8 FF 04 01 FE EC FF EC 06  ........
-        .byte   $ED,$C0,$EE,$00,$F0,$0C,$8F,$C5 ; ED00 ED C0 EE 00 F0 0C 8F C5  ........
-        .byte   $60,$30,$02,$F1,$03,$EF,$01,$F9 ; ED08 60 30 02 F1 03 EF 01 F9  `0......
-        .byte   $FF,$00,$1B,$ED,$01,$93,$ED,$02 ; ED10 FF 00 1B ED 01 93 ED 02  ........
-        .byte   $11,$EE,$FF,$EC,$08,$ED,$00,$EE ; ED18 11 EE FF EC 08 ED 00 EE  ........
-        .byte   $05,$F0,$0C,$F2,$C2,$82,$12,$14 ; ED20 05 F0 0C F2 C2 82 12 14  ........
-        .byte   $E0,$5B,$ED,$22,$17,$86,$17,$17 ; ED28 E0 5B ED 22 17 86 17 17  .[."....
-        .byte   $84,$1B,$59,$8A,$59,$87,$19,$84 ; ED30 84 1B 59 8A 59 87 19 84  ..Y.Y...
-        .byte   $19,$86,$17,$84,$3F,$82,$12,$14 ; ED38 19 86 17 84 3F 82 12 14  ....?...
-        .byte   $E0,$5B,$ED,$22,$17,$86,$17,$17 ; ED40 E0 5B ED 22 17 86 17 17  .[."....
-        .byte   $84,$16,$57,$8A,$57,$87,$17,$84 ; ED48 84 16 57 8A 57 87 17 84  ..W.W...
-        .byte   $19,$86,$17,$84,$19,$82,$12,$14 ; ED50 19 86 17 84 19 82 12 14  ........
-        .byte   $F8,$28,$ED,$84,$17,$17,$82,$12 ; ED58 F8 28 ED 84 17 17 82 12  .(......
-        .byte   $84,$14,$82,$12,$87,$20,$84,$5B ; ED60 84 14 82 12 87 20 84 5B  ..... .[
-        .byte   $88,$5B,$84,$1B,$82,$1B,$22,$1B ; ED68 88 5B 84 1B 82 1B 22 1B  .[....".
-        .byte   $19,$17,$3F,$22,$32,$32,$22,$32 ; ED70 19 17 3F 22 32 32 22 32  ..?"22"2
-        .byte   $32,$84,$3F,$87,$17,$84,$57,$88 ; ED78 32 84 3F 87 17 84 57 88  2.?...W.
-        .byte   $57,$84,$17,$3F,$EF,$FC,$22,$62 ; ED80 57 84 17 3F EF FC 22 62  W..?.."b
-        .byte   $22,$EF,$04,$17,$86,$17,$3F,$84 ; ED88 22 EF 04 17 86 17 3F 84  ".....?.
-        .byte   $22,$62,$FA,$EC,$08,$ED,$C0,$EE ; ED90 22 62 FA EC 08 ED C0 EE  "b......
-        .byte   $05,$F0,$0C,$F2,$C2,$84,$3F,$E0 ; ED98 05 F0 0C F2 C2 84 3F E0  ......?.
-        .byte   $DA,$ED,$17,$12,$86,$12,$12,$84 ; EDA0 DA ED 17 12 86 12 12 84  ........
-        .byte   $14,$54,$88,$55,$84,$15,$15,$14 ; EDA8 14 54 88 55 84 15 15 14  .T.U....
-        .byte   $52,$87,$12,$84,$12,$86,$10,$84 ; EDB0 52 87 12 84 12 86 10 84  R.......
-        .byte   $0B,$3F,$E0,$DA,$ED,$17,$12,$86 ; EDB8 0B 3F E0 DA ED 17 12 86  .?......
-        .byte   $12,$12,$84,$12,$52,$12,$22,$27 ; EDC0 12 12 84 12 52 12 22 27  ....R."'
-        .byte   $22,$29,$86,$2B,$84,$27,$30,$27 ; EDC8 22 29 86 2B 84 27 30 27  ").+.'0'
-        .byte   $2B,$27,$29,$86,$2B,$84,$27,$F8 ; EDD0 2B 27 29 86 2B 84 27 F8  +').+.'.
-        .byte   $9F,$ED,$82,$22,$32,$32,$22,$32 ; EDD8 9F ED 82 22 32 32 22 32  ..."22"2
-        .byte   $32,$84,$3F,$87,$17,$84,$57,$88 ; EDE0 32 84 3F 87 17 84 57 88  2.?...W.
-        .byte   $57,$84,$17,$86,$3F,$82,$12,$14 ; EDE8 57 84 17 86 3F 82 12 14  W...?...
-        .byte   $84,$17,$17,$82,$12,$84,$14,$82 ; EDF0 84 17 17 82 12 84 14 82  ........
-        .byte   $12,$87,$20,$84,$5B,$88,$5B,$84 ; EDF8 12 87 20 84 5B 88 5B 84  .. .[.[.
-        .byte   $1B,$3F,$EF,$FC,$17,$57,$17,$EF ; EE00 1B 3F EF FC 17 57 17 EF  .?...W..
-        .byte   $04,$12,$86,$12,$3F,$84,$17,$55 ; EE08 04 12 86 12 3F 84 17 55  ....?..U
-        .byte   $FA,$EC,$04,$F0,$18,$F2,$C1,$82 ; EE10 FA EC 04 F0 18 F2 C1 82  ........
-        .byte   $02,$04,$E0,$46,$EE,$03,$82,$03 ; EE18 02 04 E0 46 EE 03 82 03  ...F....
-        .byte   $3F,$03,$3F,$03,$3F,$03,$3F,$03 ; EE20 3F 03 3F 03 3F 03 3F 03  ?.?.?.?.
-        .byte   $3F,$03,$3F,$03,$3F,$84,$02,$86 ; EE28 3F 03 3F 03 3F 84 02 86  ?.?.?...
-        .byte   $02,$84,$02,$04,$86,$04,$84,$04 ; EE30 02 84 02 04 86 04 84 04  ........
-        .byte   $05,$86,$05,$84,$05,$06,$86,$06 ; EE38 05 86 05 84 05 06 86 06  ........
-        .byte   $82,$02,$04,$F8,$1A,$EE,$84,$07 ; EE40 82 02 04 F8 1A EE 84 07  ........
-        .byte   $82,$07,$3F,$84,$07,$82,$07,$3F ; EE48 82 07 3F 84 07 82 07 3F  ..?....?
-        .byte   $07,$3F,$07,$3F,$84,$07,$82,$07 ; EE50 07 3F 07 3F 84 07 82 07  .?.?....
-        .byte   $3F,$07,$3F,$07,$3F,$84,$07,$82 ; EE58 3F 07 3F 07 3F 84 07 82  ?.?.?...
-        .byte   $07,$3F,$07,$3F,$0B,$12,$0B,$09 ; EE60 07 3F 07 3F 0B 12 0B 09  .?.?....
-        .byte   $02,$04,$84,$05,$82,$05,$3F,$84 ; EE68 02 04 84 05 82 05 3F 84  ......?.
-        .byte   $05,$82,$05,$3F,$05,$3F,$05,$3F ; EE70 05 82 05 3F 05 3F 05 3F  ...?.?.?
-        .byte   $84,$05,$82,$05,$3F,$05,$3F,$05 ; EE78 84 05 82 05 3F 05 3F 05  ....?.?.
-        .byte   $3F,$84,$05,$82,$05,$3F,$05,$85 ; EE80 3F 84 05 82 05 3F 05 85  ?....?..
-        .byte   $3F,$84,$05,$44,$04,$82,$04,$3F ; EE88 3F 84 05 44 04 82 04 3F  ?..D...?
-        .byte   $04,$3F,$04,$3F,$04,$3F,$04,$3F ; EE90 04 3F 04 3F 04 3F 04 3F  .?.?.?.?
-        .byte   $84,$04,$43,$FA,$00,$A6,$EE,$01 ; EE98 84 04 43 FA 00 A6 EE 01  ..C.....
-        .byte   $BA,$EF,$02,$34,$F1,$FF,$EC,$07 ; EEA0 BA EF 02 34 F1 FF EC 07  ...4....
-        .byte   $ED,$C0,$EE,$05,$F0,$0C,$F2,$C2 ; EEA8 ED C0 EE 05 F0 0C F2 C2  ........
-        .byte   $8A,$3F,$3F,$3F,$89,$3F,$84,$3F ; EEB0 8A 3F 3F 3F 89 3F 84 3F  .???.?.?
-        .byte   $82,$16,$17,$E0,$99,$EF,$84,$3F ; EEB8 82 16 17 E0 99 EF 84 3F  .......?
-        .byte   $82,$17,$19,$E0,$99,$EF,$86,$12 ; EEC0 82 17 19 E0 99 EF 86 12  ........
-        .byte   $84,$10,$14,$3F,$86,$17,$84,$17 ; EEC8 84 10 14 3F 86 17 84 17  ...?....
-        .byte   $19,$17,$1B,$20,$1B,$86,$17,$84 ; EED0 19 17 1B 20 1B 86 17 84  ... ....
-        .byte   $14,$86,$17,$84,$16,$86,$17,$19 ; EED8 14 86 17 84 16 86 17 19  ........
-        .byte   $84,$1B,$86,$20,$84,$1B,$19,$17 ; EEE0 84 1B 86 20 84 1B 19 17  ... ....
-        .byte   $87,$24,$86,$22,$82,$10,$12,$14 ; EEE8 87 24 86 22 82 10 12 14  .$."....
-        .byte   $16,$17,$84,$19,$82,$1B,$86,$20 ; EEF0 16 17 84 19 82 1B 86 20  ....... 
-        .byte   $22,$24,$84,$22,$86,$1B,$84,$19 ; EEF8 22 24 84 22 86 1B 84 19  "$."....
-        .byte   $82,$1B,$19,$17,$14,$84,$14,$17 ; EF00 82 1B 19 17 14 84 14 17  ........
-        .byte   $87,$3F,$84,$14,$17,$1B,$88,$62 ; EF08 87 3F 84 14 17 1B 88 62  .?.....b
-        .byte   $84,$22,$17,$86,$19,$ED,$80,$8A ; EF10 84 22 17 86 19 ED 80 8A  ."......
-        .byte   $62,$88,$22,$8C,$20,$1B,$85,$20 ; EF18 62 88 22 8C 20 1B 85 20  b.". .. 
-        .byte   $87,$1B,$84,$17,$86,$19,$84,$1B ; EF20 87 1B 84 17 86 19 84 1B  ........
-        .byte   $54,$14,$12,$87,$12,$82,$12,$14 ; EF28 54 14 12 87 12 82 12 14  T.......
-        .byte   $16,$17,$84,$19,$86,$17,$84,$14 ; EF30 16 17 84 19 86 17 84 14  ........
-        .byte   $86,$17,$82,$53,$14,$84,$17,$14 ; EF38 86 17 82 53 14 84 17 14  ...S....
-        .byte   $86,$19,$84,$1B,$86,$14,$84,$12 ; EF40 86 19 84 1B 86 14 84 12  ........
-        .byte   $86,$22,$20,$84,$1B,$87,$19,$82 ; EF48 86 22 20 84 1B 87 19 82  ." .....
-        .byte   $23,$85,$24,$88,$22,$84,$3F,$82 ; EF50 23 85 24 88 22 84 3F 82  #.$.".?.
-        .byte   $12,$14,$16,$17,$84,$19,$8A,$62 ; EF58 12 14 16 17 84 19 8A 62  .......b
-        .byte   $88,$22,$8C,$27,$26,$85,$27,$86 ; EF60 88 22 8C 27 26 85 27 86  .".'&.'.
-        .byte   $24,$84,$20,$87,$22,$84,$24,$5B ; EF68 24 84 20 87 22 84 24 5B  $. .".$[
-        .byte   $1B,$19,$88,$19,$86,$1B,$89,$17 ; EF70 1B 19 88 19 86 1B 89 17  ........
-        .byte   $86,$22,$89,$1B,$84,$24,$22,$86 ; EF78 86 22 89 1B 84 24 22 86  ."...$".
-        .byte   $27,$84,$24,$22,$86,$27,$64,$24 ; EF80 27 84 24 22 86 27 64 24  '.$".'d$
-        .byte   $27,$84,$27,$87,$29,$8A,$67,$86 ; EF88 27 84 27 87 29 8A 67 86  '.'.).g.
-        .byte   $27,$84,$16,$82,$16,$16,$84,$17 ; EF90 27 84 16 82 16 16 84 17  '.......
-        .byte   $FF,$87,$22,$82,$16,$17,$84,$22 ; EF98 FF 87 22 82 16 17 84 22  .."...."
-        .byte   $20,$1B,$20,$17,$82,$16,$57,$86 ; EFA0 20 1B 20 17 82 16 57 86   . ...W.
-        .byte   $17,$3F,$84,$12,$14,$87,$15,$82 ; EFA8 17 3F 84 12 14 87 15 82  .?......
-        .byte   $12,$14,$84,$15,$17,$19,$3F,$89 ; EFB0 12 14 84 15 17 19 3F 89  ......?.
-        .byte   $12,$FA,$E0,$07,$F1,$E0,$07,$F1 ; EFB8 12 FA E0 07 F1 E0 07 F1  ........
-        .byte   $E0,$07,$F1,$E0,$07,$F1,$E0,$07 ; EFC0 E0 07 F1 E0 07 F1 E0 07  ........
-        .byte   $F1,$E0,$07,$F1,$E0,$22,$F1,$ED ; EFC8 F1 E0 07 F1 E0 22 F1 ED  ....."..
-        .byte   $80,$EE,$06,$84,$12,$82,$22,$22 ; EFD0 80 EE 06 84 12 82 22 22  ......""
-        .byte   $84,$20,$1B,$82,$19,$12,$17,$19 ; EFD8 84 20 1B 82 19 12 17 19  . ......
-        .byte   $EE,$00,$02,$04,$06,$07,$E0,$07 ; EFE0 EE 00 02 04 06 07 E0 07  ........
-        .byte   $F1,$E0,$07,$F1,$E0,$22,$F1,$ED ; EFE8 F1 E0 07 F1 E0 22 F1 ED  ....."..
-        .byte   $40,$EE,$06,$EC,$08,$84,$12,$22 ; EFF0 40 EE 06 EC 08 84 12 22  @......"
-        .byte   $12,$20,$12,$1B,$12,$19,$ED,$80 ; EFF8 12 20 12 1B 12 19 ED 80  . ......
-        .byte   $F2,$B5,$82,$20,$20,$27,$27,$30 ; F000 F2 B5 82 20 20 27 27 30  ...  ''0
-        .byte   $30,$37,$37,$30,$32,$30,$32,$30 ; F008 30 37 37 30 32 30 32 30  07702020
-        .byte   $32,$30,$32,$1B,$1B,$27,$27,$2B ; F010 32 30 32 1B 1B 27 27 2B  202..''+
-        .byte   $2B,$37,$37,$2B,$30,$2B,$30,$2B ; F018 2B 37 37 2B 30 2B 30 2B  +77+0+0+
-        .byte   $30,$2B,$30,$19,$19,$26,$26,$32 ; F020 30 2B 30 19 19 26 26 32  0+0..&&2
-        .byte   $32,$36,$36,$30,$32,$30,$32,$30 ; F028 32 36 36 30 32 30 32 30  26602020
-        .byte   $32,$30,$32,$ED,$40,$F2,$C1,$EC ; F030 32 30 32 ED 40 F2 C1 EC  202.@...
-        .byte   $07,$84,$27,$26,$24,$87,$30,$86 ; F038 07 84 27 26 24 87 30 86  ..'&$.0.
-        .byte   $2B,$82,$19,$1B,$20,$22,$24,$84 ; F040 2B 82 19 1B 20 22 24 84  +... "$.
-        .byte   $26,$ED,$80,$F2,$B5,$82,$27,$36 ; F048 26 ED 80 F2 B5 82 27 36  &.....'6
-        .byte   $37,$36,$34,$32,$37,$36,$37,$ED ; F050 37 36 34 32 37 36 37 ED  7642767.
-        .byte   $40,$F2,$C1,$86,$30,$84,$2B,$27 ; F058 40 F2 C1 86 30 84 2B 27  @...0.+'
-        .byte   $ED,$80,$F2,$B5,$82,$36,$37,$36 ; F060 ED 80 F2 B5 82 36 37 36  .....676
-        .byte   $37,$36,$37,$36,$37,$84,$20,$24 ; F068 37 36 37 36 37 84 20 24  76767. $
-        .byte   $82,$34,$34,$37,$37,$34,$34,$37 ; F070 82 34 34 37 37 34 34 37  .4477447
-        .byte   $37,$84,$34,$37,$EC,$07,$ED,$40 ; F078 37 84 34 37 EC 07 ED 40  7.47...@
-        .byte   $F2,$C1,$88,$6B,$84,$2B,$24,$86 ; F080 F2 C1 88 6B 84 2B 24 86  ...k.+$.
-        .byte   $26,$F0,$0C,$ED,$80,$EC,$09,$C5 ; F088 26 F0 0C ED 80 EC 09 C5  &.......
-        .byte   $82,$32,$30,$2B,$29,$30,$2B,$29 ; F090 82 32 30 2B 29 30 2B 29  .20+)0+)
-        .byte   $27,$2B,$29,$27,$24,$29,$27,$24 ; F098 27 2B 29 27 24 29 27 24  '+)'$)'$
-        .byte   $22,$F9,$EC,$08,$ED,$80,$86,$19 ; F0A0 22 F9 EC 08 ED 80 86 19  ".......
-        .byte   $84,$17,$87,$16,$82,$16,$85,$17 ; F0A8 84 17 87 16 82 16 85 17  ........
-        .byte   $88,$19,$84,$3F,$82,$0B,$10,$12 ; F0B0 88 19 84 3F 82 0B 10 12  ...?....
-        .byte   $14,$84,$16,$EC,$09,$ED,$80,$C2 ; F0B8 14 84 16 EC 09 ED 80 C2  ........
-        .byte   $82,$32,$30,$2B,$29,$30,$2B,$29 ; F0C0 82 32 30 2B 29 30 2B 29  .20+)0+)
-        .byte   $27,$2B,$29,$27,$24,$29,$27,$24 ; F0C8 27 2B 29 27 24 29 27 24  '+)'$)'$
-        .byte   $22,$F9,$32,$30,$2B,$29,$30,$2B ; F0D0 22 F9 32 30 2B 29 30 2B  ".20+)0+
-        .byte   $29,$27,$2B,$29,$27,$24,$EC,$07 ; F0D8 29 27 2B 29 27 24 EC 07  )'+)'$..
-        .byte   $ED,$00,$86,$19,$89,$14,$86,$1B ; F0E0 ED 00 86 19 89 14 86 1B  ........
-        .byte   $89,$17,$84,$20,$1B,$86,$24,$84 ; F0E8 89 17 84 20 1B 86 24 84  ... ..$.
-        .byte   $20,$1B,$86,$24,$60,$20,$24,$84 ; F0F0 20 1B 86 24 60 20 24 84   ..$` $.
-        .byte   $24,$87,$24,$8A,$62,$86,$22,$84 ; F0F8 24 87 24 8A 62 86 22 84  $.$.b.".
-        .byte   $10,$82,$10,$10,$84,$12,$FF,$EC ; F100 10 82 10 10 84 12 FF EC  ........
-        .byte   $09,$ED,$00,$EE,$02,$F0,$00,$F3 ; F108 09 ED 00 EE 02 F0 00 F3  ........
-        .byte   $82,$07,$06,$04,$02,$07,$06,$04 ; F110 82 07 06 04 02 07 06 04  ........
-        .byte   $02,$07,$06,$04,$02,$04,$06,$07 ; F118 02 07 06 04 02 04 06 07  ........
-        .byte   $09,$FA,$82,$05,$04,$02,$00,$05 ; F120 09 FA 82 05 04 02 00 05  ........
-        .byte   $04,$02,$00,$05,$04,$02,$00,$02 ; F128 04 02 00 05 04 02 00 02  ........
-        .byte   $04,$05,$07,$FA,$E0,$64,$F5,$E0 ; F130 04 05 07 FA E0 64 F5 E0  .....d..
-        .byte   $02,$F2,$E0,$02,$F2,$E0,$02,$F2 ; F138 02 F2 E0 02 F2 E0 02 F2  ........
-        .byte   $E0,$02,$F2,$E0,$02,$F2,$E0,$02 ; F140 E0 02 F2 E0 02 F2 E0 02  ........
-        .byte   $F2,$E0,$08,$F2,$E0,$02,$F2,$E0 ; F148 F2 E0 08 F2 E0 02 F2 E0  ........
-        .byte   $02,$F2,$E0,$08,$F2,$84,$10,$10 ; F150 02 F2 E0 08 F2 84 10 10  ........
-        .byte   $17,$10,$3F,$82,$12,$14,$84,$17 ; F158 17 10 3F 82 12 14 84 17  ..?.....
-        .byte   $19,$84,$17,$17,$3F,$17,$3F,$82 ; F160 19 84 17 17 3F 17 3F 82  ....?.?.
-        .byte   $1B,$20,$1B,$19,$84,$17,$12,$12 ; F168 1B 20 1B 19 84 17 12 12  . ......
-        .byte   $19,$12,$3F,$82,$16,$17,$84,$19 ; F170 19 12 3F 82 16 17 84 19  ..?.....
-        .byte   $22,$14,$14,$24,$14,$3F,$14,$86 ; F178 22 14 14 24 14 3F 14 86  "..$.?..
-        .byte   $12,$84,$10,$10,$87,$3F,$82,$20 ; F180 12 84 10 10 87 3F 82 20  .....?. 
-        .byte   $1B,$19,$17,$84,$14,$0B,$0B,$3F ; F188 1B 19 17 84 14 0B 0B 3F  .......?
-        .byte   $86,$17,$14,$84,$10,$09,$09,$87 ; F190 86 17 14 84 10 09 09 87  ........
-        .byte   $3F,$84,$0B,$86,$10,$84,$12,$12 ; F198 3F 84 0B 86 10 84 12 12  ?.......
-        .byte   $3F,$3F,$3F,$14,$86,$16,$E0,$11 ; F1A0 3F 3F 3F 14 86 16 E0 11  ???.....
-        .byte   $F2,$87,$10,$84,$10,$88,$10,$87 ; F1A8 F2 87 10 84 10 88 10 87  ........
-        .byte   $0B,$84,$0B,$88,$0B,$87,$09,$84 ; F1B0 0B 84 0B 88 0B 87 09 84  ........
-        .byte   $09,$88,$09,$86,$12,$85,$22,$82 ; F1B8 09 88 09 86 12 85 22 82  ......".
-        .byte   $12,$84,$12,$12,$14,$16,$E0,$11 ; F1C0 12 84 12 12 14 16 E0 11  ........
-        .byte   $F2,$84,$3F,$10,$10,$20,$10,$3F ; F1C8 F2 84 3F 10 10 20 10 3F  ..?.. .?
-        .byte   $86,$10,$84,$3F,$0B,$0B,$1B,$0B ; F1D0 86 10 84 3F 0B 0B 1B 0B  ...?....
-        .byte   $3F,$86,$0B,$84,$09,$19,$19,$09 ; F1D8 3F 86 0B 84 09 19 19 09  ?.......
-        .byte   $09,$19,$19,$0B,$86,$12,$85,$22 ; F1E0 09 19 19 0B 86 12 85 22  ......."
-        .byte   $82,$12,$84,$12,$12,$14,$16,$17 ; F1E8 82 12 84 12 12 14 16 17  ........
-        .byte   $86,$3F,$84,$14,$3F,$12,$3F,$10 ; F1F0 86 3F 84 14 3F 12 3F 10  .?..?.?.
-        .byte   $86,$07,$84,$06,$82,$06,$06,$84 ; F1F8 86 07 84 06 82 06 06 84  ........
-        .byte   $07,$FF,$86,$17,$17,$17,$17,$FA ; F200 07 FF 86 17 17 17 17 FA  ........
-        .byte   $15,$15,$15,$15,$12,$12,$12,$12 ; F208 15 15 15 15 12 12 12 12  ........
-        .byte   $FA,$87,$17,$84,$17,$87,$17,$84 ; F210 FA 87 17 84 17 87 17 84  ........
-        .byte   $56,$16,$16,$86,$16,$8C,$16,$16 ; F218 56 16 16 86 16 8C 16 16  V.......
-        .byte   $85,$16,$87,$14,$84,$14,$87,$14 ; F220 85 16 87 14 84 14 87 14  ........
-        .byte   $84,$52,$12,$12,$86,$12,$3F,$12 ; F228 84 52 12 12 86 12 3F 12  .R....?.
-        .byte   $FA,$00,$3B,$F2,$01,$82,$F2,$02 ; F230 FA 00 3B F2 01 82 F2 02  ..;.....
-        .byte   $BD,$F2,$FF,$EC,$07,$ED,$C0,$EE ; F238 BD F2 FF EC 07 ED C0 EE  ........
-        .byte   $03,$F0,$0C,$E0,$76,$F2,$9A,$16 ; F240 03 F0 0C E0 76 F2 9A 16  ....v...
-        .byte   $E0,$76,$F2,$99,$16,$94,$15,$14 ; F248 E0 76 F2 99 16 94 15 14  .v......
-        .byte   $EC,$05,$F2,$B5,$ED,$90,$EE,$05 ; F250 EC 05 F2 B5 ED 90 EE 05  ........
-        .byte   $C1,$92,$18,$18,$18,$18,$18,$3F ; F258 C1 92 18 18 18 18 18 3F  .......?
-        .byte   $18,$18,$18,$18,$18,$3F,$96,$22 ; F260 18 18 18 18 18 3F 96 22  .....?."
-        .byte   $F9,$F3,$96,$26,$25,$24,$23,$23 ; F268 F9 F3 96 26 25 24 23 23  ...&%$##
-        .byte   $22,$21,$20,$F8,$3B,$F2,$92,$48 ; F270 22 21 20 F8 3B F2 92 48  "! .;..H
-        .byte   $12,$98,$58,$94,$18,$17,$92,$18 ; F278 12 98 58 94 18 17 92 18  ..X.....
-        .byte   $17,$FA,$EC,$05,$F2,$35,$ED,$90 ; F280 17 FA EC 05 F2 35 ED 90  .....5..
-        .byte   $EE,$07,$F0,$18,$C3,$94,$23,$33 ; F288 EE 07 F0 18 C3 94 23 33  ......#3
-        .byte   $3F,$23,$33,$3F,$23,$33,$F9,$F0 ; F290 3F 23 33 3F 23 33 F9 F0  ?#3?#3..
-        .byte   $0C,$F2,$B5,$EC,$05,$EE,$05,$C1 ; F298 0C F2 B5 EC 05 EE 05 C1  ........
-        .byte   $92,$17,$17,$17,$17,$17,$3F,$17 ; F2A0 92 17 17 17 17 17 3F 17  ......?.
-        .byte   $17,$17,$17,$17,$3F,$96,$21,$F9 ; F2A8 17 17 17 17 3F 96 21 F9  ....?.!.
-        .byte   $F3,$96,$22,$21,$20,$1B,$19,$19 ; F2B0 F3 96 22 21 20 1B 19 19  .."! ...
-        .byte   $19,$19,$F8,$82,$F2,$EC,$04,$F2 ; F2B8 19 19 F8 82 F2 EC 04 F2  ........
-        .byte   $91,$F0,$0C,$C1,$94,$17,$18,$15 ; F2C0 91 F0 0C C1 94 17 18 15  ........
-        .byte   $18,$17,$18,$15,$18,$96,$17,$18 ; F2C8 18 17 18 15 18 96 17 18  ........
-        .byte   $15,$18,$F9,$C1,$94,$12,$13,$0B ; F2D0 15 18 F9 C1 94 12 13 0B  ........
-        .byte   $13,$12,$13,$0B,$0B,$F9,$96,$07 ; F2D8 13 12 13 0B 0B F9 96 07  ........
-        .byte   $12,$11,$0A,$94,$19,$0A,$17,$1A ; F2E0 12 11 0A 94 19 0A 17 1A  ........
-        .byte   $19,$1A,$1A,$1A,$F8,$BD,$F2,$04 ; F2E8 19 1A 1A 1A F8 BD F2 04  ........
-        .byte   $03,$F4,$F2,$FF,$EC,$01,$EE,$00 ; F2F0 03 F4 F2 FF EC 01 EE 00  ........
-        .byte   $F2,$44,$80,$04,$F4,$18,$85,$0F ; F2F8 F2 44 80 04 F4 18 85 0F  .D......
-        .byte   $FF,$03,$05,$F3,$FF,$EC,$07,$EE ; F300 FF 03 05 F3 FF EC 07 EE  ........
-        .byte   $01,$8E,$0F,$0D,$4B,$49,$47,$45 ; F308 01 8E 0F 0D 4B 49 47 45  ....KIGE
-        .byte   $03,$FF,$04,$01,$1A,$F3,$03,$2E ; F310 03 FF 04 01 1A F3 03 2E  ........
-        .byte   $F3,$FF,$EC,$06,$ED,$40,$EE,$04 ; F318 F3 FF EC 06 ED 40 EE 04  .....@..
-        .byte   $F0,$1C,$8F,$1A,$2A,$3A,$C2,$69 ; F320 F0 1C 8F 1A 2A 3A C2 69  ....*:.i
-        .byte   $59,$F1,$F5,$F9,$29,$FF,$EC,$06 ; F328 59 F1 F5 F9 29 FF EC 06  Y...)...
-        .byte   $EE,$02,$8F,$4F,$4D,$4B,$49,$47 ; F330 EE 02 8F 4F 4D 4B 49 47  ...OMKIG
-        .byte   $45,$43,$01,$FF,$04,$01,$44,$F3 ; F338 45 43 01 FF 04 01 44 F3  EC....D.
-        .byte   $03,$5C,$F3,$FF,$EC,$06,$ED,$80 ; F340 03 5C F3 FF EC 06 ED 80  .\......
-        .byte   $EE,$00,$F0,$04,$F3,$8F,$C2,$78 ; F348 EE 00 F0 04 F3 8F C2 78  .......x
-        .byte   $70,$68,$60,$58,$50,$08,$EE,$02 ; F350 70 68 60 58 50 08 EE 02  ph`XP...
-        .byte   $F1,$07,$F9,$FF,$EC,$06,$EE,$00 ; F358 F1 07 F9 FF EC 06 EE 00  ........
-        .byte   $8D,$45,$03,$FF,$04,$02,$69,$F3 ; F360 8D 45 03 FF 04 02 69 F3  .E....i.
-        .byte   $FF,$E0,$64,$F5,$F3,$F0,$1C,$8F ; F368 FF E0 64 F5 F3 F0 1C 8F  ..d.....
-        .byte   $35,$37,$39,$F0,$0C,$C9,$2A,$F1 ; F370 35 37 39 F0 0C C9 2A F1  579...*.
-        .byte   $FF,$F9,$8F,$C8,$69,$F1,$FE,$F9 ; F378 FF F9 8F C8 69 F1 FE F9  ....i...
-        .byte   $20,$FF,$04,$03,$87,$F3,$FF,$EC ; F380 20 FF 04 03 87 F3 FF EC   .......
-        .byte   $00,$EE,$00,$8E,$4F,$4D,$4B,$48 ; F388 00 EE 00 8E 4F 4D 4B 48  ....OMKH
-        .byte   $06,$FF,$00,$9C,$F3,$01,$B3,$F3 ; F390 06 FF 00 9C F3 01 B3 F3  ........
-        .byte   $02,$CA,$F3,$FF,$EC,$01,$ED,$00 ; F398 02 CA F3 FF EC 01 ED 00  ........
-        .byte   $EE,$00,$F0,$F7,$F2,$01,$81,$24 ; F3A0 EE 00 F0 F7 F2 01 81 24  .......$
-        .byte   $23,$22,$21,$81,$13,$14,$13,$14 ; F3A8 23 22 21 81 13 14 13 14  #"!.....
-        .byte   $13,$14,$FF,$EC,$01,$ED,$00,$EE ; F3B0 13 14 FF EC 01 ED 00 EE  ........
-        .byte   $00,$F0,$F7,$F2,$01,$81,$1B,$1A ; F3B8 00 F0 F7 F2 01 81 1B 1A  ........
-        .byte   $19,$18,$81,$08,$09,$08,$09,$08 ; F3C0 19 18 81 08 09 08 09 08  ........
-        .byte   $09,$FF,$EC,$01,$F0,$F7,$F2,$01 ; F3C8 09 FF EC 01 F0 F7 F2 01  ........
-        .byte   $F8,$BD,$F3,$04,$01,$DD,$F3,$FF ; F3D0 F8 BD F3 04 01 DD F3 FF  ........
-        .byte   $F0,$FC,$F8,$DF,$F3,$F0,$00,$EC ; F3D8 F0 FC F8 DF F3 F0 00 EC  ........
-        .byte   $06,$ED,$80,$EE,$00,$F2,$C2,$8F ; F3E0 06 ED 80 EE 00 F2 C2 8F  ........
-        .byte   $06,$10,$16,$20,$C2,$20,$24,$27 ; F3E8 06 10 16 20 C2 20 24 27  ... . $'
-        .byte   $30,$EF,$03,$F9,$FF,$04,$01,$D8 ; F3F0 30 EF 03 F9 FF 04 01 D8  0.......
-        .byte   $F3,$03,$FD,$F3,$FF,$EC,$06,$EE ; F3F8 F3 03 FD F3 FF EC 06 EE  ........
-        .byte   $00,$8D,$44,$02,$FF,$04,$01,$0D ; F400 00 8D 44 02 FF 04 01 0D  ..D.....
-        .byte   $F4,$03,$1E,$F4,$FF,$EC,$06,$EE ; F408 F4 03 1E F4 FF EC 06 EE  ........
-        .byte   $00,$F0,$00,$F3,$8F,$C5,$20,$21 ; F410 00 F0 00 F3 8F C5 20 21  ...... !
-        .byte   $EE,$01,$F0,$FF,$F9,$FF,$EC,$06 ; F418 EE 01 F0 FF F9 FF EC 06  ........
-        .byte   $EE,$00,$F3,$C2,$8F,$0E,$0D,$F9 ; F420 EE 00 F3 C2 8F 0E 0D F9  ........
-        .byte   $8E,$47,$46,$45,$82,$44,$43,$42 ; F428 8E 47 46 45 82 44 43 42  .GFE.DCB
-        .byte   $00,$FF,$01,$0D,$F4,$03,$1E,$F4 ; F430 00 FF 01 0D F4 03 1E F4  ........
-        .byte   $00,$3F,$F4,$02,$53,$F4,$FF,$EC ; F438 00 3F F4 02 53 F4 FF EC  .?..S...
-        .byte   $06,$ED,$00,$EE,$00,$F0,$20,$8E ; F440 06 ED 00 EE 00 F0 20 8E  ...... .
-        .byte   $C4,$10,$20,$14,$24,$17,$27,$EF ; F448 C4 10 20 14 24 17 27 EF  .. .$.'.
-        .byte   $03,$F9,$FF,$E0,$64,$F5,$8F,$10 ; F450 03 F9 FF E0 64 F5 8F 10  ....d...
-        .byte   $13,$12,$17,$0A,$12,$17,$10,$12 ; F458 13 12 17 0A 12 17 10 12  ........
-        .byte   $20,$1B,$19,$17,$15,$13,$11,$FF ; F460 20 1B 19 17 15 13 11 FF   .......
-        .byte   $04,$01,$6D,$F4,$FF,$EC,$04,$ED ; F468 04 01 6D F4 FF EC 04 ED  ..m.....
-        .byte   $40,$F0,$0E,$EE,$00,$8F,$0A,$1A ; F470 40 F0 0E EE 00 8F 0A 1A  @.......
-        .byte   $10,$20,$14,$24,$82,$3F,$8F,$C4 ; F478 10 20 14 24 82 3F 8F C4  . .$.?..
-        .byte   $13,$19,$23,$29,$EF,$04,$F9,$FF ; F480 13 19 23 29 EF 04 F9 FF  ..#)....
-        .byte   $04,$02,$90,$F4,$03,$A7,$F4,$FF ; F488 04 02 90 F4 03 A7 F4 FF  ........
-        .byte   $EC,$04,$F0,$04,$8F,$06,$0A,$12 ; F490 EC 04 F0 04 8F 06 0A 12  ........
-        .byte   $14,$17,$19,$22,$25,$82,$3F,$8E ; F498 14 17 19 22 25 82 3F 8E  ..."%.?.
-        .byte   $27,$25,$23,$21,$1B,$18,$FF,$EC ; F4A0 27 25 23 21 1B 18 FF EC  '%#!....
-        .byte   $08,$EE,$05,$F2,$F1,$8F,$4A,$48 ; F4A8 08 EE 05 F2 F1 8F 4A 48  ......JH
-        .byte   $47,$46,$45,$43,$02,$82,$3F,$8F ; F4B0 47 46 45 43 02 82 3F 8F  GFEC..?.
-        .byte   $46,$47,$49,$0D,$3F,$C2,$EF,$05 ; F4B8 46 47 49 0D 3F C2 EF 05  FGI.?...
-        .byte   $8F,$47,$49,$0D,$3F,$F9,$FF,$04 ; F4C0 8F 47 49 0D 3F F9 FF 04  .GI.?...
-        .byte   $01,$CC,$F4,$FF,$EC,$06,$ED,$80 ; F4C8 01 CC F4 FF EC 06 ED 80  ........
-        .byte   $EE,$01,$F0,$0C,$C3,$8E,$25,$35 ; F4D0 EE 01 F0 0C C3 8E 25 35  ......%5
-        .byte   $27,$37,$29,$39,$2B,$3B,$F1,$00 ; F4D8 27 37 29 39 2B 3B F1 00  '7)9+;..
-        .byte   $EF,$04,$F9,$FF,$04,$01,$E9,$F4 ; F4E0 EF 04 F9 FF 04 01 E9 F4  ........
-        .byte   $FF,$EC,$06,$ED,$80,$EE,$01,$F0 ; F4E8 FF EC 06 ED 80 EE 01 F0  ........
-        .byte   $0C,$C3,$8E,$27,$37,$F9,$FF,$00 ; F4F0 0C C3 8E 27 37 F9 FF 00  ...'7...
-        .byte   $FE,$F4,$01,$34,$F5,$FF,$EC,$05 ; F4F8 FE F4 01 34 F5 FF EC 05  ...4....
-        .byte   $ED,$00,$F2,$C1,$F0,$F4,$C3,$EE ; F500 ED 00 F2 C1 F0 F4 C3 EE  ........
-        .byte   $09,$94,$17,$18,$EE,$07,$94,$17 ; F508 09 94 17 18 EE 07 94 17  ........
-        .byte   $18,$EE,$06,$94,$17,$18,$EE,$03 ; F510 18 EE 06 94 17 18 EE 03  ........
-        .byte   $94,$17,$18,$EE,$03,$17,$18,$15 ; F518 94 17 18 EE 03 17 18 15  ........
-        .byte   $18,$17,$18,$15,$18,$F9,$C7,$94 ; F520 18 17 18 15 18 F9 C7 94  ........
-        .byte   $17,$18,$EF,$02,$F9,$DD,$9A,$3F ; F528 17 18 EF 02 F9 DD 9A 3F  .......?
-        .byte   $F9,$F8,$FE,$F4,$EC,$07,$ED,$C0 ; F530 F9 F8 FE F4 EC 07 ED C0  ........
-        .byte   $EE,$02,$F0,$0C,$9A,$3F,$3F,$3F ; F538 EE 02 F0 0C 9A 3F 3F 3F  .....???
-        .byte   $3F,$92,$18,$22,$9A,$68,$99,$68 ; F540 3F 92 18 22 9A 68 99 68  ?..".h.h
-        .byte   $94,$28,$92,$18,$22,$99,$68,$94 ; F548 94 28 92 18 22 99 68 94  .(..".h.
-        .byte   $28,$92,$18,$22,$94,$28,$92,$22 ; F550 28 92 18 22 94 28 92 22  (..".(."
-        .byte   $28,$94,$32,$98,$3F,$DF,$9A,$3F ; F558 28 94 32 98 3F DF 9A 3F  (.2.?..?
-        .byte   $F9,$F8,$34,$F5,$EC,$04,$F0,$0C ; F560 F9 F8 34 F5 EC 04 F0 0C  ..4.....
-        .byte   $F2,$C1,$FA,$00,$00,$00,$00,$00 ; F568 F2 C1 FA 00 00 00 00 00  ........
-        .byte   $00,$00,$00,$00,$01,$00,$00,$00 ; F570 00 00 00 00 01 00 00 00  ........
-        .byte   $00,$00,$3F,$1F,$1F,$0F,$0F,$07 ; F578 00 00 3F 1F 1F 0F 0F 07  ..?.....
+.byte   $04,$06,$08,$0C,$10,$18,$20,$30
+.byte   $40,$60,$80,$0A,$14,$03,$02,$01
+.byte   $03,$04,$06,$09,$0C,$12,$18,$24
+.byte   $30,$48,$60,$08,$09,$03,$02,$01
+.byte   $9A,$E9
+
+
+Audio00:
+.byte   $00,$A4,$E9,$01,$DC,$E9
+.byte   $02,$EB,$E9,$FF,$EC,$08,$ED,$00
+.byte   $EE,$0D,$F0,$00,$F2,$C2,$E0,$E1
+.byte   $E9,$EF,$FE,$E0,$E1,$E9,$EF,$FE
+.byte   $E0,$E1,$E9,$EF,$FE,$E0,$E1,$E9
+.byte   $EF,$FE,$E0,$E1,$E9,$EF,$02,$E0
+.byte   $E1,$E9,$EF,$02,$E0,$E1,$E9,$EF
+.byte   $02,$E0,$E1,$E9,$EF,$02,$E0,$E1
+.byte   $E9,$F8,$A4,$E9,$80,$3F,$F8,$A4
+.byte   $E9,$82,$22,$32,$22,$27,$22,$32
+.byte   $22,$27,$FA,$EC,$04,$8A,$57,$17
+.byte   $55,$15,$54,$14,$53,$13,$F8,$EB
+.byte   $E9
+
+Audio01:
+.byte   $00,$03,$EA,$01,$61,$EA,$02
+.byte   $C1,$EA,$FF,$EC,$07,$ED,$00,$EE
+.byte   $07,$F0,$09,$F2,$CA,$C1,$84,$16
+.byte   $15,$14,$58,$88,$18,$17,$16,$F9
+.byte   $EC,$05,$F2,$48,$82,$1A,$19,$18
+.byte   $17,$16,$85,$3F,$88,$3F,$86,$3F
+.byte   $84,$EF,$04,$18,$18,$EF,$FB,$18
+.byte   $18,$EF,$FA,$18,$18,$EF,$07,$82
+.byte   $13,$84,$18,$82,$1A,$EF,$FA,$23
+.byte   $EF,$06,$85,$3F,$84,$3F,$82,$23
+.byte   $22,$21,$22,$18,$3F,$86,$3F,$84
+.byte   $EF,$04,$18,$18,$EF,$FB,$18,$18
+.byte   $EF,$FA,$18,$18,$EF,$07,$F8,$03
+.byte   $EA,$EC,$07,$ED,$40,$EE,$07,$F0
+.byte   $09,$F2,$CA,$C1,$87,$1A,$84,$61
+.byte   $88,$61,$8A,$21,$F9,$EC,$05,$F2
+.byte   $48,$82,$23,$3F,$3F,$3F,$23,$85
+.byte   $3F,$84,$3F,$1A,$18,$82,$13,$3F
+.byte   $86,$3F,$84,$EF,$04,$21,$21,$EF
+.byte   $FB,$21,$21,$EF,$FA,$21,$21,$EF
+.byte   $07,$82,$18,$84,$21,$82,$23,$EF
+.byte   $FA,$28,$EF,$06,$85,$3F,$84,$3F
+.byte   $1A,$18,$82,$13,$3F,$86,$3F,$84
+.byte   $EF,$04,$21,$21,$EF,$FB,$21,$21
+.byte   $EF,$FA,$21,$21,$EF,$07,$F8,$61
+.byte   $EA,$E0,$64,$F5,$F2,$81,$CF,$86
+.byte   $0A,$F9,$CF,$07,$F9,$F8,$C1,$EA
+
+Audio05:
+.byte   $00,$DA,$EA,$01,$08,$EB,$02,$36
+.byte   $EB,$FF,$EC,$06,$ED,$00,$EE,$05
+.byte   $F0,$0C,$F2,$C3,$94,$12,$22,$15
+.byte   $25,$96,$17,$94,$19,$62,$22,$32
+.byte   $25,$35,$96,$27,$94,$29,$3F,$92
+.byte   $32,$30,$3F,$27,$25,$3F,$27,$25
+.byte   $27,$25,$94,$24,$20,$20,$22,$FF
+.byte   $EC,$06,$ED,$00,$EE,$05,$F0,$0C
+.byte   $F2,$C3,$94,$09,$19,$12,$22,$96
+.byte   $14,$94,$15,$19,$19,$29,$22,$32
+.byte   $96,$24,$94,$25,$3F,$92,$2B,$29
+.byte   $3F,$24,$22,$3F,$22,$22,$22,$22
+.byte   $94,$20,$17,$17,$19,$FF,$E0,$64
+.byte   $F5,$94,$12,$12,$22,$12,$96,$20
+.byte   $94,$19,$57,$17,$96,$15,$14,$94
+.byte   $15,$96,$10,$92,$12,$12,$96,$3F
+.byte   $92,$12,$12,$96,$3F,$94,$10,$92
+.byte   $10,$3F,$F3,$8E,$72,$70,$6A,$68
+.byte   $66,$65,$64,$63,$62,$FF
+
+Audio17:
+.byte $00,$72
+.byte   $EB,$01,$70,$EB,$03,$8E,$EB,$FF
+.byte   $82,$3F,$EC,$04,$ED,$00,$EE,$02
+.byte   $F0,$20,$CF,$8F,$60,$5E,$5C,$5A
+.byte   $58,$56,$54,$52,$50,$48,$46,$44
+.byte   $02,$F1,$F7,$F9,$00,$FF,$EC,$05
+.byte   $EE,$02,$81,$49,$4A,$4B,$4C,$4D
+.byte   $0E,$FF
+
+
+Audio27:
+.byte $00,$A4,$EB,$01,$C2,$EB
+.byte   $02,$E0,$EB,$FF,$EC,$07,$ED,$80
+.byte   $EE,$02,$F0,$00,$F2,$F2,$94,$25
+.byte   $24,$23,$22,$20,$1B,$20,$22,$25
+.byte   $24,$27,$26,$29,$28,$29,$2B,$98
+.byte   $30,$FF,$EC,$07,$ED,$80,$EE,$02
+.byte   $F0,$00,$F2,$F2,$94,$20,$20,$1A
+.byte   $1A,$17,$17,$17,$1B,$20,$20,$22
+.byte   $22,$24,$24,$25,$27,$98,$27,$FF
+.byte   $E0,$64,$F5,$94,$10,$17,$0A,$15
+.byte   $07,$12,$07,$07,$10,$17,$12,$19
+.byte   $14,$1B,$15,$17,$F3,$9F,$20,$1B
+.byte   $1A,$19,$18,$17,$16,$15,$14,$13
+.byte   $12,$11,$10,$FF
+
+Audio28:
+.byte $00,$0D,$EC,$01
+.byte   $0B,$EC,$FF,$F0,$01,$EC,$04,$ED
+.byte   $00,$C3,$82,$15,$80,$3F,$F9,$EE
+.byte   $0F,$FF
+
+Audio25:
+.byte $00,$24,$EC,$01,$3C,$EC
+.byte   $02,$54,$EC,$FF,$EC,$05,$ED,$00
+.byte   $EE,$04,$F0,$0C,$F2,$C1,$94,$19
+.byte   $1B,$19,$15,$19,$1B,$20,$22,$20
+.byte   $1B,$3F,$20,$FF,$EC,$05,$ED,$00
+.byte   $EE,$04,$F0,$0C,$F2,$C1,$94,$15
+.byte   $17,$15,$12,$15,$17,$19,$1B,$17
+.byte   $17,$3F,$17,$FF,$E0,$64,$F5,$98
+.byte   $15,$17,$94,$20,$17,$3F,$20,$FF
+
+Audio24:
+.byte   $04,$01,$65,$EC,$FF,$EC,$06,$ED
+.byte   $80,$F0,$18,$EE,$00,$C3,$8F,$10
+.byte   $20,$EF,$03,$F9,$EE,$00,$C3,$8F
+.byte   $14,$24,$EF,$03,$F9,$EE,$00,$C3
+.byte   $8F,$17,$27,$EF,$03,$F9,$EE,$00
+.byte   $C3,$8F,$20,$30,$EF,$03,$F9,$FF
+
+Audio26:
+.byte   $00,$9A,$EC,$01,$BE,$EC,$02,$E2
+.byte   $EC,$FF,$EC,$05,$ED,$C0,$F0,$0C
+.byte   $F2,$C1,$EE,$03,$C1,$84,$17,$9B
+.byte   $19,$84,$3F,$9B,$19,$84,$3F,$9B
+.byte   $19,$96,$22,$F9,$98,$20,$22,$84
+.byte   $29,$9B,$27,$96,$29,$FF,$EC,$05
+.byte   $ED,$C0,$F0,$0C,$F2,$C1,$EE,$03
+.byte   $C1,$84,$14,$9B,$14,$84,$3F,$9B
+.byte   $14,$84,$3F,$9B,$14,$96,$19,$F9
+.byte   $98,$19,$1B,$84,$24,$9B,$24,$96
+.byte   $24,$FF,$E0,$64,$F5,$C7,$96,$09
+.byte   $F9,$98,$15,$17,$84,$09,$9B,$19
+.byte   $84,$09,$9B,$19,$07,$09,$07,$09
+.byte   $FF
+
+
+Audio14:
+.byte $04,$01,$FE,$EC,$FF,$EC,$06
+.byte   $ED,$C0,$EE,$00,$F0,$0C,$8F,$C5
+.byte   $60,$30,$02,$F1,$03,$EF,$01,$F9
+.byte   $FF
+
+
+Audio03:
+.byte $00,$1B,$ED,$01,$93,$ED,$02
+.byte   $11,$EE,$FF,$EC,$08,$ED,$00,$EE
+.byte   $05,$F0,$0C,$F2,$C2,$82,$12,$14
+.byte   $E0,$5B,$ED,$22,$17,$86,$17,$17
+.byte   $84,$1B,$59,$8A,$59,$87,$19,$84
+.byte   $19,$86,$17,$84,$3F,$82,$12,$14
+.byte   $E0,$5B,$ED,$22,$17,$86,$17,$17
+.byte   $84,$16,$57,$8A,$57,$87,$17,$84
+.byte   $19,$86,$17,$84,$19,$82,$12,$14
+.byte   $F8,$28,$ED,$84,$17,$17,$82,$12
+.byte   $84,$14,$82,$12,$87,$20,$84,$5B
+.byte   $88,$5B,$84,$1B,$82,$1B,$22,$1B
+.byte   $19,$17,$3F,$22,$32,$32,$22,$32
+.byte   $32,$84,$3F,$87,$17,$84,$57,$88
+.byte   $57,$84,$17,$3F,$EF,$FC,$22,$62
+.byte   $22,$EF,$04,$17,$86,$17,$3F,$84
+.byte   $22,$62,$FA,$EC,$08,$ED,$C0,$EE
+.byte   $05,$F0,$0C,$F2,$C2,$84,$3F,$E0
+.byte   $DA,$ED,$17,$12,$86,$12,$12,$84
+.byte   $14,$54,$88,$55,$84,$15,$15,$14
+.byte   $52,$87,$12,$84,$12,$86,$10,$84
+.byte   $0B,$3F,$E0,$DA,$ED,$17,$12,$86
+.byte   $12,$12,$84,$12,$52,$12,$22,$27
+.byte   $22,$29,$86,$2B,$84,$27,$30,$27
+.byte   $2B,$27,$29,$86,$2B,$84,$27,$F8
+.byte   $9F,$ED,$82,$22,$32,$32,$22,$32
+.byte   $32,$84,$3F,$87,$17,$84,$57,$88
+.byte   $57,$84,$17,$86,$3F,$82,$12,$14
+.byte   $84,$17,$17,$82,$12,$84,$14,$82
+.byte   $12,$87,$20,$84,$5B,$88,$5B,$84
+.byte   $1B,$3F,$EF,$FC,$17,$57,$17,$EF
+.byte   $04,$12,$86,$12,$3F,$84,$17,$55
+.byte   $FA,$EC,$04,$F0,$18,$F2,$C1,$82
+.byte   $02,$04,$E0,$46,$EE,$03,$82,$03
+.byte   $3F,$03,$3F,$03,$3F,$03,$3F,$03
+.byte   $3F,$03,$3F,$03,$3F,$84,$02,$86
+.byte   $02,$84,$02,$04,$86,$04,$84,$04
+.byte   $05,$86,$05,$84,$05,$06,$86,$06
+.byte   $82,$02,$04,$F8,$1A,$EE,$84,$07
+.byte   $82,$07,$3F,$84,$07,$82,$07,$3F
+.byte   $07,$3F,$07,$3F,$84,$07,$82,$07
+.byte   $3F,$07,$3F,$07,$3F,$84,$07,$82
+.byte   $07,$3F,$07,$3F,$0B,$12,$0B,$09
+.byte   $02,$04,$84,$05,$82,$05,$3F,$84
+.byte   $05,$82,$05,$3F,$05,$3F,$05,$3F
+.byte   $84,$05,$82,$05,$3F,$05,$3F,$05
+.byte   $3F,$84,$05,$82,$05,$3F,$05,$85
+.byte   $3F,$84,$05,$44,$04,$82,$04,$3F
+.byte   $04,$3F,$04,$3F,$04,$3F,$04,$3F
+.byte   $84,$04,$43,$FA
+
+
+Audio04:
+.byte $00,$A6,$EE,$01
+.byte   $BA,$EF,$02,$34,$F1,$FF,$EC,$07
+.byte   $ED,$C0,$EE,$05,$F0,$0C,$F2,$C2
+.byte   $8A,$3F,$3F,$3F,$89,$3F,$84,$3F
+.byte   $82,$16,$17,$E0,$99,$EF,$84,$3F
+.byte   $82,$17,$19,$E0,$99,$EF,$86,$12
+.byte   $84,$10,$14,$3F,$86,$17,$84,$17
+.byte   $19,$17,$1B,$20,$1B,$86,$17,$84
+.byte   $14,$86,$17,$84,$16,$86,$17,$19
+.byte   $84,$1B,$86,$20,$84,$1B,$19,$17
+.byte   $87,$24,$86,$22,$82,$10,$12,$14
+.byte   $16,$17,$84,$19,$82,$1B,$86,$20
+.byte   $22,$24,$84,$22,$86,$1B,$84,$19
+.byte   $82,$1B,$19,$17,$14,$84,$14,$17
+.byte   $87,$3F,$84,$14,$17,$1B,$88,$62
+.byte   $84,$22,$17,$86,$19,$ED,$80,$8A
+.byte   $62,$88,$22,$8C,$20,$1B,$85,$20
+.byte   $87,$1B,$84,$17,$86,$19,$84,$1B
+.byte   $54,$14,$12,$87,$12,$82,$12,$14
+.byte   $16,$17,$84,$19,$86,$17,$84,$14
+.byte   $86,$17,$82,$53,$14,$84,$17,$14
+.byte   $86,$19,$84,$1B,$86,$14,$84,$12
+.byte   $86,$22,$20,$84,$1B,$87,$19,$82
+.byte   $23,$85,$24,$88,$22,$84,$3F,$82
+.byte   $12,$14,$16,$17,$84,$19,$8A,$62
+.byte   $88,$22,$8C,$27,$26,$85,$27,$86
+.byte   $24,$84,$20,$87,$22,$84,$24,$5B
+.byte   $1B,$19,$88,$19,$86,$1B,$89,$17
+.byte   $86,$22,$89,$1B,$84,$24,$22,$86
+.byte   $27,$84,$24,$22,$86,$27,$64,$24
+.byte   $27,$84,$27,$87,$29,$8A,$67,$86
+.byte   $27,$84,$16,$82,$16,$16,$84,$17
+.byte   $FF,$87,$22,$82,$16,$17,$84,$22
+.byte   $20,$1B,$20,$17,$82,$16,$57,$86
+.byte   $17,$3F,$84,$12,$14,$87,$15,$82
+.byte   $12,$14,$84,$15,$17,$19,$3F,$89
+.byte   $12,$FA,$E0,$07,$F1,$E0,$07,$F1
+.byte   $E0,$07,$F1,$E0,$07,$F1,$E0,$07
+.byte   $F1,$E0,$07,$F1,$E0,$22,$F1,$ED
+.byte   $80,$EE,$06,$84,$12,$82,$22,$22
+.byte   $84,$20,$1B,$82,$19,$12,$17,$19
+.byte   $EE,$00,$02,$04,$06,$07,$E0,$07
+.byte   $F1,$E0,$07,$F1,$E0,$22,$F1,$ED
+.byte   $40,$EE,$06,$EC,$08,$84,$12,$22
+.byte   $12,$20,$12,$1B,$12,$19,$ED,$80
+.byte   $F2,$B5,$82,$20,$20,$27,$27,$30
+.byte   $30,$37,$37,$30,$32,$30,$32,$30
+.byte   $32,$30,$32,$1B,$1B,$27,$27,$2B
+.byte   $2B,$37,$37,$2B,$30,$2B,$30,$2B
+.byte   $30,$2B,$30,$19,$19,$26,$26,$32
+.byte   $32,$36,$36,$30,$32,$30,$32,$30
+.byte   $32,$30,$32,$ED,$40,$F2,$C1,$EC
+.byte   $07,$84,$27,$26,$24,$87,$30,$86
+.byte   $2B,$82,$19,$1B,$20,$22,$24,$84
+.byte   $26,$ED,$80,$F2,$B5,$82,$27,$36
+.byte   $37,$36,$34,$32,$37,$36,$37,$ED
+.byte   $40,$F2,$C1,$86,$30,$84,$2B,$27
+.byte   $ED,$80,$F2,$B5,$82,$36,$37,$36
+.byte   $37,$36,$37,$36,$37,$84,$20,$24
+.byte   $82,$34,$34,$37,$37,$34,$34,$37
+.byte   $37,$84,$34,$37,$EC,$07,$ED,$40
+.byte   $F2,$C1,$88,$6B,$84,$2B,$24,$86
+.byte   $26,$F0,$0C,$ED,$80,$EC,$09,$C5
+.byte   $82,$32,$30,$2B,$29,$30,$2B,$29
+.byte   $27,$2B,$29,$27,$24,$29,$27,$24
+.byte   $22,$F9,$EC,$08,$ED,$80,$86,$19
+.byte   $84,$17,$87,$16,$82,$16,$85,$17
+.byte   $88,$19,$84,$3F,$82,$0B,$10,$12
+.byte   $14,$84,$16,$EC,$09,$ED,$80,$C2
+.byte   $82,$32,$30,$2B,$29,$30,$2B,$29
+.byte   $27,$2B,$29,$27,$24,$29,$27,$24
+.byte   $22,$F9,$32,$30,$2B,$29,$30,$2B
+.byte   $29,$27,$2B,$29,$27,$24,$EC,$07
+.byte   $ED,$00,$86,$19,$89,$14,$86,$1B
+.byte   $89,$17,$84,$20,$1B,$86,$24,$84
+.byte   $20,$1B,$86,$24,$60,$20,$24,$84
+.byte   $24,$87,$24,$8A,$62,$86,$22,$84
+.byte   $10,$82,$10,$10,$84,$12,$FF,$EC
+.byte   $09,$ED,$00,$EE,$02,$F0,$00,$F3
+.byte   $82,$07,$06,$04,$02,$07,$06,$04
+.byte   $02,$07,$06,$04,$02,$04,$06,$07
+.byte   $09,$FA,$82,$05,$04,$02,$00,$05
+.byte   $04,$02,$00,$05,$04,$02,$00,$02
+.byte   $04,$05,$07,$FA,$E0,$64,$F5,$E0
+.byte   $02,$F2,$E0,$02,$F2,$E0,$02,$F2
+.byte   $E0,$02,$F2,$E0,$02,$F2,$E0,$02
+.byte   $F2,$E0,$08,$F2,$E0,$02,$F2,$E0
+.byte   $02,$F2,$E0,$08,$F2,$84,$10,$10
+.byte   $17,$10,$3F,$82,$12,$14,$84,$17
+.byte   $19,$84,$17,$17,$3F,$17,$3F,$82
+.byte   $1B,$20,$1B,$19,$84,$17,$12,$12
+.byte   $19,$12,$3F,$82,$16,$17,$84,$19
+.byte   $22,$14,$14,$24,$14,$3F,$14,$86
+.byte   $12,$84,$10,$10,$87,$3F,$82,$20
+.byte   $1B,$19,$17,$84,$14,$0B,$0B,$3F
+.byte   $86,$17,$14,$84,$10,$09,$09,$87
+.byte   $3F,$84,$0B,$86,$10,$84,$12,$12
+.byte   $3F,$3F,$3F,$14,$86,$16,$E0,$11
+.byte   $F2,$87,$10,$84,$10,$88,$10,$87
+.byte   $0B,$84,$0B,$88,$0B,$87,$09,$84
+.byte   $09,$88,$09,$86,$12,$85,$22,$82
+.byte   $12,$84,$12,$12,$14,$16,$E0,$11
+.byte   $F2,$84,$3F,$10,$10,$20,$10,$3F
+.byte   $86,$10,$84,$3F,$0B,$0B,$1B,$0B
+.byte   $3F,$86,$0B,$84,$09,$19,$19,$09
+.byte   $09,$19,$19,$0B,$86,$12,$85,$22
+.byte   $82,$12,$84,$12,$12,$14,$16,$17
+.byte   $86,$3F,$84,$14,$3F,$12,$3F,$10
+.byte   $86,$07,$84,$06,$82,$06,$06,$84
+.byte   $07,$FF,$86,$17,$17,$17,$17,$FA
+.byte   $15,$15,$15,$15,$12,$12,$12,$12
+.byte   $FA,$87,$17,$84,$17,$87,$17,$84
+.byte   $56,$16,$16,$86,$16,$8C,$16,$16
+.byte   $85,$16,$87,$14,$84,$14,$87,$14
+.byte   $84,$52,$12,$12,$86,$12,$3F,$12
+.byte   $FA
+
+
+Audio02:
+.byte $00,$3B,$F2,$01,$82,$F2,$02
+.byte   $BD,$F2,$FF,$EC,$07,$ED,$C0,$EE
+.byte   $03,$F0,$0C,$E0,$76,$F2,$9A,$16
+.byte   $E0,$76,$F2,$99,$16,$94,$15,$14
+.byte   $EC,$05,$F2,$B5,$ED,$90,$EE,$05
+.byte   $C1,$92,$18,$18,$18,$18,$18,$3F
+.byte   $18,$18,$18,$18,$18,$3F,$96,$22
+.byte   $F9,$F3,$96,$26,$25,$24,$23,$23
+.byte   $22,$21,$20,$F8,$3B,$F2,$92,$48
+.byte   $12,$98,$58,$94,$18,$17,$92,$18
+.byte   $17,$FA,$EC,$05,$F2,$35,$ED,$90
+.byte   $EE,$07,$F0,$18,$C3,$94,$23,$33
+.byte   $3F,$23,$33,$3F,$23,$33,$F9,$F0
+.byte   $0C,$F2,$B5,$EC,$05,$EE,$05,$C1
+.byte   $92,$17,$17,$17,$17,$17,$3F,$17
+.byte   $17,$17,$17,$17,$3F,$96,$21,$F9
+.byte   $F3,$96,$22,$21,$20,$1B,$19,$19
+.byte   $19,$19,$F8,$82,$F2,$EC,$04,$F2
+.byte   $91,$F0,$0C,$C1,$94,$17,$18,$15
+.byte   $18,$17,$18,$15,$18,$96,$17,$18
+.byte   $15,$18,$F9,$C1,$94,$12,$13,$0B
+.byte   $13,$12,$13,$0B,$0B,$F9,$96,$07
+.byte   $12,$11,$0A,$94,$19,$0A,$17,$1A
+.byte   $19,$1A,$1A,$1A,$F8,$BD,$F2
+
+Audio22:
+.byte $04
+.byte   $03,$F4,$F2,$FF,$EC,$01,$EE,$00
+.byte   $F2,$44,$80,$04,$F4,$18,$85,$0F
+.byte   $FF
+
+Audio16:
+.byte $03,$05,$F3,$FF,$EC,$07,$EE
+.byte   $01,$8E,$0F,$0D,$4B,$49,$47,$45
+.byte   $03,$FF
+
+
+Audio11:
+.byte $04,$01,$1A,$F3,$03,$2E
+.byte   $F3,$FF,$EC,$06,$ED,$40,$EE,$04
+.byte   $F0,$1C,$8F,$1A,$2A,$3A,$C2,$69
+.byte   $59,$F1,$F5,$F9,$29,$FF,$EC,$06
+.byte   $EE,$02,$8F,$4F,$4D,$4B,$49,$47
+.byte   $45,$43,$01,$FF
+
+Audio09:
+.byte  $04,$01,$44,$F3
+.byte   $03,$5C,$F3,$FF,$EC,$06,$ED,$80
+.byte   $EE,$00,$F0,$04,$F3,$8F,$C2,$78
+.byte   $70,$68,$60,$58,$50,$08,$EE,$02
+.byte   $F1,$07,$F9,$FF,$EC,$06,$EE,$00
+.byte   $8D,$45,$03,$FF
+
+
+Audio08:
+.byte $04,$02,$69,$F3
+.byte   $FF,$E0,$64,$F5,$F3,$F0,$1C,$8F
+.byte   $35,$37,$39,$F0,$0C,$C9,$2A,$F1
+.byte   $FF,$F9,$8F,$C8,$69,$F1,$FE,$F9
+.byte   $20,$FF
+
+Audio10:
+.byte $04,$03,$87,$F3,$FF,$EC
+.byte   $00,$EE,$00,$8E,$4F,$4D,$4B,$48
+.byte   $06,$FF
+
+
+Audio07:
+.byte $00,$9C,$F3,$01,$B3,$F3
+.byte   $02,$CA,$F3,$FF,$EC,$01,$ED,$00
+.byte   $EE,$00,$F0,$F7,$F2,$01,$81,$24
+.byte   $23,$22,$21,$81,$13,$14,$13,$14
+.byte   $13,$14,$FF,$EC,$01,$ED,$00,$EE
+.byte   $00,$F0,$F7,$F2,$01,$81,$1B,$1A
+.byte   $19,$18,$81,$08,$09,$08,$09,$08
+.byte   $09,$FF,$EC,$01,$F0,$F7,$F2,$01
+.byte   $F8,$BD,$F3
+
+Audio13:
+.byte $04,$01,$DD,$F3,$FF
+.byte   $F0,$FC,$F8,$DF,$F3,$F0,$00,$EC
+.byte   $06,$ED,$80,$EE,$00,$F2,$C2,$8F
+.byte   $06,$10,$16,$20,$C2,$20,$24,$27
+.byte   $30,$EF,$03,$F9,$FF
+
+
+Audio12:
+.byte $04,$01,$D8
+.byte   $F3,$03,$FD,$F3,$FF,$EC,$06,$EE
+.byte   $00,$8D,$44,$02,$FF
+
+
+Audio15:
+.byte $04,$01,$0D
+.byte   $F4,$03,$1E,$F4,$FF,$EC,$06,$EE
+.byte   $00,$F0,$00,$F3,$8F,$C5,$20,$21
+.byte   $EE,$01,$F0,$FF,$F9,$FF,$EC,$06
+.byte   $EE,$00,$F3,$C2,$8F,$0E,$0D,$F9
+.byte   $8E,$47,$46,$45,$82,$44,$43,$42
+.byte   $00,$FF
+
+Audio23:
+.byte $01,$0D,$F4,$03,$1E,$F4
+.byte   $00,$3F,$F4,$02,$53,$F4,$FF,$EC
+.byte   $06,$ED,$00,$EE,$00,$F0,$20,$8E
+.byte   $C4,$10,$20,$14,$24,$17,$27,$EF
+.byte   $03,$F9,$FF,$E0,$64,$F5,$8F,$10
+.byte   $13,$12,$17,$0A,$12,$17,$10,$12
+.byte   $20,$1B,$19,$17,$15,$13,$11,$FF
+
+
+Audio19:
+.byte   $04,$01,$6D,$F4,$FF,$EC,$04,$ED
+.byte   $40,$F0,$0E,$EE,$00,$8F,$0A,$1A
+.byte   $10,$20,$14,$24,$82,$3F,$8F,$C4
+.byte   $13,$19,$23,$29,$EF,$04,$F9,$FF
+.byte   $04,$02,$90,$F4,$03,$A7,$F4,$FF
+.byte   $EC,$04,$F0,$04,$8F,$06,$0A,$12
+.byte   $14,$17,$19,$22,$25,$82,$3F,$8E
+.byte   $27,$25,$23,$21,$1B,$18,$FF,$EC
+.byte   $08,$EE,$05,$F2,$F1,$8F,$4A,$48
+.byte   $47,$46,$45,$43,$02,$82,$3F,$8F
+.byte   $46,$47,$49,$0D,$3F,$C2,$EF,$05
+.byte   $8F,$47,$49,$0D,$3F,$F9,$FF
+
+
+Audio20:
+.byte $04
+.byte   $01,$CC,$F4,$FF,$EC,$06,$ED,$80
+.byte   $EE,$01,$F0,$0C,$C3,$8E,$25,$35
+.byte   $27,$37,$29,$39,$2B,$3B,$F1,$00
+.byte   $EF,$04,$F9,$FF
+
+Audio21:
+.byte $04,$01,$E9,$F4
+.byte   $FF,$EC,$06,$ED,$80,$EE,$01,$F0
+.byte   $0C,$C3,$8E,$27,$37,$F9,$FF
+
+
+Audio06:
+.byte $00
+.byte   $FE,$F4,$01,$34,$F5,$FF,$EC,$05
+.byte   $ED,$00,$F2,$C1,$F0,$F4,$C3,$EE
+.byte   $09,$94,$17,$18,$EE,$07,$94,$17
+.byte   $18,$EE,$06,$94,$17,$18,$EE,$03
+.byte   $94,$17,$18,$EE,$03,$17,$18,$15
+.byte   $18,$17,$18,$15,$18,$F9,$C7,$94
+.byte   $17,$18,$EF,$02,$F9,$DD,$9A,$3F
+.byte   $F9,$F8,$FE,$F4,$EC,$07,$ED,$C0
+.byte   $EE,$02,$F0,$0C,$9A,$3F,$3F,$3F
+.byte   $3F,$92,$18,$22,$9A,$68,$99,$68
+.byte   $94,$28,$92,$18,$22,$99,$68,$94
+.byte   $28,$92,$18,$22,$94,$28,$92,$22
+.byte   $28,$94,$32,$98,$3F,$DF,$9A,$3F
+.byte   $F9,$F8,$34,$F5,$EC,$04,$F0,$0C
+.byte   $F2,$C1,$FA,$00,$00,$00,$00,$00
+.byte   $00,$00,$00,$00,$01,$00,$00,$00
+.byte   $00,$00,$3F,$1F,$1F,$0F,$0F,$07
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 LF580:
         .byte   $08                             ; F580 08                       .
 LF581:
@@ -10548,6 +10468,7 @@ LF697:
         .byte   $66,$44,$46,$64,$44,$40,$00,$00 ; FF6F 66 44 46 64 44 40 00 00  fDFdD@..
         .byte   $00,$04,$44,$66,$66,$66,$66,$66 ; FF77 00 04 44 66 66 66 66 66  ..Dfffff
         .byte   $66                             ; FF7F 66                       f
+        
 LFF80:
         .byte   $00,$00,$00,$00,$00,$01,$00,$00 ; FF80 00 00 00 00 00 01 00 00  ........
         .byte   $00,$00,$00,$02,$00,$00,$00,$00 ; FF88 00 00 00 02 00 00 00 00  ........
@@ -10566,7 +10487,7 @@ LFF80:
         .byte   $3C,$3C,$3C,$FC,$FC,$FC,$F8,$E0 ; FFF0 3C 3C 3C FC FC FC F8 E0  <<<.....
         .byte   $DF,$DF
 
-.res $FFFA - *, $FF
+.segment "VECTORS"
 .word VNMI
 .word VBOOT
 .word VIRQ
