@@ -155,9 +155,9 @@ VBOOT:
         ldx #$FF
         txs
 
-        jsr     SoundSystemInit                           ; 814B 20 99 E2                  ..
-        lda     #$FF                            ; 814E A9 FF                    ..
-        jsr     LE2CD                           ; 8150 20 CD E2                  ..
+        jsr     SoundInit                           ; 814B 20 99 E2                  ..
+        lda     #SFXSTOP                            ; 814E A9 FF                    ..
+        jsr     SoundPlay                           ; 8150 20 CD E2                  ..
         lda     #$10                            ; 8153 A9 10                    ..
         sta     PPUCTRL_MIRROR                           ; 8155 8D 0E 03                 ...
         sta     PPUCTRL                           ; 8158 8D 00 20                 .. 
@@ -198,8 +198,8 @@ DrawTitleScreen:
         jsr     L9A37                           ; 81AD 20 37 9A                  7.
         jsr     PPUEnableNMI                           ; 81B0 20 DE 8B                  ..
         jsr     L8BC2                           ; 81B3 20 C2 8B                  ..
-        lda     #$06                            ; 81B6 A9 06                    ..
-        jsr     LE2CD                           ; 81B8 20 CD E2                  ..
+        lda     #MusicTitleScreen                            ; 81B6 A9 06                    ..
+        jsr     SoundPlay                           ; 81B8 20 CD E2                  ..
         lda     #$00                            ; 81BB A9 00                    ..
         sta     $00                             ; 81BD 85 00                    ..
 L81BF:
@@ -249,8 +249,8 @@ L8277:
         ldx     #$FF
         txs
         jsr     PPUDisableNMI
-        lda     #$FF
-        jsr     LE2CD
+        lda     #SFXSTOP
+        jsr     SoundPlay
         jsr     PPUDisableRendering
         jsr     ClearScreenAndSprites
 
@@ -334,8 +334,8 @@ L8314:
         sta     $0305                           ; 8337 8D 05 03                 ...
         jsr     PPUEnableNMI                           ; 833A 20 DE 8B                  ..
         jsr     L8BC2                           ; 833D 20 C2 8B                  ..
-        lda     #$00                            ; 8340 A9 00                    ..
-        jsr     LE2CD                           ; 8342 20 CD E2                  ..
+        lda     #MusicMapScreen                            ; 8340 A9 00                    ..
+        jsr     SoundPlay                           ; 8342 20 CD E2                  ..
         jsr     WaitFor1Frame                           ; 8345 20 40 8C                  @.
 L8348:
         jsr     ReadJoypads                           ; 8348 20 87 8C                  ..
@@ -400,8 +400,8 @@ L83A0:
         .byte   $03,$29,$0F,$AA,$CA,$8E,$44,$03 ; 83F0 03 29 0F AA CA 8E 44 03  .)....D.
 ; ----------------------------------------------------------------------------
 L83F8:
-        lda     #$07                            ; 83F8 A9 07                    ..
-        jsr     LE2CD                           ; 83FA 20 CD E2                  ..
+        lda     #MusicStartEncounter                            ; 83F8 A9 07                    ..
+        jsr     SoundPlay                           ; 83FA 20 CD E2                  ..
         lda     $034B                           ; 83FD AD 4B 03                 .K.
         beq     L840A                           ; 8400 F0 08                    ..
         jsr     LA8A1                           ; 8402 20 A1 A8                  ..
@@ -430,8 +430,8 @@ L8419:
         lda     #$01                            ; 842C A9 01                    ..
         sta     $0305                           ; 842E 8D 05 03                 ...
         jsr     PPUDisableNMI                           ; 8431 20 EA 8B                  ..
-        lda     #$FF                            ; 8434 A9 FF                    ..
-        jsr     LE2CD                           ; 8436 20 CD E2                  ..
+        lda     #SFXSTOP                            ; 8434 A9 FF                    ..
+        jsr     SoundPlay                           ; 8436 20 CD E2                  ..
         jsr     PPUDisableRendering                           ; 8439 20 B6 8B                  ..
         jsr     L8A41                           ; 843C 20 41 8A                  A.
         jsr     L8A5E                           ; 843F 20 5E 8A                  ^.
@@ -451,7 +451,7 @@ L8419:
         jsr     L8BC2                           ; 8465 20 C2 8B                  ..
         ldx     $038A                           ; 8468 AE 8A 03                 ...
         lda     L8697,x                         ; 846B BD 97 86                 ...
-        jsr     LE2CD                           ; 846E 20 CD E2                  ..
+        jsr     SoundPlay                           ; 846E 20 CD E2                  ..
         lda     #$00                            ; 8471 A9 00                    ..
         sta     $0301                           ; 8473 8D 01 03                 ...
 L8476:
@@ -585,8 +585,8 @@ L85C8:
         .byte   $ED,$82                         ; 8603 ED 82                    ..
 ; ----------------------------------------------------------------------------
 L8605:
-        lda     #$FF                            ; 8605 A9 FF                    ..
-        sta     LE2CD                           ; 8607 8D CD E2                 ...
+        lda     #SFXSTOP                            ; 8605 A9 FF                    ..
+        sta     SoundPlay                           ; 8607 8D CD E2                 ...
         lda     #$80                            ; 860A A9 80                    ..
         sta     $0680                           ; 860C 8D 80 06                 ...
 L860F:
@@ -671,7 +671,10 @@ L868E:
 
 ; ----------------------------------------------------------------------------
 L8697:
-        .byte $01,$01,$03,$01
+        .byte MusicEncounterScreen
+        .byte MusicEncounterScreen
+        .byte MusicBonusScreenStart
+        .byte MusicEncounterScreen
 
         .byte $20, $2B ; space + ascii file separator
         .byte "       YOU/VE HIT SOMETHING!     "
@@ -713,8 +716,8 @@ DrawGetReadyScreen:
         lda     #$B1                            ; 872D A9 B1                    ..
         sta     PPUADDR                           ; 872F 8D 06 20                 .. 
         jsr     L874B                           ; 8732 20 4B 87                  K.
-        lda     #$1B                            ; 8735 A9 1B                    ..
-        jsr     LE2CD                           ; 8737 20 CD E2                  ..
+        lda     #MusicGetReadyScreen                            ; 8735 A9 1B                    ..
+        jsr     SoundPlay                           ; 8737 20 CD E2                  ..
         jsr     PPUEnableNMI                           ; 873A 20 DE 8B                  ..
         jsr     L8BC2                           ; 873D 20 C2 8B                  ..
 L8740:
@@ -783,8 +786,8 @@ DrawStatusLine_PowerLabel:
 
 ; ----------------------------------------------------------------------------
 L87EC:
-        lda     #$1D                            ; 87EC A9 1D                    ..
-        jsr     LE2CD                           ; 87EE 20 CD E2                  ..
+        lda     #MusicPortPowerup                            ; 87EC A9 1D                    ..
+        jsr     SoundPlay                           ; 87EE 20 CD E2                  ..
         bit     $0341                           ; 87F1 2C 41 03                 ,A.
         bpl     L87F9                           ; 87F4 10 03                    ..
         jmp     L888D                           ; 87F6 4C 8D 88                 L..
@@ -2170,8 +2173,8 @@ L9241:
         lda     $20                             ; 9241 A5 20                    . 
         and     #$BF                            ; 9243 29 BF                    ).
         sta     $20                             ; 9245 85 20                    . 
-        lda     #$0F                            ; 9247 A9 0F                    ..
-        jsr     LE2CD                           ; 9249 20 CD E2                  ..
+        lda     #SFXEncounterBoatDespawn                            ; 9247 A9 0F                    ..
+        jsr     SoundPlay                           ; 9249 20 CD E2                  ..
         lda     $038A                           ; 924C AD 8A 03                 ...
         bne     L9258                           ; 924F D0 07                    ..
         lda     #$02                            ; 9251 A9 02                    ..
@@ -2304,8 +2307,8 @@ L9328:
         sta     $038A                           ; 9334 8D 8A 03                 ...
         lda     #$02                            ; 9337 A9 02                    ..
         sta     $21                             ; 9339 85 21                    .!
-        lda     #$11                            ; 933B A9 11                    ..
-        jsr     LE2CD                           ; 933D 20 CD E2                  ..
+        lda     #SFXEncounterBoatDespawnDupe                            ; 933B A9 11                    ..
+        jsr     SoundPlay                           ; 933D 20 CD E2                  ..
         jmp     L9456                           ; 9340 4C 56 94                 LV.
 
 ; ----------------------------------------------------------------------------
@@ -2316,7 +2319,7 @@ L9343:
         sta     $16                             ; 934A 85 16                    ..
         lda     #$00                            ; 934C A9 00                    ..
         sta     $17                             ; 934E 85 17                    ..
-        lda     $0392                           ; 9350 AD 92 03                 ...
+        lda     PlayerCrabLevel                           ; 9350 AD 92 03                 ...
         asl     a                               ; 9353 0A                       .
         tax                                     ; 9354 AA                       .
         lda     L9442,x                         ; 9355 BD 42 94                 .B.
@@ -2485,8 +2488,8 @@ L9472:
 L9480:
         bit     $3F                             ; 9480 24 3F                    $?
         bpl     L948F                           ; 9482 10 0B                    ..
-        lda     #$12                            ; 9484 A9 12                    ..
-        jsr     LE2CD                           ; 9486 20 CD E2                  ..
+        lda     #SFXPlayerDeath                            ; 9484 A9 12                    ..
+        jsr     SoundPlay                           ; 9486 20 CD E2                  ..
         lda     #$80                            ; 9489 A9 80                    ..
         sta     $0306                           ; 948B 8D 06 03                 ...
         rts                                     ; 948E 60                       `
@@ -3641,8 +3644,8 @@ L9BA3:
         bit     $20                             ; 9BAE 24 20                    $ 
         bvs     L9BBD                           ; 9BB0 70 0B                    p.
         jsr     L9CC7                           ; 9BB2 20 C7 9C                  ..
-        lda     #$08                            ; 9BB5 A9 08                    ..
-        jsr     LE2CD                           ; 9BB7 20 CD E2                  ..
+        lda     #SFXEncounterBoatFire                            ; 9BB5 A9 08                    ..
+        jsr     SoundPlay                           ; 9BB7 20 CD E2                  ..
         jmp     L9C05                           ; 9BBA 4C 05 9C                 L..
 
 ; ----------------------------------------------------------------------------
@@ -3699,8 +3702,8 @@ L9C05:
         bit     $20                             ; 9C28 24 20                    $ 
         bvs     L9C37                           ; 9C2A 70 0B                    p.
         jsr     L9CC7                           ; 9C2C 20 C7 9C                  ..
-        lda     #$0A                            ; 9C2F A9 0A                    ..
-        jsr     LE2CD                           ; 9C31 20 CD E2                  ..
+        lda     #SFXEncounterSubmarineFire                            ; 9C2F A9 0A                    ..
+        jsr     SoundPlay                           ; 9C31 20 CD E2                  ..
         jmp     L9C5C                           ; 9C34 4C 5C 9C                 L\.
 
 ; ----------------------------------------------------------------------------
@@ -3730,8 +3733,8 @@ L9C5C:
         bit     $20                             ; 9C5D 24 20                    $ 
         bvs     L9C6C                           ; 9C5F 70 0B                    p.
         jsr     L9CC7                           ; 9C61 20 C7 9C                  ..
-        lda     #$0B                            ; 9C64 A9 0B                    ..
-        jsr     LE2CD                           ; 9C66 20 CD E2                  ..
+        lda     #SFXEncounterHarpoonFire                            ; 9C64 A9 0B                    ..
+        jsr     SoundPlay                           ; 9C66 20 CD E2                  ..
         jmp     L9C7E                           ; 9C69 4C 7E 9C                 L~.
 
 ; ----------------------------------------------------------------------------
@@ -3755,8 +3758,8 @@ L9C7F:
         bit     $20                             ; 9C7F 24 20                    $ 
         bvs     L9C8E                           ; 9C81 70 0B                    p.
         jsr     L9CC7                           ; 9C83 20 C7 9C                  ..
-        lda     #$09                            ; 9C86 A9 09                    ..
-        jsr     LE2CD                           ; 9C88 20 CD E2                  ..
+        lda     #SFXBonusPlaneFire                            ; 9C86 A9 09                    ..
+        jsr     SoundPlay                           ; 9C88 20 CD E2                  ..
         jmp     L9C7E                           ; 9C8B 4C 7E 9C                 L~.
 
 ; ----------------------------------------------------------------------------
@@ -4344,8 +4347,8 @@ LA0B3:
 ; ----------------------------------------------------------------------------
 LA0C6:
         ldx     $034A                           ; A0C6 AE 4A 03                 .J.
-        lda     LA123,x                         ; A0C9 BD 23 A1                 .#.
-        jsr     LE2CD                           ; A0CC 20 CD E2                  ..
+        lda     JawsHitSounds,x                         ; A0C9 BD 23 A1                 .#.
+        jsr     SoundPlay                           ; A0CC 20 CD E2                  ..
         lda     #$18                            ; A0CF A9 18                    ..
         sta     $38                             ; A0D1 85 38                    .8
         lda     $0304                           ; A0D3 AD 04 03                 ...
@@ -4392,8 +4395,13 @@ LA117:
         jmp     StoreWorkingData                           ; A120 4C 61 97                 La.
 
 ; ----------------------------------------------------------------------------
-LA123:
-        .byte   $0C,$0D,$0C,$0D,$0D             ; A123 0C 0D 0C 0D 0D           .....
+JawsHitSounds:
+        .byte SFXEncounterJawsHit
+        .byte SFXEncounterJawsHarpoonHit
+        .byte SFXEncounterJawsHit
+        .byte SFXEncounterJawsHarpoonHit
+        .byte SFXEncounterJawsHarpoonHit
+
 LA128:
         .byte   $01,$00,$01,$00,$00             ; A128 01 00 01 00 00           .....
 LA12D:
@@ -4553,8 +4561,8 @@ LA25C:
 LA269:
         lda     #$04                            ; A269 A9 04                    ..
         jsr     L8CD0                           ; A26B 20 D0 8C                  ..
-        lda     #$0E                            ; A26E A9 0E                    ..
-        jsr     LE2CD                           ; A270 20 CD E2                  ..
+        lda     #SFXEncounterEnemyDeath                            ; A26E A9 0E                    ..
+        jsr     SoundPlay                           ; A270 20 CD E2                  ..
         lda     #$80                            ; A273 A9 80                    ..
         sta     $34                             ; A275 85 34                    .4
         lda     #$39                            ; A277 A9 39                    .9
@@ -4776,8 +4784,8 @@ LA449:
 LA459:
         lda     #$06                            ; A459 A9 06                    ..
         jsr     L8CD0                           ; A45B 20 D0 8C                  ..
-        lda     #$0E                            ; A45E A9 0E                    ..
-        jsr     LE2CD                           ; A460 20 CD E2                  ..
+        lda     #SFXEncounterEnemyDeath                            ; A45E A9 0E                    ..
+        jsr     SoundPlay                           ; A460 20 CD E2                  ..
         lda     #$80                            ; A463 A9 80                    ..
         sta     $3A                             ; A465 85 3A                    .:
         lda     #$0E                            ; A467 A9 0E                    ..
@@ -4922,8 +4930,8 @@ LA56A:
         jsr     L9940                           ; A570 20 40 99                  @.
         bit     $3F                             ; A573 24 3F                    $?
         bvc     LA597                           ; A575 50 20                    P 
-        lda     #$0E                            ; A577 A9 0E                    ..
-        jsr     LE2CD                           ; A579 20 CD E2                  ..
+        lda     #SFXEncounterEnemyDeath                            ; A577 A9 0E                    ..
+        jsr     SoundPlay                           ; A579 20 CD E2                  ..
         dec     $37                             ; A57C C6 37                    .7
         bne     LA58E                           ; A57E D0 0E                    ..
         lda     #$0A                            ; A580 A9 0A                    ..
@@ -5009,8 +5017,8 @@ LA5E5:
 LA5F7:
         jsr     L9961                           ; A5F7 20 61 99                  a.
         bcc     LA61A                           ; A5FA 90 1E                    ..
-        lda     #$15                            ; A5FC A9 15                    ..
-        jsr     LE2CD                           ; A5FE 20 CD E2                  ..
+        lda     #SFXEncounterPickup                            ; A5FC A9 15                    ..
+        jsr     SoundPlay                           ; A5FE 20 CD E2                  ..
         lda     #$02                            ; A601 A9 02                    ..
         jsr     L8CD0                           ; A603 20 D0 8C                  ..
         inc     $0392                           ; A606 EE 92 03                 ...
@@ -5076,8 +5084,8 @@ LA658:
 LA66D:
         jsr     L9961                           ; A66D 20 61 99                  a.
         bcc     LA698                           ; A670 90 26                    .&
-        lda     #$15                            ; A672 A9 15                    ..
-        jsr     LE2CD                           ; A674 20 CD E2                  ..
+        lda     #SFXEncounterPickup                            ; A672 A9 15                    ..
+        jsr     SoundPlay                           ; A674 20 CD E2                  ..
         lda     #$02                            ; A677 A9 02                    ..
         jsr     L8CD0                           ; A679 20 D0 8C                  ..
         inc     $0390                           ; A67C EE 90 03                 ...
@@ -5144,8 +5152,8 @@ LA6D3:
 LA6E2:
         jsr     L9961                           ; A6E2 20 61 99                  a.
         bcc     LA711                           ; A6E5 90 2A                    .*
-        lda     #$15                            ; A6E7 A9 15                    ..
-        jsr     LE2CD                           ; A6E9 20 CD E2                  ..
+        lda     #SFXEncounterPickup                            ; A6E7 A9 15                    ..
+        jsr     SoundPlay                           ; A6E9 20 CD E2                  ..
         jsr     L8C69                           ; A6EC 20 69 8C                  i.
         and     #$06                            ; A6EF 29 06                    ).
         tax                                     ; A6F1 AA                       .
@@ -5320,8 +5328,8 @@ LA80B:
         tax                                     ; A815 AA                       .
         lda     LA87F,x                         ; A816 BD 7F A8                 ...
         sta     $0345                           ; A819 8D 45 03                 .E.
-        lda     #$14                            ; A81C A9 14                    ..
-        jsr     LE2CD                           ; A81E 20 CD E2                  ..
+        lda     #SFXMapTrackerPulse                            ; A81C A9 14                    ..
+        jsr     SoundPlay                           ; A81E 20 CD E2                  ..
         lda     #$00                            ; A821 A9 00                    ..
         sta     $0342                           ; A823 8D 42 03                 .B.
         lda     #$01                            ; A826 A9 01                    ..
@@ -6756,8 +6764,8 @@ UnknownData:
 
 LCF0E:
         jsr     PPUDisableNMI                           ; CF0E 20 EA 8B                  ..
-        lda     #$FF                            ; CF11 A9 FF                    ..
-        jsr     LE2CD                           ; CF13 20 CD E2                  ..
+        lda     #SFXSTOP                            ; CF11 A9 FF                    ..
+        jsr     SoundPlay                           ; CF13 20 CD E2                  ..
         jsr     L977C                           ; CF16 20 7C 97                  |.
         jsr     ClearScreenAndSprites                           ; CF19 20 12 8E                  ..
         jsr     DrawStatusLine                           ; CF1C 20 8F A7                  ..
@@ -6773,8 +6781,8 @@ LCF0E:
         lda     #$01                            ; CF37 A9 01                    ..
         sta     $0302                           ; CF39 8D 02 03                 ...
         sta     $0305                           ; CF3C 8D 05 03                 ...
-        lda     #$03                            ; CF3F A9 03                    ..
-        jsr     LE2CD                           ; CF41 20 CD E2                  ..
+        lda     #MusicBonusScreenStart                            ; CF3F A9 03                    ..
+        jsr     SoundPlay                           ; CF41 20 CD E2                  ..
         jsr     PPUEnableNMI                           ; CF44 20 DE 8B                  ..
         jsr     L8BC2                           ; CF47 20 C2 8B                  ..
         lda     #$B4                            ; CF4A A9 B4                    ..
@@ -6873,8 +6881,8 @@ LD002:
         sta     $0305                           ; D027 8D 05 03                 ...
         jsr     PPUEnableNMI                           ; D02A 20 DE 8B                  ..
         jsr     L8BC2                           ; D02D 20 C2 8B                  ..
-        lda     #$1A                            ; D030 A9 1A                    ..
-        jsr     LE2CD                           ; D032 20 CD E2                  ..
+        lda     #MusicBonusScreenEnd                            ; D030 A9 1A                    ..
+        jsr     SoundPlay                           ; D032 20 CD E2                  ..
         lda     #$78                            ; D035 A9 78                    .x
         jsr     LD11F                           ; D037 20 1F D1                  ..
         jsr     LA8A1                           ; D03A 20 A1 A8                  ..
@@ -6982,8 +6990,8 @@ LD0FB:
 ; ----------------------------------------------------------------------------
         lda     #$11                            ; D10F A9 11                    ..
         jsr     L8CD0                           ; D111 20 D0 8C                  ..
-        lda     #$15                            ; D114 A9 15                    ..
-        jsr     LE2CD                           ; D116 20 CD E2                  ..
+        lda     #SFXEncounterPickup                            ; D114 A9 15                    ..
+        jsr     SoundPlay                           ; D116 20 CD E2                  ..
         lda     #$78                            ; D119 A9 78                    .x
         jsr     LD11F                           ; D11B 20 1F D1                  ..
         rts                                     ; D11E 60                       `
@@ -7399,8 +7407,8 @@ LD3C2:
         lda     $0304                           ; D420 AD 04 03                 ...
         ora     #$10                            ; D423 09 10                    ..
         sta     $0304                           ; D425 8D 04 03                 ...
-        lda     #$0E                            ; D428 A9 0E                    ..
-        jsr     LE2CD                           ; D42A 20 CD E2                  ..
+        lda     #SFXEncounterEnemyDeath                            ; D428 A9 0E                    ..
+        jsr     SoundPlay                           ; D42A 20 CD E2                  ..
         lda     #$39                            ; D42D A9 39                    .9
         jmp     L97AD                           ; D42F 4C AD 97                 L..
 
@@ -7615,8 +7623,8 @@ LD617:
         .byte   $18,$40,$00                     ; D75F 18 40 00                 .@.
 ; ----------------------------------------------------------------------------
 LD762:
-        lda     #$FF                            ; D762 A9 FF                    ..
-        jsr     LE2CD                           ; D764 20 CD E2                  ..
+        lda     #SFXSTOP                            ; D762 A9 FF                    ..
+        jsr     SoundPlay                           ; D764 20 CD E2                  ..
         jsr     PPUDisableNMI                           ; D767 20 EA 8B                  ..
         jsr     PPUDisableRendering                           ; D76A 20 B6 8B                  ..
         jsr     ClearScreenAndSprites                           ; D76D 20 12 8E                  ..
@@ -7676,8 +7684,8 @@ LD7D6:
         bpl     LD7D6                           ; D7DA 10 FA                    ..
         lda     #$01                            ; D7DC A9 01                    ..
         sta     $0302                           ; D7DE 8D 02 03                 ...
-        lda     #$02                            ; D7E1 A9 02                    ..
-        jsr     LE2CD                           ; D7E3 20 CD E2                  ..
+        lda     #MusicFinaleScreen                            ; D7E1 A9 02                    ..
+        jsr     SoundPlay                           ; D7E3 20 CD E2                  ..
         jsr     PPUEnableNMI                           ; D7E6 20 DE 8B                  ..
         jsr     L8BC2                           ; D7E9 20 C2 8B                  ..
 LD7EC:
@@ -7816,8 +7824,8 @@ LD963:
         lda     $08                             ; D97E A5 08                    ..
         ora     #$10                            ; D980 09 10                    ..
         sta     $08                             ; D982 85 08                    ..
-        lda     #$17                            ; D984 A9 17                    ..
-        jsr     LE2CD                           ; D986 20 CD E2                  ..
+        lda     #SFXFinaleStrobe                            ; D984 A9 17                    ..
+        jsr     SoundPlay                           ; D986 20 CD E2                  ..
         jmp     LD9AB                           ; D989 4C AB D9                 L..
 
 ; ----------------------------------------------------------------------------
@@ -7893,8 +7901,8 @@ LD9EB:
         beq     LDA31                           ; DA0B F0 24                    .$
         lda     #$80                            ; DA0D A9 80                    ..
         sta     $0306                           ; DA0F 8D 06 03                 ...
-        lda     #$18                            ; DA12 A9 18                    ..
-        jsr     LE2CD                           ; DA14 20 CD E2                  ..
+        lda     #SFXFinaleHit                            ; DA12 A9 18                    ..
+        jsr     SoundPlay                           ; DA14 20 CD E2                  ..
         ldx     #$00                            ; DA17 A2 00                    ..
         ldy     #$00                            ; DA19 A0 00                    ..
 LDA1B:
@@ -8386,8 +8394,8 @@ LDD60:
         .byte   $BF,$DD                         ; DD80 BF DD                    ..
 ; ----------------------------------------------------------------------------
         jsr     L8B5F                           ; DD82 20 5F 8B                  _.
-        lda     #$04                            ; DD85 A9 04                    ..
-        jsr     LE2CD                           ; DD87 20 CD E2                  ..
+        lda     #MusicTheEndScreen                            ; DD85 A9 04                    ..
+        jsr     SoundPlay                           ; DD87 20 CD E2                  ..
 LDD8A:
         jsr     WaitFor1Frame                           ; DD8A 20 40 8C                  @.
         lda     $0574                           ; DD8D AD 74 05                 .t.
@@ -8687,7 +8695,7 @@ LDED4:
         .byte   $D6,$FC,$F8,$C5,$80             ; E294 D6 FC F8 C5 80           .....
 
 ; ----------------------------------------------------------------------------
-SoundSystemInit:
+SoundInit:
         lda #$00
         sta SND_MASTERCTRL
         lda #$30
@@ -8713,16 +8721,16 @@ SoundSystemInit:
         rts
 
 ; ----------------------------------------------------------------------------
-LE2CD:
+SoundPlay:
         ldx     #$01                            ; E2CD A2 01                    ..
         stx     $055D                           ; E2CF 8E 5D 05                 .].
         cmp     #$E0                            ; E2D2 C9 E0                    ..
         bcs     LE331                           ; E2D4 B0 5B                    .[
         asl     a                               ; E2D6 0A                       .
         tax                                     ; E2D7 AA                       .
-        lda     AudioPointers,x                         ; E2D8 BD BE E8                 ...
+        lda     SoundPointers,x                         ; E2D8 BD BE E8                 ...
         sta     $F0                             ; E2DB 85 F0                    ..
-        lda     AudioPointers+1,x                         ; E2DD BD BF E8                 ...
+        lda     SoundPointers+1,x                         ; E2DD BD BF E8                 ...
         sta     $F1                             ; E2E0 85 F1                    ..
         ldy     #$00                            ; E2E2 A0 00                    ..
 LE2E4:
@@ -9509,39 +9517,73 @@ LE8A7:
 
 
 
-AudioPointers:
-        .addr Audio00
-        .addr Audio01
-        .addr Audio02
-        .addr Audio03
-        .addr Audio04
-        .addr Audio05
-        .addr Audio06
-        .addr Audio07
-        .addr Audio08
-        .addr Audio09
-        .addr Audio10
-        .addr Audio11
-        .addr Audio12
-        .addr Audio13
-        .addr Audio14
-        .addr Audio15
-        .addr Audio16
-        .addr Audio15
-        .addr Audio17
-        .addr NoAudio
-        .addr Audio19
-        .addr Audio20
-        .addr Audio21
-        .addr Audio22
-        .addr Audio23
-        .addr Audio24
-        .addr Audio25
-        .addr Audio26
-        .addr Audio00
-        .addr Audio27
-        .addr Audio28
-NoAudio:
+MusicMapScreen                 = 00
+MusicEncounterScreen           = 01
+MusicFinaleScreen              = 02
+MusicBonusScreenStart          = 03
+MusicTheEndScreen              = 04
+MusicUnknown                   = 05
+MusicTitleScreen               = 06
+MusicStartEncounter            = 07
+SFXEncounterBoatFire           = 08
+SFXBonusPlaneFire              = 09
+SFXEncounterSubmarineFire      = 10
+SFXEncounterHarpoonFire        = 11
+SFXEncounterJawsHit            = 12
+SFXEncounterJawsHarpoonHit     = 13
+SFXEncounterEnemyDeath         = 14
+SFXEncounterBoatDespawn        = 15
+SFXFinaleMiss                  = 16
+SFXEncounterBoatDespawnDupe    = 17
+SFXPlayerDeath                 = 18
+SFXSilent                      = 19
+SFXMapTrackerPulse             = 20
+SFXEncounterPickup             = 21
+SFXUnknown1                    = 22
+SFXFinaleStrobe                = 23
+SFXFinaleHit                   = 24
+SFXUnknown2                    = 25
+MusicBonusScreenEnd            = 26
+MusicGetReadyScreen            = 27
+MusicMapScreenDupe             = 28
+MusicPortPowerup               = 29
+SFXUnknown3                    = 30
+SFXSTOP                        = $FF
+
+SoundPointers:
+        .addr MusicMapScreenData
+        .addr MusicEncounterScreenData
+        .addr MusicFinaleScreenData
+        .addr MusicBonusScreenStartData
+        .addr MusicTheEndScreenData
+        .addr MusicUnknownData                         ; unused music?
+        .addr MusicTitleScreenData
+        .addr MusicStartEncounterData
+        .addr SFXEncounterBoatFireData
+        .addr SFXBonusPlaneFireData
+        .addr SFXEncounterSubmarineFireData
+        .addr SFXEncounterHarpoonFireData
+        .addr SFXEncounterJawsHitData
+        .addr SFXEncounterJawsHarpoonHitData
+        .addr SFXEncounterEnemyDeathData
+        .addr SFXEncounterBoatDespawnData
+        .addr SFXFinaleMissData
+        .addr SFXEncounterBoatDespawnData              ; unused duplicate?
+        .addr SFXPlayerDeathData
+        .addr SFXSilentData
+        .addr SFXMapTrackerPulseData
+        .addr SFXEncounterPickupData
+        .addr SFXUnknown1Data                          ; unused beeps?
+        .addr SFXFinaleStrobeData
+        .addr SFXFinaleHitData
+        .addr SFXUnknown2Data                          ; unused chime?
+        .addr MusicBonusScreenEndData
+        .addr MusicGetReadyScreenData
+        .addr MusicMapScreenData
+        .addr MusicPortPowerupData
+        .addr SFXUnknown3Data                          ; unused error beep?
+
+SFXSilentData:
         .byte $FF
 
 LE8FD:
@@ -9574,7 +9616,7 @@ LE978:
 .byte   $9A,$E9
 
 
-Audio00:
+MusicMapScreenData:
 .byte   $00,$A4,$E9,$01,$DC,$E9
 .byte   $02,$EB,$E9,$FF,$EC,$08,$ED,$00
 .byte   $EE,$0D,$F0,$00,$F2,$C2,$E0,$E1
@@ -9589,7 +9631,7 @@ Audio00:
 .byte   $55,$15,$54,$14,$53,$13,$F8,$EB
 .byte   $E9
 
-Audio01:
+MusicEncounterScreenData:
 .byte   $00,$03,$EA,$01,$61,$EA,$02
 .byte   $C1,$EA,$FF,$EC,$07,$ED,$00,$EE
 .byte   $07,$F0,$09,$F2,$CA,$C1,$84,$16
@@ -9618,7 +9660,7 @@ Audio01:
 .byte   $EA,$E0,$64,$F5,$F2,$81,$CF,$86
 .byte   $0A,$F9,$CF,$07,$F9,$F8,$C1,$EA
 
-Audio05:
+MusicUnknownData:
 .byte   $00,$DA,$EA,$01,$08,$EB,$02,$36
 .byte   $EB,$FF,$EC,$06,$ED,$00,$EE,$05
 .byte   $F0,$0C,$F2,$C3,$94,$12,$22,$15
@@ -9639,7 +9681,7 @@ Audio05:
 .byte   $10,$3F,$F3,$8E,$72,$70,$6A,$68
 .byte   $66,$65,$64,$63,$62,$FF
 
-Audio17:
+SFXPlayerDeathData:
 .byte $00,$72
 .byte   $EB,$01,$70,$EB,$03,$8E,$EB,$FF
 .byte   $82,$3F,$EC,$04,$ED,$00,$EE,$02
@@ -9650,7 +9692,7 @@ Audio17:
 .byte   $0E,$FF
 
 
-Audio27:
+MusicPortPowerupData:
 .byte $00,$A4,$EB,$01,$C2,$EB
 .byte   $02,$E0,$EB,$FF,$EC,$07,$ED,$80
 .byte   $EE,$02,$F0,$00,$F2,$F2,$94,$25
@@ -9666,13 +9708,13 @@ Audio27:
 .byte   $1A,$19,$18,$17,$16,$15,$14,$13
 .byte   $12,$11,$10,$FF
 
-Audio28:
+SFXUnknown3Data:
 .byte $00,$0D,$EC,$01
 .byte   $0B,$EC,$FF,$F0,$01,$EC,$04,$ED
 .byte   $00,$C3,$82,$15,$80,$3F,$F9,$EE
 .byte   $0F,$FF
 
-Audio25:
+MusicBonusScreenEndData:
 .byte $00,$24,$EC,$01,$3C,$EC
 .byte   $02,$54,$EC,$FF,$EC,$05,$ED,$00
 .byte   $EE,$04,$F0,$0C,$F2,$C1,$94,$19
@@ -9683,7 +9725,7 @@ Audio25:
 .byte   $17,$3F,$17,$FF,$E0,$64,$F5,$98
 .byte   $15,$17,$94,$20,$17,$3F,$20,$FF
 
-Audio24:
+SFXUnknown2Data:
 .byte   $04,$01,$65,$EC,$FF,$EC,$06,$ED
 .byte   $80,$F0,$18,$EE,$00,$C3,$8F,$10
 .byte   $20,$EF,$03,$F9,$EE,$00,$C3,$8F
@@ -9691,7 +9733,7 @@ Audio24:
 .byte   $8F,$17,$27,$EF,$03,$F9,$EE,$00
 .byte   $C3,$8F,$20,$30,$EF,$03,$F9,$FF
 
-Audio26:
+MusicGetReadyScreenData:
 .byte   $00,$9A,$EC,$01,$BE,$EC,$02,$E2
 .byte   $EC,$FF,$EC,$05,$ED,$C0,$F0,$0C
 .byte   $F2,$C1,$EE,$03,$C1,$84,$17,$9B
@@ -9708,14 +9750,14 @@ Audio26:
 .byte   $FF
 
 
-Audio14:
+SFXEncounterEnemyDeathData:
 .byte $04,$01,$FE,$EC,$FF,$EC,$06
 .byte   $ED,$C0,$EE,$00,$F0,$0C,$8F,$C5
 .byte   $60,$30,$02,$F1,$03,$EF,$01,$F9
 .byte   $FF
 
 
-Audio03:
+MusicBonusScreenStartData:
 .byte $00,$1B,$ED,$01,$93,$ED,$02
 .byte   $11,$EE,$FF,$EC,$08,$ED,$00,$EE
 .byte   $05,$F0,$0C,$F2,$C2,$82,$12,$14
@@ -9768,7 +9810,7 @@ Audio03:
 .byte   $84,$04,$43,$FA
 
 
-Audio04:
+MusicTheEndScreenData:
 .byte $00,$A6,$EE,$01
 .byte   $BA,$EF,$02,$34,$F1,$FF,$EC,$07
 .byte   $ED,$C0,$EE,$05,$F0,$0C,$F2,$C2
@@ -9887,7 +9929,7 @@ Audio04:
 .byte   $FA
 
 
-Audio02:
+MusicFinaleScreenData:
 .byte $00,$3B,$F2,$01,$82,$F2,$02
 .byte   $BD,$F2,$FF,$EC,$07,$ED,$C0,$EE
 .byte   $03,$F0,$0C,$E0,$76,$F2,$9A,$16
@@ -9913,19 +9955,19 @@ Audio02:
 .byte   $12,$11,$0A,$94,$19,$0A,$17,$1A
 .byte   $19,$1A,$1A,$1A,$F8,$BD,$F2
 
-Audio22:
+SFXFinaleStrobeData:
 .byte $04
 .byte   $03,$F4,$F2,$FF,$EC,$01,$EE,$00
 .byte   $F2,$44,$80,$04,$F4,$18,$85,$0F
 .byte   $FF
 
-Audio16:
+SFXFinaleMissData:
 .byte $03,$05,$F3,$FF,$EC,$07,$EE
 .byte   $01,$8E,$0F,$0D,$4B,$49,$47,$45
 .byte   $03,$FF
 
 
-Audio11:
+SFXEncounterHarpoonFireData:
 .byte $04,$01,$1A,$F3,$03,$2E
 .byte   $F3,$FF,$EC,$06,$ED,$40,$EE,$04
 .byte   $F0,$1C,$8F,$1A,$2A,$3A,$C2,$69
@@ -9933,7 +9975,7 @@ Audio11:
 .byte   $EE,$02,$8F,$4F,$4D,$4B,$49,$47
 .byte   $45,$43,$01,$FF
 
-Audio09:
+SFXBonusPlaneFireData:
 .byte  $04,$01,$44,$F3
 .byte   $03,$5C,$F3,$FF,$EC,$06,$ED,$80
 .byte   $EE,$00,$F0,$04,$F3,$8F,$C2,$78
@@ -9942,20 +9984,20 @@ Audio09:
 .byte   $8D,$45,$03,$FF
 
 
-Audio08:
+SFXEncounterBoatFireData:
 .byte $04,$02,$69,$F3
 .byte   $FF,$E0,$64,$F5,$F3,$F0,$1C,$8F
 .byte   $35,$37,$39,$F0,$0C,$C9,$2A,$F1
 .byte   $FF,$F9,$8F,$C8,$69,$F1,$FE,$F9
 .byte   $20,$FF
 
-Audio10:
+SFXEncounterSubmarineFireData:
 .byte $04,$03,$87,$F3,$FF,$EC
 .byte   $00,$EE,$00,$8E,$4F,$4D,$4B,$48
 .byte   $06,$FF
 
 
-Audio07:
+MusicStartEncounterData:
 .byte $00,$9C,$F3,$01,$B3,$F3
 .byte   $02,$CA,$F3,$FF,$EC,$01,$ED,$00
 .byte   $EE,$00,$F0,$F7,$F2,$01,$81,$24
@@ -9966,7 +10008,7 @@ Audio07:
 .byte   $09,$FF,$EC,$01,$F0,$F7,$F2,$01
 .byte   $F8,$BD,$F3
 
-Audio13:
+SFXEncounterJawsHarpoonHitData:
 .byte $04,$01,$DD,$F3,$FF
 .byte   $F0,$FC,$F8,$DF,$F3,$F0,$00,$EC
 .byte   $06,$ED,$80,$EE,$00,$F2,$C2,$8F
@@ -9974,13 +10016,13 @@ Audio13:
 .byte   $30,$EF,$03,$F9,$FF
 
 
-Audio12:
+SFXEncounterJawsHitData:
 .byte $04,$01,$D8
 .byte   $F3,$03,$FD,$F3,$FF,$EC,$06,$EE
 .byte   $00,$8D,$44,$02,$FF
 
 
-Audio15:
+SFXEncounterBoatDespawnData:
 .byte $04,$01,$0D
 .byte   $F4,$03,$1E,$F4,$FF,$EC,$06,$EE
 .byte   $00,$F0,$00,$F3,$8F,$C5,$20,$21
@@ -9989,7 +10031,7 @@ Audio15:
 .byte   $8E,$47,$46,$45,$82,$44,$43,$42
 .byte   $00,$FF
 
-Audio23:
+SFXFinaleHitData:
 .byte $01,$0D,$F4,$03,$1E,$F4
 .byte   $00,$3F,$F4,$02,$53,$F4,$FF,$EC
 .byte   $06,$ED,$00,$EE,$00,$F0,$20,$8E
@@ -9999,7 +10041,7 @@ Audio23:
 .byte   $20,$1B,$19,$17,$15,$13,$11,$FF
 
 
-Audio19:
+SFXMapTrackerPulseData:
 .byte   $04,$01,$6D,$F4,$FF,$EC,$04,$ED
 .byte   $40,$F0,$0E,$EE,$00,$8F,$0A,$1A
 .byte   $10,$20,$14,$24,$82,$3F,$8F,$C4
@@ -10014,20 +10056,20 @@ Audio19:
 .byte   $8F,$47,$49,$0D,$3F,$F9,$FF
 
 
-Audio20:
+SFXEncounterPickupData:
 .byte $04
 .byte   $01,$CC,$F4,$FF,$EC,$06,$ED,$80
 .byte   $EE,$01,$F0,$0C,$C3,$8E,$25,$35
 .byte   $27,$37,$29,$39,$2B,$3B,$F1,$00
 .byte   $EF,$04,$F9,$FF
 
-Audio21:
+SFXUnknown1Data:
 .byte $04,$01,$E9,$F4
 .byte   $FF,$EC,$06,$ED,$80,$EE,$01,$F0
 .byte   $0C,$C3,$8E,$27,$37,$F9,$FF
 
 
-Audio06:
+MusicTitleScreenData:
 .byte $00
 .byte   $FE,$F4,$01,$34,$F5,$FF,$EC,$05
 .byte   $ED,$00,$F2,$C1,$F0,$F4,$C3,$EE
