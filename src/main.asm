@@ -43,14 +43,36 @@ PressedInputs2        = $0333
 
 CurrentScore          = $0380
 
+
+PlayerData            = $0680
+Enemy1Data            = PlayerData + ( 1 * $20)
+Enemy2Data            = PlayerData + ( 2 * $20)
+Enemy3Data            = PlayerData + ( 3 * $20)
+JawsData              = PlayerData + ( 4 * $20)
+PUp1Data              = PlayerData + ( 5 * $20)
+PUp2Data              = PlayerData + ( 6 * $20)
+PUp3Data              = PlayerData + ( 7 * $20)
+PUp4Data              = PlayerData + ( 7 * $20)
+PUp5Data              = PlayerData + ( 8 * $20)
+PUp6Data              = PlayerData + ( 9 * $20)
+PUp7Data              = PlayerData + (10 * $20)
+
+
 JawsHP                = $0388 ; 16 bit
-JawsX                 = $0702 ; 16 bit
-JawsY                 = $0704 ; 16 bit
+JawsType              = JawsData + EntityType
+JawsX                 = JawsData + EntityX ; 16 bit
+JawsY                 = JawsData + EntityY ; 16 bit
+
 CameraX               = $0338 ; 16 bit
 CameraY               = $033A ; 16 bit
-BoatX                 = $0682 ; 16 bit
-BoatY                 = $0684 ; 16 bit
 
+
+PlayerType            = PlayerData + EntityType
+PlayerX               = PlayerData + EntityX ; 16 bit
+PlayerY               = PlayerData + EntityY ; 16 bit
+
+PlayerPowerLevel      = $0391
+PlayerCrabLevel       = $0392
 
 SpritePosY            = $200
 SpriteTile            = $201
@@ -58,11 +80,16 @@ SpriteAttr            = $202
 SpritePosX            = $203
 SPR                   = 4
 
-
+SoundIsPlaying        = $055D
 
 ; $20 bytes of working data
-WorkingData     = $20
-
+WorksetPtr            = $40
+Workset               = $20
+EntityType            = $01
+EntityX               = $02 ; 16 bit
+EntityY               = $04 ; 16 bit
+EntityXSpeed          = $11
+EntityV24             = $18
 
 
 
@@ -185,7 +212,7 @@ DrawTitleScreen:
         sta     CameraY                           ; 818D 8D 3A 03                 .:.
         sta     CameraY+1                           ; 8190 8D 3B 03                 .;.
         jsr     L977C                           ; 8193 20 7C 97                  |.
-        jsr     L974C                           ; 8196 20 4C 97                  L.
+        jsr     LoadPlayerWorkset                           ; 8196 20 4C 97                  L.
         lda     #$C0                            ; 8199 A9 C0                    ..
         sta     $20                             ; 819B 85 20                    . 
         lda     #$03                            ; 819D A9 03                    ..
@@ -194,7 +221,7 @@ DrawTitleScreen:
         sta     $22                             ; 81A4 85 22                    ."
         lda     #$37                            ; 81A6 A9 37                    .7
         sta     $24                             ; 81A8 85 24                    .$
-        jsr     StoreWorkingData                           ; 81AA 20 61 97                  a.
+        jsr     WorksetSave                           ; 81AA 20 61 97                  a.
         jsr     L9A37                           ; 81AD 20 37 9A                  7.
         jsr     PPUEnableNMI                           ; 81B0 20 DE 8B                  ..
         jsr     L8BC2                           ; 81B3 20 C2 8B                  ..
@@ -268,8 +295,8 @@ L8277:
         sta     $0387                           ; 8295 8D 87 03                 ...
         lda     #$00                            ; 8298 A9 00                    ..
         sta     $0397                           ; 829A 8D 97 03                 ...
-        sta     $0391                           ; 829D 8D 91 03                 ...
-        sta     $0392                           ; 82A0 8D 92 03                 ...
+        sta     PlayerPowerLevel                           ; 829D 8D 91 03                 ...
+        sta     PlayerCrabLevel                           ; 82A0 8D 92 03                 ...
         sta     $038E                           ; 82A3 8D 8E 03                 ...
         sta     $038B                           ; 82A6 8D 8B 03                 ...
         lda     #$02                            ; 82A9 A9 02                    ..
@@ -534,12 +561,12 @@ L8553:
         dec     $0387                           ; 8556 CE 87 03                 ...
         beq     L8575                           ; 8559 F0 1A                    ..
         lsr     $0390                           ; 855B 4E 90 03                 N..
-        dec     $0391                           ; 855E CE 91 03                 ...
+        dec     PlayerPowerLevel                           ; 855E CE 91 03                 ...
         bpl     L8568                           ; 8561 10 05                    ..
         .byte   $A9,$00,$8D,$91,$03             ; 8563 A9 00 8D 91 03           .....
 ; ----------------------------------------------------------------------------
 L8568:
-        dec     $0392                           ; 8568 CE 92 03                 ...
+        dec     PlayerCrabLevel                           ; 8568 CE 92 03                 ...
         bpl     L8572                           ; 856B 10 05                    ..
         .byte   $A9,$00,$8D,$92,$03             ; 856D A9 00 8D 92 03           .....
 ; ----------------------------------------------------------------------------
@@ -600,11 +627,11 @@ L860F:
 
 ; ----------------------------------------------------------------------------
 L8621:
-        lda     #$80                            ; 8621 A9 80                    ..
-        sta     $40                             ; 8623 85 40                    .@
-        lda     #$06                            ; 8625 A9 06                    ..
-        sta     $41                             ; 8627 85 41                    .A
-        jsr     LoadWorkingData                           ; 8629 20 54 97                  T.
+        lda     #<PlayerData                            ; 8621 A9 80                    ..
+        sta     WorksetPtr                             ; 8623 85 40                    .@
+        lda     #>PlayerData                            ; 8625 A9 06                    ..
+        sta     WorksetPtr+1                             ; 8627 85 41                    .A
+        jsr     WorksetLoad                           ; 8629 20 54 97                  T.
         bit     $20                             ; 862C 24 20                    $ 
         bvs     L8644                           ; 862E 70 14                    p.
         lda     #$C0                            ; 8630 A9 C0                    ..
@@ -615,7 +642,7 @@ L8621:
         sta     $35                             ; 863A 85 35                    .5
         lda     #$24                            ; 863C A9 24                    .$
         jsr     L97AD                           ; 863E 20 AD 97                  ..
-        jmp     StoreWorkingData                           ; 8641 4C 61 97                 La.
+        jmp     WorksetSave                           ; 8641 4C 61 97                 La.
 
 ; ----------------------------------------------------------------------------
 L8644:
@@ -623,13 +650,13 @@ L8644:
         bmi     L8681                           ; 8646 30 39                    09
         dec     $35                             ; 8648 C6 35                    .5
         beq     L864F                           ; 864A F0 03                    ..
-        jmp     StoreWorkingData                           ; 864C 4C 61 97                 La.
+        jmp     WorksetSave                           ; 864C 4C 61 97                 La.
 
 ; ----------------------------------------------------------------------------
 L864F:
-        lda     #$A0                            ; 864F A9 A0                    ..
+        lda     #<Enemy1Data                            ; 864F A9 A0                    ..
         sta     $44                             ; 8651 85 44                    .D
-        lda     #$06                            ; 8653 A9 06                    ..
+        lda     #>Enemy1Data                            ; 8653 A9 06                    ..
         sta     $45                             ; 8655 85 45                    .E
         ldy     #$00                            ; 8657 A0 00                    ..
 L8659:
@@ -652,7 +679,7 @@ L8659:
         sta     $32                             ; 8678 85 32                    .2
         lda     #$01                            ; 867A A9 01                    ..
         sta     $33                             ; 867C 85 33                    .3
-        jmp     StoreWorkingData                           ; 867E 4C 61 97                 La.
+        jmp     WorksetSave                           ; 867E 4C 61 97                 La.
 
 ; ----------------------------------------------------------------------------
 L8681:
@@ -661,13 +688,13 @@ L8681:
         bne     L868E                           ; 8685 D0 07                    ..
         lda     #$00                            ; 8687 A9 00                    ..
         sta     $20                             ; 8689 85 20                    . 
-        jmp     StoreWorkingData                           ; 868B 4C 61 97                 La.
+        jmp     WorksetSave                           ; 868B 4C 61 97                 La.
 
 ; ----------------------------------------------------------------------------
 L868E:
         jsr     L97BE                           ; 868E 20 BE 97                  ..
         jsr     L981B                           ; 8691 20 1B 98                  ..
-        jmp     StoreWorkingData                           ; 8694 4C 61 97                 La.
+        jmp     WorksetSave                           ; 8694 4C 61 97                 La.
 
 ; ----------------------------------------------------------------------------
 L8697:
@@ -778,7 +805,7 @@ DrawStatusLine_PowerLabel:
         sta     PPUADDR                           ; 87DA 8D 06 20                 .. 
         lda     #$91                            ; 87DD A9 91                    ..
         sta     PPUADDR                           ; 87DF 8D 06 20                 .. 
-        lda     $0391                           ; 87E2 AD 91 03                 ...
+        lda     PlayerPowerLevel                           ; 87E2 AD 91 03                 ...
         clc                                     ; 87E5 18                       .
         adc     #$31                            ; 87E6 69 31                    i1
         sta     PPUDATA                           ; 87E8 8D 07 20                 .. 
@@ -816,11 +843,11 @@ L87F9:
         sta     $0323                           ; 882E 8D 23 03                 .#.
         sta     CameraY                           ; 8831 8D 3A 03                 .:.
         sta     CameraY+1                           ; 8834 8D 3B 03                 .;.
-        lda     #$80                            ; 8837 A9 80                    ..
-        sta     $40                             ; 8839 85 40                    .@
-        lda     #$06                            ; 883B A9 06                    ..
-        sta     $41                             ; 883D 85 41                    .A
-        jsr     LoadWorkingData                           ; 883F 20 54 97                  T.
+        lda     #<PlayerData                            ; 8837 A9 80                    ..
+        sta     WorksetPtr                             ; 8839 85 40                    .@
+        lda     #>PlayerData                            ; 883B A9 06                    ..
+        sta     WorksetPtr+1                             ; 883D 85 41                    .A
+        jsr     WorksetLoad                           ; 883F 20 54 97                  T.
         lda     #$C0                            ; 8842 A9 C0                    ..
         sta     $20                             ; 8844 85 20                    . 
         lda     #$07                            ; 8846 A9 07                    ..
@@ -829,7 +856,7 @@ L87F9:
         sta     $22                             ; 884D 85 22                    ."
         lda     #$67                            ; 884F A9 67                    .g
         sta     $24                             ; 8851 85 24                    .$
-        jsr     StoreWorkingData                           ; 8853 20 61 97                  a.
+        jsr     WorksetSave                           ; 8853 20 61 97                  a.
         jsr     L9A37                           ; 8856 20 37 9A                  7.
         lda     #$01                            ; 8859 A9 01                    ..
         sta     $0305                           ; 885B 8D 05 03                 ...
@@ -881,11 +908,11 @@ L888D:
         sta     $0323                           ; 88CD 8D 23 03                 .#.
         sta     CameraY                           ; 88D0 8D 3A 03                 .:.
         sta     CameraY+1                           ; 88D3 8D 3B 03                 .;.
-        lda     #$80                            ; 88D6 A9 80                    ..
-        sta     $40                             ; 88D8 85 40                    .@
-        lda     #$06                            ; 88DA A9 06                    ..
-        sta     $41                             ; 88DC 85 41                    .A
-        jsr     LoadWorkingData                           ; 88DE 20 54 97                  T.
+        lda     #<PlayerData                            ; 88D6 A9 80                    ..
+        sta     WorksetPtr                             ; 88D8 85 40                    .@
+        lda     #>PlayerData                            ; 88DA A9 06                    ..
+        sta     WorksetPtr+1                             ; 88DC 85 41                    .A
+        jsr     WorksetLoad                           ; 88DE 20 54 97                  T.
         lda     #$C0                            ; 88E1 A9 C0                    ..
         sta     $20                             ; 88E3 85 20                    . 
         lda     #$0C                            ; 88E5 A9 0C                    ..
@@ -902,7 +929,7 @@ L888D:
         sta     $30                             ; 88FC 85 30                    .0
         lda     #$00                            ; 88FE A9 00                    ..
         sta     $31                             ; 8900 85 31                    .1
-        jsr     StoreWorkingData                           ; 8902 20 61 97                  a.
+        jsr     WorksetSave                           ; 8902 20 61 97                  a.
         jsr     L9A37                           ; 8905 20 37 9A                  7.
         lda     #$01                            ; 8908 A9 01                    ..
         sta     $0305                           ; 890A 8D 05 03                 ...
@@ -910,13 +937,13 @@ L888D:
         jsr     L8BC2                           ; 8910 20 C2 8B                  ..
 L8913:
         jsr     WaitFor1Frame                           ; 8913 20 40 8C                  @.
-        lda     #$80                            ; 8916 A9 80                    ..
-        sta     $40                             ; 8918 85 40                    .@
-        lda     #$06                            ; 891A A9 06                    ..
-        sta     $41                             ; 891C 85 41                    .A
-        jsr     LoadWorkingData                           ; 891E 20 54 97                  T.
-        jsr     MoveJawsX                           ; 8921 20 FA 97                  ..
-        jsr     StoreWorkingData                           ; 8924 20 61 97                  a.
+        lda     #<PlayerData                            ; 8916 A9 80                    ..
+        sta     WorksetPtr                             ; 8918 85 40                    .@
+        lda     #>PlayerData                            ; 891A A9 06                    ..
+        sta     WorksetPtr+1                             ; 891C 85 41                    .A
+        jsr     WorksetLoad                           ; 891E 20 54 97                  T.
+        jsr     WorksetMoveX                           ; 8921 20 FA 97                  ..
+        jsr     WorksetSave                           ; 8924 20 61 97                  a.
         lda     $23                             ; 8927 A5 23                    .#
         bmi     L8931                           ; 8929 30 06                    0.
         lda     $22                             ; 892B A5 22                    ."
@@ -929,7 +956,7 @@ L8931:
 
 ; ----------------------------------------------------------------------------
 L893A:
-        lda     $0391                           ; 893A AD 91 03                 ...
+        lda     PlayerPowerLevel                           ; 893A AD 91 03                 ...
         cmp     #$08                            ; 893D C9 08                    ..
         bcs     L899C                           ; 893F B0 5B                    .[
         jsr     LA8A1                           ; 8941 20 A1 A8                  ..
@@ -938,7 +965,7 @@ L893A:
         jsr     L8B83                           ; 8946 20 83 8B                  ..
         lda     #$3C                            ; 8949 A9 3C                    .<
         jsr     LD11F                           ; 894B 20 1F D1                  ..
-        inc     $0391                           ; 894E EE 91 03                 ...
+        inc     PlayerPowerLevel                           ; 894E EE 91 03                 ...
         lda     #$00                            ; 8951 A9 00                    ..
         sta     $0100                           ; 8953 8D 00 01                 ...
         ldx     $0101                           ; 8956 AE 01 01                 ...
@@ -948,7 +975,7 @@ L893A:
         lda     #$91                            ; 895F A9 91                    ..
         sta     $0102,x                         ; 8961 9D 02 01                 ...
         inx                                     ; 8964 E8                       .
-        lda     $0391                           ; 8965 AD 91 03                 ...
+        lda     PlayerPowerLevel                           ; 8965 AD 91 03                 ...
         clc                                     ; 8968 18                       .
         adc     #$31                            ; 8969 69 31                    i1
         sta     $0102,x                         ; 896B 9D 02 01                 ...
@@ -994,34 +1021,34 @@ L8A16:
         lda     $16                             ; 8A1C A5 16                    ..
         clc                                     ; 8A1E 18                       .
         adc     #$08                            ; 8A1F 69 08                    i.
-        sta     BoatX                           ; 8A21 8D 82 06                 ...
+        sta     PlayerX                           ; 8A21 8D 82 06                 ...
         lda     $17                             ; 8A24 A5 17                    ..
         adc     #$00                            ; 8A26 69 00                    i.
-        sta     BoatX+1                           ; 8A28 8D 83 06                 ...
+        sta     PlayerX+1                           ; 8A28 8D 83 06                 ...
         lda     $038D                           ; 8A2B AD 8D 03                 ...
         jsr     L8C29                           ; 8A2E 20 29 8C                  ).
         lda     $16                             ; 8A31 A5 16                    ..
         clc                                     ; 8A33 18                       .
         adc     #$08                            ; 8A34 69 08                    i.
-        sta     BoatY                           ; 8A36 8D 84 06                 ...
+        sta     PlayerY                           ; 8A36 8D 84 06                 ...
         lda     $17                             ; 8A39 A5 17                    ..
         adc     #$00                            ; 8A3B 69 00                    i.
-        sta     BoatY+1                           ; 8A3D 8D 85 06                 ...
+        sta     PlayerY+1                           ; 8A3D 8D 85 06                 ...
         rts                                     ; 8A40 60                       `
 
 ; ----------------------------------------------------------------------------
 L8A41:
-        lda     BoatX+1                           ; 8A41 AD 83 06                 ...
+        lda     PlayerX+1                           ; 8A41 AD 83 06                 ...
         lsr     a                               ; 8A44 4A                       J
-        lda     BoatX                           ; 8A45 AD 82 06                 ...
+        lda     PlayerX                           ; 8A45 AD 82 06                 ...
         ror     a                               ; 8A48 6A                       j
         lsr     a                               ; 8A49 4A                       J
         lsr     a                               ; 8A4A 4A                       J
         lsr     a                               ; 8A4B 4A                       J
         sta     $038C                           ; 8A4C 8D 8C 03                 ...
-        lda     BoatY+1                           ; 8A4F AD 85 06                 ...
+        lda     PlayerY+1                           ; 8A4F AD 85 06                 ...
         lsr     a                               ; 8A52 4A                       J
-        lda     BoatY                           ; 8A53 AD 84 06                 ...
+        lda     PlayerY                           ; 8A53 AD 84 06                 ...
         ror     a                               ; 8A56 6A                       j
         lsr     a                               ; 8A57 4A                       J
         lsr     a                               ; 8A58 4A                       J
@@ -1059,7 +1086,7 @@ VNMI:
         lda #$01
         sta $0301
         lda $0302
-        beq @L8ABF
+        beq @DrawUIOrChangePalette
         lda #$01
         bit $0305
         beq @CopySprites
@@ -1070,113 +1097,116 @@ VNMI:
         sta $49
         lda #$C0
         jmp @PositionSprite0
-
-; ----------------------------------------------------------------------------
 @L8AA0:
-        lda #$00                            ; 8AA0 A9 00                    ..
-        sta $48                             ; 8AA2 85 48                    .H
-        lda #$2B                            ; 8AA4 A9 2B                    .+
-        sta $49                             ; 8AA6 85 49                    .I
-        lda #$B0                            ; 8AA8 A9 B0                    ..
+        lda #$00
+        sta $48
+        lda #$2B
+        sta $49
+        lda #$B0
 @PositionSprite0:
-        sta SpritePosY                           ; 8AAA 8D 00 02                 ...
-        lda #$FF                            ; 8AAD A9 FF                    ..
-        sta SpriteTile                           ; 8AAF 8D 01 02                 ...
-        lda #$20                            ; 8AB2 A9 20                    . 
-        sta SpriteAttr                           ; 8AB4 8D 02 02                 ...
-        lda #$D0                            ; 8AB7 A9 D0                    ..
-        sta SpritePosX                           ; 8AB9 8D 03 02                 ...
+        sta SpritePosY
+        lda #$FF
+        sta SpriteTile
+        lda #$20
+        sta SpriteAttr
+        lda #$D0
+        sta SpritePosX
 @CopySprites:
-        jsr DMACopySprites                           ; 8ABC 20 AF 8E                  ..
-@L8ABF:
-        lda #$01                            ; 8ABF A9 01                    ..
-        bit $0300                           ; 8AC1 2C 00 03                 ,..
-        beq L8ACC                           ; 8AC4 F0 06                    ..
-        jsr WritePalette                           ; 8AC6 20 E8 8E                  ..
-        jmp L8ACF                           ; 8AC9 4C CF 8A                 L..
-
-; ----------------------------------------------------------------------------
-L8ACC:
-        jsr     L8B10
-L8ACF:
+        jsr DMACopySprites
+@DrawUIOrChangePalette:
+        lda #$01
+        bit $0300
+        beq @DrawUI
+        ; if 300 is set, update the palette and dont redraw the UI
+        jsr WritePalette
+        jmp @Continue
+@DrawUI:
+        jsr     DrawUI
+@Continue:
         lda     PPUCTRL_MIRROR
         and     #%11111101
-        tax                                     ; 8AD4 AA                       .
-        lda     $0323                           ; 8AD5 AD 23 03                 .#.
-        and     #$01                            ; 8AD8 29 01                    ).
-        beq     L8ADE                           ; 8ADA F0 02                    ..
+        tax
+        lda     $0323
+        and     #$01
+        beq     @L8ADE
         inx
         inx
-; ----------------------------------------------------------------------------
-L8ADE:
-        stx     PPUCTRL_MIRROR                           ; 8ADE 8E 0E 03                 ...
-        stx     PPUCTRL                           ; 8AE1 8E 00 20                 .. 
-        lda     PPUMASK_MIRROR                           ; 8AE4 AD 0F 03                 ...
-        sta     PPUMASK                           ; 8AE7 8D 01 20                 .. 
-        lda     PPUSTATUS                           ; 8AEA AD 02 20                 .. 
-        lda     SCROLL_X                           ; 8AED AD 20 03                 . .
-        sta     PPUSCROLL                           ; 8AF0 8D 05 20                 .. 
-        lda     SCROLL_Y                           ; 8AF3 AD 22 03                 .".
-        sta     PPUSCROLL                           ; 8AF6 8D 05 20                 .. 
-        ldx     ActiveCHR                           ; 8AF9 AE 07 03                 ...
-        lda     CHRBANKS,x                         ; 8AFC BD B1 80                 ...
-        sta     CHRBANKS,x                         ; 8AFF 9D B1 80                 ...
-        lda     $055D                           ; 8B02 AD 5D 05                 .].
-        bne     @Exit                           ; 8B05 D0 03                    ..
-        jsr     LE353                           ; 8B07 20 53 E3                  S.
+@L8ADE:
+        stx     PPUCTRL_MIRROR
+        stx     PPUCTRL
+        lda     PPUMASK_MIRROR
+        sta     PPUMASK
+        lda     PPUSTATUS
+        lda     SCROLL_X
+        sta     PPUSCROLL
+        lda     SCROLL_Y
+        sta     PPUSCROLL
+        ldx     ActiveCHR
+        lda     CHRBANKS,x
+        sta     CHRBANKS,x
+        lda     SoundIsPlaying
+        bne     @Exit
+        jsr     SoundUpdate
 @Exit:
-        pla                                     ; 8B0A 68                       h
-        tay                                     ; 8B0B A8                       .
-        pla                                     ; 8B0C 68                       h
-        tax                                     ; 8B0D AA                       .
-        pla                                     ; 8B0E 68                       h
-        rti                                     ; 8B0F 40                       @
+        pla
+        tay
+        pla
+        tax
+        pla
+        rti
 
 ; ----------------------------------------------------------------------------
-L8B10:
-        ldx     $0303                           ; 8B10 AE 03 03                 ...
-        dex                                     ; 8B13 CA                       .
-        bpl     L8B17                           ; 8B14 10 01                    ..
-        rts                                     ; 8B16 60                       `
+DrawUI:
+        @TempJumpTarget = $0334
+        ldx     $0303
+        dex
+        bpl     @KeepDrawingUI
+        rts
+@KeepDrawingUI:
+        txa
+        asl     a
+        tax
+        lda     DrawUIPointers,x
+        sta     @TempJumpTarget
+        lda     DrawUIPointers+1,x
+        sta     @TempJumpTarget+1
+        jmp     (@TempJumpTarget)
+
+DrawUIPointers:
+.addr LAC58
+.addr LAC64
+.addr LAC6D
+.addr LAC79
+.addr DrawUIStatusLineScore
+.addr DrawUIStatusLineJawsPower
+.addr DrawUIEncounterWaves
+.addr LA903
+.addr DrawUIStatusLineShells
+
 
 ; ----------------------------------------------------------------------------
-L8B17:
-        txa                                     ; 8B17 8A                       .
-        asl     a                               ; 8B18 0A                       .
-        tax                                     ; 8B19 AA                       .
-        lda     L8B29,x                         ; 8B1A BD 29 8B                 .).
-        sta     $0334                           ; 8B1D 8D 34 03                 .4.
-        lda     L8B2A,x                         ; 8B20 BD 2A 8B                 .*.
-        sta     $0335                           ; 8B23 8D 35 03                 .5.
-        jmp     ($0334)                         ; 8B26 6C 34 03                 l4.
-
-; ----------------------------------------------------------------------------
-; JP these pointers update 303.. but i dont know what 303 is used for yet.
-L8B29:
-        .byte   $58                             ; 8B29 58                       X
-L8B2A:
-        .byte   $AC,$64,$AC,$6D,$AC,$79,$AC,$3B ; 8B2A AC 64 AC 6D AC 79 AC 3B  .d.m.y.;
-        .byte   $8B,$44,$8B,$4D,$8B,$03,$A9,$56 ; 8B32 8B 44 8B 4D 8B 03 A9 56  .D.M...V
-        .byte   $8B                             ; 8B3A 8B                       .
-; ----------------------------------------------------------------------------
+DrawUIStatusLineScore:
         jsr     DrawStatusLine_Score                           ; 8B3B 20 9E A7                  ..
         lda     #$00                            ; 8B3E A9 00                    ..
         sta     $0303                           ; 8B40 8D 03 03                 ...
         rts                                     ; 8B43 60                       `
 
 ; ----------------------------------------------------------------------------
+DrawUIStatusLineJawsPower:
         jsr     DrawStatusLine_JawsPower                           ; 8B44 20 5C A9                  \.
         lda     #$00                            ; 8B47 A9 00                    ..
         sta     $0303                           ; 8B49 8D 03 03                 ...
         rts                                     ; 8B4C 60                       `
 
 ; ----------------------------------------------------------------------------
-        jsr     LA9E4                           ; 8B4D 20 E4 A9                  ..
+DrawUIEncounterWaves:
+        jsr     DrawEncounterWaves                           ; 8B4D 20 E4 A9                  ..
         lda     #$00                            ; 8B50 A9 00                    ..
         sta     $0303                           ; 8B52 8D 03 03                 ...
         rts                                     ; 8B55 60                       `
 
 ; ----------------------------------------------------------------------------
+DrawUIStatusLineShells:
         jsr     DrawStatusLine_Shells                           ; 8B56 20 92 A9                  ..
         lda     #$00                            ; 8B59 A9 00                    ..
         sta     $0303                           ; 8B5B 8D 03 03                 ...
@@ -1400,7 +1430,7 @@ ReadJoypads:
         rts
 
 ; ----------------------------------------------------------------------------
-L8CD0:
+AwardPoints:
         asl     a                               ; 8CD0 0A                       .
         sta     $13                             ; 8CD1 85 13                    ..
         asl     a                               ; 8CD3 0A                       .
@@ -1409,84 +1439,84 @@ L8CD0:
         tax                                     ; 8CD8 AA                       .
         ldy     #$05                            ; 8CD9 A0 05                    ..
         clc                                     ; 8CDB 18                       .
-L8CDC:
+@L8CDC:
         lda     LFF80,x                         ; 8CDC BD 80 FF                 ...
         adc     CurrentScore,y                         ; 8CDF 79 80 03                 y..
         cmp     #$0A                            ; 8CE2 C9 0A                    ..
-        bcc     L8CE8                           ; 8CE4 90 02                    ..
+        bcc     @L8CE8                           ; 8CE4 90 02                    ..
         sbc     #$0A                            ; 8CE6 E9 0A                    ..
-L8CE8:
+@L8CE8:
         sta     CurrentScore,y                         ; 8CE8 99 80 03                 ...
         dex                                     ; 8CEB CA                       .
         dey                                     ; 8CEC 88                       .
-        bpl     L8CDC                           ; 8CED 10 ED                    ..
+        bpl     @L8CDC                           ; 8CED 10 ED                    ..
         lda     $0304                           ; 8CEF AD 04 03                 ...
         ora     #$80                            ; 8CF2 09 80                    ..
         sta     $0304                           ; 8CF4 8D 04 03                 ...
         ldx     #$00                            ; 8CF7 A2 00                    ..
-L8CF9:
+@L8CF9:
         lda     $0350,x                         ; 8CF9 BD 50 03                 .P.
         cmp     CurrentScore,x                         ; 8CFC DD 80 03                 ...
-        bcc     L8D0B                           ; 8CFF 90 0A                    ..
-        bne     L8D18                           ; 8D01 D0 15                    ..
+        bcc     @L8D0B                           ; 8CFF 90 0A                    ..
+        bne     @L8D18                           ; 8D01 D0 15                    ..
         inx                                     ; 8D03 E8                       .
         cpx     #$06                            ; 8D04 E0 06                    ..
-        bcc     L8CF9                           ; 8D06 90 F1                    ..
+        bcc     @L8CF9                           ; 8D06 90 F1                    ..
         .byte   $4C,$18,$8D                     ; 8D08 4C 18 8D                 L..
 ; ----------------------------------------------------------------------------
-L8D0B:
+@L8D0B:
         ldx     #$00                            ; 8D0B A2 00                    ..
-L8D0D:
+@L8D0D:
         lda     CurrentScore,x                         ; 8D0D BD 80 03                 ...
         sta     $0350,x                         ; 8D10 9D 50 03                 .P.
         inx                                     ; 8D13 E8                       .
         cpx     #$06                            ; 8D14 E0 06                    ..
-        bcc     L8D0D                           ; 8D16 90 F5                    ..
-L8D18:
+        bcc     @L8D0D                           ; 8D16 90 F5                    ..
+@L8D18:
         ldx     #$00                            ; 8D18 A2 00                    ..
-L8D1A:
+@L8D1A:
         lda     $0394,x                         ; 8D1A BD 94 03                 ...
         cmp     CurrentScore,x                         ; 8D1D DD 80 03                 ...
-        bne     L8D2A                           ; 8D20 D0 08                    ..
+        bne     @L8D2A                           ; 8D20 D0 08                    ..
         inx                                     ; 8D22 E8                       .
         cpx     #$03                            ; 8D23 E0 03                    ..
-        bcc     L8D1A                           ; 8D25 90 F3                    ..
-        jmp     L8D2C                           ; 8D27 4C 2C 8D                 L,.
+        bcc     @L8D1A                           ; 8D25 90 F3                    ..
+        jmp     @L8D2C                           ; 8D27 4C 2C 8D                 L,.
 
 ; ----------------------------------------------------------------------------
-L8D2A:
-        bcs     L8D68                           ; 8D2A B0 3C                    .<
-L8D2C:
+@L8D2A:
+        bcs     @L8D68                           ; 8D2A B0 3C                    .<
+@L8D2C:
         lda     $038A                           ; 8D2C AD 8A 03                 ...
-        bne     L8D3E                           ; 8D2F D0 0D                    ..
+        bne     @L8D3E                           ; 8D2F D0 0D                    ..
         lda     $0397                           ; 8D31 AD 97 03                 ...
-        bne     L8D3E                           ; 8D34 D0 08                    ..
+        bne     @L8D3E                           ; 8D34 D0 08                    ..
         lda     #$80                            ; 8D36 A9 80                    ..
         sta     $0397                           ; 8D38 8D 97 03                 ...
-        jmp     L8D52                           ; 8D3B 4C 52 8D                 LR.
+        jmp     @L8D52                           ; 8D3B 4C 52 8D                 LR.
 
 ; ----------------------------------------------------------------------------
-L8D3E:
+@L8D3E:
         .byte   $A9,$19,$20,$CD,$E2,$EE,$87,$03 ; 8D3E A9 19 20 CD E2 EE 87 03  .. .....
         .byte   $AD,$87,$03,$C9,$0A,$90,$05,$A9 ; 8D46 AD 87 03 C9 0A 90 05 A9  ........
         .byte   $09,$8D,$87,$03                 ; 8D4E 09 8D 87 03              ....
 ; ----------------------------------------------------------------------------
-L8D52:
+@L8D52:
         ldx     #$02                            ; 8D52 A2 02                    ..
         lda     #$03                            ; 8D54 A9 03                    ..
         clc                                     ; 8D56 18                       .
-L8D57:
+@L8D57:
         adc     $0394,x                         ; 8D57 7D 94 03                 }..
         cmp     #$0A                            ; 8D5A C9 0A                    ..
-        bcc     L8D60                           ; 8D5C 90 02                    ..
+        bcc     @L8D60                           ; 8D5C 90 02                    ..
         .byte   $E9,$0A                         ; 8D5E E9 0A                    ..
 ; ----------------------------------------------------------------------------
-L8D60:
+@L8D60:
         sta     $0394,x                         ; 8D60 9D 94 03                 ...
         lda     #$00                            ; 8D63 A9 00                    ..
         dex                                     ; 8D65 CA                       .
-        bpl     L8D57                           ; 8D66 10 EF                    ..
-L8D68:
+        bpl     @L8D57                           ; 8D66 10 EF                    ..
+@L8D68:
         rts                                     ; 8D68 60                       `
 
 ; ----------------------------------------------------------------------------
@@ -1752,27 +1782,40 @@ L8F17:
         sta     $0300                           ; 8F35 8D 00 03                 ...
         rts                                     ; 8F38 60                       `
 
-; ----------------------------------------------------------------------------
-L8F39:
-        asl     a                               ; 8F39 0A                       .
-        tay                                     ; 8F3A A8                       .
-        pla                                     ; 8F3B 68                       h
-        clc                                     ; 8F3C 18                       .
-        adc     #$01                            ; 8F3D 69 01                    i.
-        sta     $44                             ; 8F3F 85 44                    .D
-        pla                                     ; 8F41 68                       h
-        adc     #$00                            ; 8F42 69 00                    i.
-        sta     $45                             ; 8F44 85 45                    .E
-        lda     ($44),y                         ; 8F46 B1 44                    .D
-        sta     $0318                           ; 8F48 8D 18 03                 ...
-        iny                                     ; 8F4B C8                       .
-        lda     ($44),y                         ; 8F4C B1 44                    .D
-        sta     $0319                           ; 8F4E 8D 19 03                 ...
-        jmp     ($0318)                         ; 8F51 6C 18 03                 l..
+; # Procedure: JumpEngine
+; Reads a list of pointers after the code that JSR'ed
+; into it and jumps into the pointer for the A register.
+;
+; ## Example:
+; DoWork:
+;   lda #1            ; set A to 1
+;   jsr JumpEngine    ; enter the jumpengine
+;   .addr FirstItem   ; 
+;   .addr SecondItem  ; this pointer will be jumped to
+; 
+
+JumpEngine:
+        @TempCallsite = $44
+        @TempTarget   = $0318
+        asl a
+        tay
+        pla
+        clc
+        adc #$01
+        sta @TempCallsite
+        pla
+        adc #$00
+        sta @TempCallsite+1
+        lda (@TempCallsite),y
+        sta @TempTarget
+        iny
+        lda (@TempCallsite),y
+        sta @TempTarget+1
+        jmp (@TempTarget)
 
 ; ----------------------------------------------------------------------------
 L8F54:
-        jsr     L974C                           ; 8F54 20 4C 97                  L.
+        jsr     LoadPlayerWorkset                           ; 8F54 20 4C 97                  L.
         bit     $20                             ; 8F57 24 20                    $ 
         bvs     L8F70                           ; 8F59 70 15                    p.
         lda     #$C0                            ; 8F5B A9 C0                    ..
@@ -1829,7 +1872,7 @@ L8F9F:
 L8FB7:
         jsr     L97BE                           ; 8FB7 20 BE 97                  ..
 L8FBA:
-        jsr     MoveJawsX                           ; 8FBA 20 FA 97                  ..
+        jsr     WorksetMoveX                           ; 8FBA 20 FA 97                  ..
         jsr     L981B                           ; 8FBD 20 1B 98                  ..
         lda     $22                             ; 8FC0 A5 22                    ."
         and     #$0F                            ; 8FC2 29 0F                    ).
@@ -1871,7 +1914,7 @@ L8FD6:
 
 ; ----------------------------------------------------------------------------
 L9006:
-        ldx     $0391                           ; 9006 AE 91 03                 ...
+        ldx     PlayerPowerLevel                           ; 9006 AE 91 03                 ...
         cpx     #$08                            ; 9009 E0 08                    ..
         bcs     L901B                           ; 900B B0 0E                    ..
         lda     $0390                           ; 900D AD 90 03                 ...
@@ -1942,7 +1985,7 @@ L907E:
 L9099:
         sta     $0340                           ; 9099 8D 40 03                 .@.
 L909C:
-        jmp     StoreWorkingData                           ; 909C 4C 61 97                 La.
+        jmp     WorksetSave                           ; 909C 4C 61 97                 La.
 
 ; ----------------------------------------------------------------------------
 L909F:
@@ -2088,11 +2131,11 @@ L91A9:
 
 ; ----------------------------------------------------------------------------
 L91AF:
-        lda     #$A0                            ; 91AF A9 A0                    ..
-        sta     $40                             ; 91B1 85 40                    .@
-        lda     #$06                            ; 91B3 A9 06                    ..
-        sta     $41                             ; 91B5 85 41                    .A
-        jsr     LoadWorkingData                           ; 91B7 20 54 97                  T.
+        lda     #<Enemy1Data                            ; 91AF A9 A0                    ..
+        sta     WorksetPtr                             ; 91B1 85 40                    .@
+        lda     #>Enemy1Data                            ; 91B3 A9 06                    ..
+        sta     WorksetPtr+1                             ; 91B5 85 41                    .A
+        jsr     WorksetLoad                           ; 91B7 20 54 97                  T.
         lda     #$C0                            ; 91BA A9 C0                    ..
         sta     $20                             ; 91BC 85 20                    . 
         lda     #$00                            ; 91BE A9 00                    ..
@@ -2122,7 +2165,7 @@ L91AF:
         sta     $24                             ; 91E6 85 24                    .$
         lda     #$0D                            ; 91E8 A9 0D                    ..
         jsr     L97AD                           ; 91EA 20 AD 97                  ..
-        jmp     StoreWorkingData                           ; 91ED 4C 61 97                 La.
+        jmp     WorksetSave                           ; 91ED 4C 61 97                 La.
 
 ; ----------------------------------------------------------------------------
 L91F0:
@@ -2131,11 +2174,15 @@ L91F1:
         .byte   $04,$1A,$11,$1E,$01,$07,$15     ; 91F1 04 1A 11 1E 01 07 15     .......
 ; ----------------------------------------------------------------------------
 L91F8:
-        jsr     L974C                           ; 91F8 20 4C 97                  L.
-        lda     $21                             ; 91FB A5 21                    .!
-        jsr     L8F39                           ; 91FD 20 39 8F                  9.
-        .byte   $06,$92,$FE,$92,$56,$94         ; 9200 06 92 FE 92 56 94        ....V.
+        jsr     LoadPlayerWorkset                           ; 91F8 20 4C 97                  L.
+        lda     Workset + EntityType                             ; 91FB A5 21                    .!
+        jsr     JumpEngine                           ; 91FD 20 39 8F                  9.
+        .addr   L9206
+        .addr   L92FE
+        .addr   L9456
+
 ; ----------------------------------------------------------------------------
+L9206:
         bit     $20                             ; 9206 24 20                    $ 
         bvs     L9231                           ; 9208 70 27                    p'
         lda     #$80                            ; 920A A9 80                    ..
@@ -2155,7 +2202,7 @@ L91F8:
         jsr     L97AD                           ; 9227 20 AD 97                  ..
         lda     #$C0                            ; 922A A9 C0                    ..
         sta     $20                             ; 922C 85 20                    . 
-        jmp     StoreWorkingData                           ; 922E 4C 61 97                 La.
+        jmp     WorksetSave                           ; 922E 4C 61 97                 La.
 
 ; ----------------------------------------------------------------------------
 L9231:
@@ -2163,7 +2210,7 @@ L9231:
         beq     L923D                           ; 9234 F0 07                    ..
         dec     $3D                             ; 9236 C6 3D                    .=
         beq     L9241                           ; 9238 F0 07                    ..
-        jmp     StoreWorkingData                           ; 923A 4C 61 97                 La.
+        jmp     WorksetSave                           ; 923A 4C 61 97                 La.
 
 ; ----------------------------------------------------------------------------
 L923D:
@@ -2194,7 +2241,7 @@ L925F:
         lda     $20                             ; 9264 A5 20                    . 
         and     #$EF                            ; 9266 29 EF                    ).
         sta     $20                             ; 9268 85 20                    . 
-        lda     $0392                           ; 926A AD 92 03                 ...
+        lda     PlayerCrabLevel                           ; 926A AD 92 03                 ...
         asl     a                               ; 926D 0A                       .
         tax                                     ; 926E AA                       .
         lda     $2C                             ; 926F A5 2C                    .,
@@ -2220,7 +2267,7 @@ L9297:
         lda     $20                             ; 929C A5 20                    . 
         ora     #$10                            ; 929E 09 10                    ..
         sta     $20                             ; 92A0 85 20                    . 
-        lda     $0392                           ; 92A2 AD 92 03                 ...
+        lda     PlayerCrabLevel                           ; 92A2 AD 92 03                 ...
         asl     a                               ; 92A5 0A                       .
         tax                                     ; 92A6 AA                       .
         lda     $2C                             ; 92A7 A5 2C                    .,
@@ -2264,7 +2311,7 @@ L92EC:
 L92EE:
         sta     $06A0,x                         ; 92EE 9D A0 06                 ...
 L92F1:
-        jmp     StoreWorkingData                           ; 92F1 4C 61 97                 La.
+        jmp     WorksetSave                           ; 92F1 4C 61 97                 La.
 
 ; ----------------------------------------------------------------------------
 L92F4:
@@ -2286,7 +2333,7 @@ L92FE:
         sta     $3F                             ; 9311 85 3F                    .?
         lda     #$B4                            ; 9313 A9 B4                    ..
         sta     $3D                             ; 9315 85 3D                    .=
-        jmp     StoreWorkingData                           ; 9317 4C 61 97                 La.
+        jmp     WorksetSave                           ; 9317 4C 61 97                 La.
 
 ; ----------------------------------------------------------------------------
 L931A:
@@ -2346,7 +2393,7 @@ L9377:
         sta     $16                             ; 9379 85 16                    ..
         lda     #$FF                            ; 937B A9 FF                    ..
         sta     $17                             ; 937D 85 17                    ..
-        lda     $0392                           ; 937F AD 92 03                 ...
+        lda     PlayerCrabLevel                           ; 937F AD 92 03                 ...
         asl     a                               ; 9382 0A                       .
         tax                                     ; 9383 AA                       .
         lda     L944C,x                         ; 9384 BD 4C 94                 .L.
@@ -2366,7 +2413,7 @@ L9399:
         sta     $16                             ; 93A2 85 16                    ..
         lda     #$00                            ; 93A4 A9 00                    ..
         sta     $17                             ; 93A6 85 17                    ..
-        lda     $0392                           ; 93A8 AD 92 03                 ...
+        lda     PlayerCrabLevel                           ; 93A8 AD 92 03                 ...
         asl     a                               ; 93AB 0A                       .
         tax                                     ; 93AC AA                       .
         lda     L9442,x                         ; 93AD BD 42 94                 .B.
@@ -2392,7 +2439,7 @@ L93CE:
         sta     $16                             ; 93D0 85 16                    ..
         lda     #$FF                            ; 93D2 A9 FF                    ..
         sta     $17                             ; 93D4 85 17                    ..
-        lda     $0392                           ; 93D6 AD 92 03                 ...
+        lda     PlayerCrabLevel                           ; 93D6 AD 92 03                 ...
         asl     a                               ; 93D9 0A                       .
         tax                                     ; 93DA AA                       .
         lda     L944C,x                         ; 93DB BD 4C 94                 .L.
@@ -2402,7 +2449,7 @@ L93CE:
         ldx     #$12                            ; 93E5 A2 12                    ..
         jsr     L9882                           ; 93E7 20 82 98                  ..
 L93EA:
-        jsr     MoveJawsX                           ; 93EA 20 FA 97                  ..
+        jsr     WorksetMoveX                           ; 93EA 20 FA 97                  ..
         jsr     L981B                           ; 93ED 20 1B 98                  ..
         ldx     $22                             ; 93F0 A6 22                    ."
         lda     $23                             ; 93F2 A5 23                    .#
@@ -2447,7 +2494,7 @@ L9435:
         and     #$90                            ; 943A 29 90                    ).
         sta     $06A0,x                         ; 943C 9D A0 06                 ...
 L943F:
-        jmp     StoreWorkingData                           ; 943F 4C 61 97                 La.
+        jmp     WorksetSave                           ; 943F 4C 61 97                 La.
 
 ; ----------------------------------------------------------------------------
 L9442:
@@ -2474,7 +2521,7 @@ L9456:
         sta     $3F                             ; 9469 85 3F                    .?
         lda     #$B4                            ; 946B A9 B4                    ..
         sta     $3D                             ; 946D 85 3D                    .=
-        jmp     StoreWorkingData                           ; 946F 4C 61 97                 La.
+        jmp     WorksetSave                           ; 946F 4C 61 97                 La.
 
 ; ----------------------------------------------------------------------------
 L9472:
@@ -2507,7 +2554,7 @@ L949F:
         sty     $16                             ; 949F 84 16                    ..
         lda     #$00                            ; 94A1 A9 00                    ..
         sta     $17                             ; 94A3 85 17                    ..
-        lda     $0392                           ; 94A5 AD 92 03                 ...
+        lda     PlayerCrabLevel                           ; 94A5 AD 92 03                 ...
         asl     a                               ; 94A8 0A                       .
         tax                                     ; 94A9 AA                       .
         lda     L95BC,x                         ; 94AA BD BC 95                 ...
@@ -2544,7 +2591,7 @@ L94E0:
         sty     $16                             ; 94E0 84 16                    ..
         lda     #$FF                            ; 94E2 A9 FF                    ..
         sta     $17                             ; 94E4 85 17                    ..
-        lda     $0392                           ; 94E6 AD 92 03                 ...
+        lda     PlayerCrabLevel                           ; 94E6 AD 92 03                 ...
         asl     a                               ; 94E9 0A                       .
         tax                                     ; 94EA AA                       .
         lda     L95C6,x                         ; 94EB BD C6 95                 ...
@@ -2569,7 +2616,7 @@ L9512:
         sty     $16                             ; 9512 84 16                    ..
         lda     #$00                            ; 9514 A9 00                    ..
         sta     $17                             ; 9516 85 17                    ..
-        lda     $0392                           ; 9518 AD 92 03                 ...
+        lda     PlayerCrabLevel                           ; 9518 AD 92 03                 ...
         asl     a                               ; 951B 0A                       .
         tax                                     ; 951C AA                       .
         lda     L95BC,x                         ; 951D BD BC 95                 ...
@@ -2606,7 +2653,7 @@ L9552:
         sty     $16                             ; 9552 84 16                    ..
         lda     #$FF                            ; 9554 A9 FF                    ..
         sta     $17                             ; 9556 85 17                    ..
-        lda     $0392                           ; 9558 AD 92 03                 ...
+        lda     PlayerCrabLevel                           ; 9558 AD 92 03                 ...
         asl     a                               ; 955B 0A                       .
         tax                                     ; 955C AA                       .
         lda     L95C6,x                         ; 955D BD C6 95                 ...
@@ -2617,7 +2664,7 @@ L9552:
         jsr     L9882                           ; 9569 20 82 98                  ..
 L956C:
         jsr     L97BE                           ; 956C 20 BE 97                  ..
-        jsr     MoveJawsX                           ; 956F 20 FA 97                  ..
+        jsr     WorksetMoveX                           ; 956F 20 FA 97                  ..
         jsr     L981B                           ; 9572 20 1B 98                  ..
         ldx     $22                             ; 9575 A6 22                    ."
         lda     $23                             ; 9577 A5 23                    .#
@@ -2652,7 +2699,7 @@ L95A1:
         lda     #$03                            ; 95B4 A9 03                    ..
         sta     $06A1,x                         ; 95B6 9D A1 06                 ...
 L95B9:
-        jmp     StoreWorkingData                           ; 95B9 4C 61 97                 La.
+        jmp     WorksetSave                           ; 95B9 4C 61 97                 La.
 
 ; ----------------------------------------------------------------------------
 L95BC:
@@ -2779,11 +2826,11 @@ L966B:
         .byte   $A9,$0F,$60                     ; 966B A9 0F 60                 ..`
 ; ----------------------------------------------------------------------------
 L966E:
-        lda     BoatX                           ; 966E AD 82 06                 ...
+        lda     PlayerX                           ; 966E AD 82 06                 ...
         sec                                     ; 9671 38                       8
         sbc     #$80                            ; 9672 E9 80                    ..
         tax                                     ; 9674 AA                       .
-        lda     BoatX+1                           ; 9675 AD 83 06                 ...
+        lda     PlayerX+1                           ; 9675 AD 83 06                 ...
         sbc     #$00                            ; 9678 E9 00                    ..
         tay                                     ; 967A A8                       .
         bcs     L9683                           ; 967B B0 06                    ..
@@ -2809,11 +2856,11 @@ L968F:
         tya                                     ; 969F 98                       .
         sbc     #$00                            ; 96A0 E9 00                    ..
         sta     CameraX+1                           ; 96A2 8D 39 03                 .9.
-        lda     BoatY                           ; 96A5 AD 84 06                 ...
+        lda     PlayerY                           ; 96A5 AD 84 06                 ...
         sec                                     ; 96A8 38                       8
         sbc     #$60                            ; 96A9 E9 60                    .`
         tax                                     ; 96AB AA                       .
-        lda     BoatY+1                           ; 96AC AD 85 06                 ...
+        lda     PlayerY+1                           ; 96AC AD 85 06                 ...
         sbc     #$00                            ; 96AF E9 00                    ..
         tay                                     ; 96B1 A8                       .
         bcs     L96BA                           ; 96B2 B0 06                    ..
@@ -2857,11 +2904,11 @@ L96EA:
 
 ; ----------------------------------------------------------------------------
 L96F1:
-        lda     BoatY                           ; 96F1 AD 84 06                 ...
+        lda     PlayerY                           ; 96F1 AD 84 06                 ...
         sec                                     ; 96F4 38                       8
         sbc     #$60                            ; 96F5 E9 60                    .`
         tax                                     ; 96F7 AA                       .
-        lda     BoatY+1                           ; 96F8 AD 85 06                 ...
+        lda     PlayerY+1                           ; 96F8 AD 85 06                 ...
         sbc     #$00                            ; 96FB E9 00                    ..
         tay                                     ; 96FD A8                       .
         bcs     L9706                           ; 96FE B0 06                    ..
@@ -2915,26 +2962,27 @@ L9746:
         rts                                     ; 974B 60                       `
 
 ; ----------------------------------------------------------------------------
-L974C:
-        lda     #$80                            ; 974C A9 80                    ..
-        sta     $40                             ; 974E 85 40                    .@
-        lda     #$06                            ; 9750 A9 06                    ..
-        sta     $41                             ; 9752 85 41                    .A
-LoadWorkingData:
+LoadPlayerWorkset:
+        lda     #<PlayerData                            ; 974C A9 80                    ..
+        sta     WorksetPtr                             ; 974E 85 40                    .@
+        lda     #>PlayerData                            ; 9750 A9 06                    ..
+        sta     WorksetPtr+1                             ; 9752 85 41                    .A
+
+WorksetLoad:
         ldy     #$00                            ; 9754 A0 00                    ..
 @Continue:
         lda     ($40),y                         ; 9756 B1 40                    .@
-        sta     WorkingData,y                           ; 9758 99 20 00                 . .
+        sta     Workset,y                           ; 9758 99 20 00                 . .
         iny                                     ; 975B C8                       .
         cpy     #$20                            ; 975C C0 20                    . 
         bcc     @Continue                           ; 975E 90 F6                    ..
         rts                                     ; 9760 60                       `
 
 ; ----------------------------------------------------------------------------
-StoreWorkingData:
+WorksetSave:
         ldy     #$00                            ; 9761 A0 00                    ..
 @Continue:
-        lda     WorkingData,y                           ; 9763 B9 20 00                 . .
+        lda     Workset,y                           ; 9763 B9 20 00                 . .
         sta     ($40),y                         ; 9766 91 40                    .@
         iny                                     ; 9768 C8                       .
         cpy     #$20                            ; 9769 C0 20                    . 
@@ -2942,14 +2990,14 @@ StoreWorkingData:
         rts                                     ; 976D 60                       `
 
 ; ----------------------------------------------------------------------------
-L976E:
-        lda     $40                             ; 976E A5 40                    .@
+WorksetNext:
+        lda     WorksetPtr                             ; 976E A5 40                    .@
         clc                                     ; 9770 18                       .
         adc     #$20                            ; 9771 69 20                    i 
-        sta     $40                             ; 9773 85 40                    .@
-        lda     $41                             ; 9775 A5 41                    .A
+        sta     WorksetPtr                             ; 9773 85 40                    .@
+        lda     WorksetPtr+1                             ; 9775 A5 41                    .A
         adc     #$00                            ; 9777 69 00                    i.
-        sta     $41                             ; 9779 85 41                    .A
+        sta     WorksetPtr+1                             ; 9779 85 41                    .A
         rts                                     ; 977B 60                       `
 
 ; ----------------------------------------------------------------------------
@@ -3036,26 +3084,26 @@ L97F9:
         rts                                     ; 97F9 60                       `
 
 ; ----------------------------------------------------------------------------
-MoveJawsX:
-        lda     $30                             ; 97FA A5 30                    .0
-        clc                                     ; 97FC 18                       .
-        adc     $2C                             ; 97FD 65 2C                    e,
-        sta     $2C                             ; 97FF 85 2C                    .,
-        lda     $31                             ; 9801 A5 31                    .1
-        bmi     @MoveJawsX                           ; 9803 30 0B                    0.
-        adc     $22                             ; 9805 65 22                    e"
-        sta     $22                             ; 9807 85 22                    ."
-        lda     $23                             ; 9809 A5 23                    .#
-        adc     #$00                            ; 980B 69 00                    i.
-        sta     $23                             ; 980D 85 23                    .#
-        rts                                     ; 980F 60                       `
-@MoveJawsX:
-        adc     $22                             ; 9810 65 22                    e"
-        sta     $22                             ; 9812 85 22                    ."
-        lda     $23                             ; 9814 A5 23                    .#
-        adc     #$FF                            ; 9816 69 FF                    i.
-        sta     $23                             ; 9818 85 23                    .#
-        rts                                     ; 981A 60                       `
+WorksetMoveX:
+        lda     $30
+        clc
+        adc     $2C
+        sta     $2C
+        lda     Workset + EntityXSpeed
+        bmi     @MoveNegative
+        adc     Workset + EntityX
+        sta     Workset + EntityX
+        lda     Workset + EntityX + 1
+        adc     #$00
+        sta     Workset + EntityX + 1
+        rts
+@MoveNegative:
+        adc     Workset + EntityX
+        sta     Workset + EntityX
+        lda     Workset + EntityX + 1
+        adc     #$FF
+        sta     Workset + EntityX + 1
+        rts
 
 ; ----------------------------------------------------------------------------
 L981B:
@@ -3240,7 +3288,7 @@ L990A:
         bpl     L992E                           ; 990E 10 1E                    ..
         and     #$40                            ; 9910 29 40                    )@
         beq     L992E                           ; 9912 F0 1A                    ..
-        jsr     L9969                           ; 9914 20 69 99                  i.
+        jsr     HitDetect                           ; 9914 20 69 99                  i.
         bcc     L992E                           ; 9917 90 15                    ..
         ldy     #$1F                            ; 9919 A0 1F                    ..
         lda     ($42),y                         ; 991B B1 42                    .B
@@ -3272,7 +3320,7 @@ L9940:
         lda     $3F                             ; 9947 A5 3F                    .?
         and     #$7F                            ; 9949 29 7F                    ).
         sta     $3F                             ; 994B 85 3F                    .?
-        jsr     L9961                           ; 994D 20 61 99                  a.
+        jsr     HitDetectAgainstPlayer                           ; 994D 20 61 99                  a.
         bcc     L9960                           ; 9950 90 0E                    ..
         lda     $3F                             ; 9952 A5 3F                    .?
         ora     #$80                            ; 9954 09 80                    ..
@@ -3284,12 +3332,12 @@ L9960:
         rts                                     ; 9960 60                       `
 
 ; ----------------------------------------------------------------------------
-L9961:
-        lda     #$80                            ; 9961 A9 80                    ..
+HitDetectAgainstPlayer:
+        lda     #<PlayerData                            ; 9961 A9 80                    ..
         sta     $42                             ; 9963 85 42                    .B
-        lda     #$06                            ; 9965 A9 06                    ..
+        lda     #>PlayerData                            ; 9965 A9 06                    ..
         sta     $43                             ; 9967 85 43                    .C
-L9969:
+HitDetect:
         ldy     #$02                            ; 9969 A0 02                    ..
         lda     #$00                            ; 996B A9 00                    ..
         sta     $15                             ; 996D 85 15                    ..
@@ -3302,7 +3350,7 @@ L9969:
         sbc     $23                             ; 9979 E5 23                    .#
         iny                                     ; 997B C8                       .
         sta     $1B                             ; 997C 85 1B                    ..
-        bcs     L9992                           ; 997E B0 12                    ..
+        bcs     @L9992                           ; 997E B0 12                    ..
         inc     $15                             ; 9980 E6 15                    ..
         eor     #$FF                            ; 9982 49 FF                    I.
         sta     $1B                             ; 9984 85 1B                    ..
@@ -3310,9 +3358,9 @@ L9969:
         eor     #$FF                            ; 9988 49 FF                    I.
         sta     $1A                             ; 998A 85 1A                    ..
         inc     $1A                             ; 998C E6 1A                    ..
-        bne     L9992                           ; 998E D0 02                    ..
+        bne     @L9992                           ; 998E D0 02                    ..
         inc     $1B                             ; 9990 E6 1B                    ..
-L9992:
+@L9992:
         lda     ($42),y                         ; 9992 B1 42                    .B
         sec                                     ; 9994 38                       8
         sbc     $24                             ; 9995 E5 24                    .$
@@ -3321,7 +3369,7 @@ L9992:
         lda     ($42),y                         ; 999A B1 42                    .B
         sbc     $25                             ; 999C E5 25                    .%
         sta     $1D                             ; 999E 85 1D                    ..
-        bcs     L99B6                           ; 99A0 B0 14                    ..
+        bcs     @L99B6                           ; 99A0 B0 14                    ..
         inc     $15                             ; 99A2 E6 15                    ..
         inc     $15                             ; 99A4 E6 15                    ..
         eor     #$FF                            ; 99A6 49 FF                    I.
@@ -3330,25 +3378,25 @@ L9992:
         eor     #$FF                            ; 99AC 49 FF                    I.
         sta     $1C                             ; 99AE 85 1C                    ..
         inc     $1C                             ; 99B0 E6 1C                    ..
-        bne     L99B6                           ; 99B2 D0 02                    ..
+        bne     @L99B6                           ; 99B2 D0 02                    ..
         .byte   $E6,$1D                         ; 99B4 E6 1D                    ..
 ; ----------------------------------------------------------------------------
-L99B6:
+@L99B6:
         clc                                     ; 99B6 18                       .
         lda     $1B                             ; 99B7 A5 1B                    ..
         ora     $1D                             ; 99B9 05 1D                    ..
-        bne     L99CF                           ; 99BB D0 12                    ..
+        bne     @L99CF                           ; 99BB D0 12                    ..
         ldy     #$0E                            ; 99BD A0 0E                    ..
         lda     ($42),y                         ; 99BF B1 42                    .B
         adc     $2E                             ; 99C1 65 2E                    e.
         cmp     $1A                             ; 99C3 C5 1A                    ..
-        bcc     L99CF                           ; 99C5 90 08                    ..
+        bcc     @L99CF                           ; 99C5 90 08                    ..
         iny                                     ; 99C7 C8                       .
         lda     ($42),y                         ; 99C8 B1 42                    .B
         clc                                     ; 99CA 18                       .
         adc     $2F                             ; 99CB 65 2F                    e/
         cmp     $1C                             ; 99CD C5 1C                    ..
-L99CF:
+@L99CF:
         rts                                     ; 99CF 60                       `
 
 ; ----------------------------------------------------------------------------
@@ -3421,10 +3469,10 @@ L9A37:
         sta     $46                             ; 9A39 85 46                    .F
         lda     #$3F                            ; 9A3B A9 3F                    .?
         sta     $47                             ; 9A3D 85 47                    .G
-        lda     #$80                            ; 9A3F A9 80                    ..
-        sta     $40                             ; 9A41 85 40                    .@
-        lda     #$06                            ; 9A43 A9 06                    ..
-        sta     $41                             ; 9A45 85 41                    .A
+        lda     #<PlayerData                            ; 9A3F A9 80                    ..
+        sta     WorksetPtr                             ; 9A41 85 40                    .@
+        lda     #>PlayerData                            ; 9A43 A9 06                    ..
+        sta     WorksetPtr+1                             ; 9A45 85 41                    .A
         ldx     #$04                            ; 9A47 A2 04                    ..
         ldy     #$80                            ; 9A49 A0 80                    ..
         lda     $0336                           ; 9A4B AD 36 03                 .6.
@@ -3446,13 +3494,13 @@ L9A59:
         and     #$C1                            ; 9A68 29 C1                    ).
         beq     L9A94                           ; 9A6A F0 28                    .(
 L9A6C:
-        lda     $40                             ; 9A6C A5 40                    .@
+        lda     WorksetPtr                             ; 9A6C A5 40                    .@
         clc                                     ; 9A6E 18                       .
         adc     #$20                            ; 9A6F 69 20                    i 
-        sta     $40                             ; 9A71 85 40                    .@
-        lda     $41                             ; 9A73 A5 41                    .A
+        sta     WorksetPtr                             ; 9A71 85 40                    .@
+        lda     WorksetPtr+1                             ; 9A73 A5 41                    .A
         adc     #$00                            ; 9A75 69 00                    i.
-        sta     $41                             ; 9A77 85 41                    .A
+        sta     WorksetPtr+1                             ; 9A77 85 41                    .A
         dec     $46                             ; 9A79 C6 46                    .F
         bne     L9A59                           ; 9A7B D0 DC                    ..
         ldy     $47                             ; 9A7D A4 47                    .G
@@ -3594,14 +3642,14 @@ L9B4F:
 
 ; ----------------------------------------------------------------------------
 L9B5A:
-        lda     #$A0                            ; 9B5A A9 A0                    ..
-        sta     $40                             ; 9B5C 85 40                    .@
-        lda     #$06                            ; 9B5E A9 06                    ..
-        sta     $41                             ; 9B60 85 41                    .A
+        lda     #<Enemy1Data                            ; 9B5A A9 A0                    ..
+        sta     WorksetPtr                             ; 9B5C 85 40                    .@
+        lda     #>Enemy1Data                            ; 9B5E A9 06                    ..
+        sta     WorksetPtr+1                             ; 9B60 85 41                    .A
         lda     #$03                            ; 9B62 A9 03                    ..
         sta     $46                             ; 9B64 85 46                    .F
 L9B66:
-        jsr     LoadWorkingData                           ; 9B66 20 54 97                  T.
+        jsr     WorksetLoad                           ; 9B66 20 54 97                  T.
         lda     $20                             ; 9B69 A5 20                    . 
         bpl     L9B85                           ; 9B6B 10 18                    ..
         lda     #$9B                            ; 9B6D A9 9B                    ..
@@ -3609,38 +3657,43 @@ L9B66:
         lda     #$81                            ; 9B70 A9 81                    ..
         pha                                     ; 9B72 48                       H
         lda     $21                             ; 9B73 A5 21                    .!
-        jsr     L8F39                           ; 9B75 20 39 8F                  9.
-        .byte   $AE,$9B,$06,$9C,$28,$9C,$5D,$9C ; 9B78 AE 9B 06 9C 28 9C 5D 9C  ....(.].
-        .byte   $7F,$9C                         ; 9B80 7F 9C                    ..
+        jsr     JumpEngine                           ; 9B75 20 39 8F                  9.
+        .addr L9BAE
+        .addr L9C06
+        .addr L9C28
+        .addr L9C5D
+        .addr L9C7F
+
 ; ----------------------------------------------------------------------------
-        jsr     StoreWorkingData                           ; 9B82 20 61 97                  a.
+        jsr     WorksetSave                           ; 9B82 20 61 97                  a.
 L9B85:
-        jsr     L976E                           ; 9B85 20 6E 97                  n.
+        jsr     WorksetNext                           ; 9B85 20 6E 97                  n.
         dec     $46                             ; 9B88 C6 46                    .F
         bne     L9B66                           ; 9B8A D0 DA                    ..
         rts                                     ; 9B8C 60                       `
 
 ; ----------------------------------------------------------------------------
 L9B8D:
-        lda     #$A0                            ; 9B8D A9 A0                    ..
-        sta     $40                             ; 9B8F 85 40                    .@
-        lda     #$06                            ; 9B91 A9 06                    ..
-        sta     $41                             ; 9B93 85 41                    .A
+        lda     #<Enemy1Data                            ; 9B8D A9 A0                    ..
+        sta     WorksetPtr                             ; 9B8F 85 40                    .@
+        lda     #>Enemy1Data                            ; 9B91 A9 06                    ..
+        sta     WorksetPtr+1                             ; 9B93 85 41                    .A
         lda     #$03                            ; 9B95 A9 03                    ..
         sta     $46                             ; 9B97 85 46                    .F
 L9B99:
-        jsr     LoadWorkingData                           ; 9B99 20 54 97                  T.
+        jsr     WorksetLoad                           ; 9B99 20 54 97                  T.
         lda     $20                             ; 9B9C A5 20                    . 
         bpl     L9BA3                           ; 9B9E 10 03                    ..
         jsr     L9C7F                           ; 9BA0 20 7F 9C                  ..
 L9BA3:
-        jsr     StoreWorkingData                           ; 9BA3 20 61 97                  a.
-        jsr     L976E                           ; 9BA6 20 6E 97                  n.
+        jsr     WorksetSave                           ; 9BA3 20 61 97                  a.
+        jsr     WorksetNext                           ; 9BA6 20 6E 97                  n.
         dec     $46                             ; 9BA9 C6 46                    .F
         bne     L9B99                           ; 9BAB D0 EC                    ..
         rts                                     ; 9BAD 60                       `
 
 ; ----------------------------------------------------------------------------
+L9BAE:
         bit     $20                             ; 9BAE 24 20                    $ 
         bvs     L9BBD                           ; 9BB0 70 0B                    p.
         jsr     L9CC7                           ; 9BB2 20 C7 9C                  ..
@@ -3676,7 +3729,7 @@ L9BE8:
         lda     #$40                            ; 9BE8 A9 40                    .@
         ldy     #$04                            ; 9BEA A0 04                    ..
         jsr     L9841                           ; 9BEC 20 41 98                  A.
-        jsr     MoveJawsX                           ; 9BEF 20 FA 97                  ..
+        jsr     WorksetMoveX                           ; 9BEF 20 FA 97                  ..
 L9BF2:
         jsr     L981B                           ; 9BF2 20 1B 98                  ..
         jsr     L99D0                           ; 9BF5 20 D0 99                  ..
@@ -3693,12 +3746,15 @@ L9C05:
         rts                                     ; 9C05 60                       `
 
 ; ----------------------------------------------------------------------------
+L9C06: ; never got called in the tas
         .byte   $24,$20,$70,$0B,$20,$C7,$9C,$A9 ; 9C06 24 20 70 0B 20 C7 9C A9  $ p. ...
         .byte   $08,$20,$CD,$E2,$4C,$27,$9C,$A5 ; 9C0E 08 20 CD E2 4C 27 9C A5  . ..L'..
         .byte   $3F,$30,$0A,$29,$01,$F0,$06,$20 ; 9C16 3F 30 0A 29 01 F0 06 20  ?0.)... 
         .byte   $FA,$97,$4C,$27,$9C,$A9,$00,$85 ; 9C1E FA 97 4C 27 9C A9 00 85  ..L'....
         .byte   $20,$60                         ; 9C26 20 60                     `
+
 ; ----------------------------------------------------------------------------
+L9C28:
         bit     $20                             ; 9C28 24 20                    $ 
         bvs     L9C37                           ; 9C2A 70 0B                    p.
         jsr     L9CC7                           ; 9C2C 20 C7 9C                  ..
@@ -3712,7 +3768,7 @@ L9C37:
         bmi     L9C58                           ; 9C39 30 1D                    0.
         and     #$01                            ; 9C3B 29 01                    ).
         beq     L9C58                           ; 9C3D F0 19                    ..
-        jsr     MoveJawsX                           ; 9C3F 20 FA 97                  ..
+        jsr     WorksetMoveX                           ; 9C3F 20 FA 97                  ..
         jsr     L981B                           ; 9C42 20 1B 98                  ..
         lda     #$20                            ; 9C45 A9 20                    . 
         ldy     #$10                            ; 9C47 A0 10                    ..
@@ -3730,6 +3786,7 @@ L9C5C:
         rts                                     ; 9C5C 60                       `
 
 ; ----------------------------------------------------------------------------
+L9C5D:
         bit     $20                             ; 9C5D 24 20                    $ 
         bvs     L9C6C                           ; 9C5F 70 0B                    p.
         jsr     L9CC7                           ; 9C61 20 C7 9C                  ..
@@ -3743,7 +3800,7 @@ L9C6C:
         bmi     L9C7A                           ; 9C6E 30 0A                    0.
         and     #$01                            ; 9C70 29 01                    ).
         beq     L9C7A                           ; 9C72 F0 06                    ..
-        jsr     MoveJawsX                           ; 9C74 20 FA 97                  ..
+        jsr     WorksetMoveX                           ; 9C74 20 FA 97                  ..
         jmp     L9C7E                           ; 9C77 4C 7E 9C                 L~.
 
 ; ----------------------------------------------------------------------------
@@ -3816,11 +3873,11 @@ L9CCB:
         sta     $20                             ; 9CDC 85 20                    . 
         and     #$10                            ; 9CDE 29 10                    ).
         bne     L9CFF                           ; 9CE0 D0 1D                    ..
-        lda     BoatX                           ; 9CE2 AD 82 06                 ...
+        lda     PlayerX                           ; 9CE2 AD 82 06                 ...
         clc                                     ; 9CE5 18                       .
         adc     L9D52,x                         ; 9CE6 7D 52 9D                 }R.
         sta     $22                             ; 9CE9 85 22                    ."
-        lda     BoatX+1                           ; 9CEB AD 83 06                 ...
+        lda     PlayerX+1                           ; 9CEB AD 83 06                 ...
         adc     #$00                            ; 9CEE 69 00                    i.
         sta     $23                             ; 9CF0 85 23                    .#
         lda     L9D54,x                         ; 9CF2 BD 54 9D                 .T.
@@ -3831,11 +3888,11 @@ L9CCB:
 
 ; ----------------------------------------------------------------------------
 L9CFF:
-        lda     BoatX                           ; 9CFF AD 82 06                 ...
+        lda     PlayerX                           ; 9CFF AD 82 06                 ...
         sec                                     ; 9D02 38                       8
         sbc     L9D52,x                         ; 9D03 FD 52 9D                 .R.
         sta     $22                             ; 9D06 85 22                    ."
-        lda     BoatX+1                           ; 9D08 AD 83 06                 ...
+        lda     PlayerX+1                           ; 9D08 AD 83 06                 ...
         sbc     #$00                            ; 9D0B E9 00                    ..
         sta     $23                             ; 9D0D 85 23                    .#
         lda     L9D54,x                         ; 9D0F BD 54 9D                 .T.
@@ -3855,9 +3912,9 @@ L9D23:
         clc                                     ; 9D2D 18                       .
         lda     L9D53,x                         ; 9D2E BD 53 9D                 .S.
         bmi     L9D40                           ; 9D31 30 0D                    0.
-        adc     BoatY                           ; 9D33 6D 84 06                 m..
+        adc     PlayerY                           ; 9D33 6D 84 06                 m..
         sta     $24                             ; 9D36 85 24                    .$
-        lda     BoatY+1                           ; 9D38 AD 85 06                 ...
+        lda     PlayerY+1                           ; 9D38 AD 85 06                 ...
         adc     #$00                            ; 9D3B 69 00                    i.
         jmp     L9D4A                           ; 9D3D 4C 4A 9D                 LJ.
 
@@ -3892,11 +3949,11 @@ L9D58:
         .byte   $2A,$00                         ; 9D78 2A 00                    *.
 ; ----------------------------------------------------------------------------
 L9D7A:
-        lda     #$00                            ; 9D7A A9 00                    ..
-        sta     $40                             ; 9D7C 85 40                    .@
-        lda     #$07                            ; 9D7E A9 07                    ..
-        sta     $41                             ; 9D80 85 41                    .A
-        jsr     LoadWorkingData                           ; 9D82 20 54 97                  T.
+        lda     #<JawsData                            ; 9D7A A9 00                    ..
+        sta     WorksetPtr                             ; 9D7C 85 40                    .@
+        lda     #>JawsData                            ; 9D7E A9 07                    ..
+        sta     WorksetPtr+1                             ; 9D80 85 41                    .A
+        jsr     WorksetLoad                           ; 9D82 20 54 97                  T.
         bit     $20                             ; 9D85 24 20                    $ 
         bvs     L9DB9                           ; 9D87 70 30                    p0
         lda     $0348                           ; 9D89 AD 48 03                 .H.
@@ -3926,7 +3983,7 @@ L9D7A:
         sta     $20                             ; 9DB0 85 20                    . 
         lda     #$80                            ; 9DB2 A9 80                    ..
         sta     $3D                             ; 9DB4 85 3D                    .=
-        jmp     StoreWorkingData                           ; 9DB6 4C 61 97                 La.
+        jmp     WorksetSave                           ; 9DB6 4C 61 97                 La.
 
 ; ----------------------------------------------------------------------------
 L9DB9:
@@ -3941,7 +3998,7 @@ L9DB9:
         sta     $0340                           ; 9DCD 8D 40 03                 .@.
         lda     #$01                            ; 9DD0 A9 01                    ..
         sta     $0306                           ; 9DD2 8D 06 03                 ...
-        jmp     StoreWorkingData                           ; 9DD5 4C 61 97                 La.
+        jmp     WorksetSave                           ; 9DD5 4C 61 97                 La.
 
 ; ----------------------------------------------------------------------------
 L9DD8:
@@ -4012,9 +4069,9 @@ L9E3F:
 L9E47:
         jsr     L9E53                           ; 9E47 20 53 9E                  S.
 L9E4A:
-        jsr     MoveJawsX                           ; 9E4A 20 FA 97                  ..
+        jsr     WorksetMoveX                           ; 9E4A 20 FA 97                  ..
         jsr     L981B                           ; 9E4D 20 1B 98                  ..
-        jmp     StoreWorkingData                           ; 9E50 4C 61 97                 La.
+        jmp     WorksetSave                           ; 9E50 4C 61 97                 La.
 
 ; ----------------------------------------------------------------------------
 L9E53:
@@ -4173,11 +4230,11 @@ L9F82:
 
 ; ----------------------------------------------------------------------------
 L9F8A:
-        lda     #$00                            ; 9F8A A9 00                    ..
-        sta     $40                             ; 9F8C 85 40                    .@
-        lda     #$07                            ; 9F8E A9 07                    ..
-        sta     $41                             ; 9F90 85 41                    .A
-        jsr     LoadWorkingData                           ; 9F92 20 54 97                  T.
+        lda     #<JawsData                            ; 9F8A A9 00                    ..
+        sta     WorksetPtr                             ; 9F8C 85 40                    .@
+        lda     #>JawsData                            ; 9F8E A9 07                    ..
+        sta     WorksetPtr+1                             ; 9F90 85 41                    .A
+        jsr     WorksetLoad                           ; 9F92 20 54 97                  T.
         bit     $20                             ; 9F95 24 20                    $ 
         bvs     L9FFD                           ; 9F97 70 64                    pd
         jsr     L8C69                           ; 9F99 20 69 8C                  i.
@@ -4229,7 +4286,7 @@ L9FED:
         sta     $39                             ; 9FF3 85 39                    .9
         lda     #$30                            ; 9FF5 A9 30                    .0
         jsr     L97AD                           ; 9FF7 20 AD 97                  ..
-        jmp     StoreWorkingData                           ; 9FFA 4C 61 97                 La.
+        jmp     WorksetSave                           ; 9FFA 4C 61 97                 La.
 
 ; ----------------------------------------------------------------------------
 L9FFD:
@@ -4249,14 +4306,14 @@ LA013:
 LA01D:
         ror     $31                             ; A01D 66 31                    f1
         ror     $30                             ; A01F 66 30                    f0
-        jsr     MoveJawsX                           ; A021 20 FA 97                  ..
+        jsr     WorksetMoveX                           ; A021 20 FA 97                  ..
         asl     $30                             ; A024 06 30                    .0
         rol     $31                             ; A026 26 31                    &1
         jmp     LA02E                           ; A028 4C 2E A0                 L..
 
 ; ----------------------------------------------------------------------------
 LA02B:
-        jsr     MoveJawsX                           ; A02B 20 FA 97                  ..
+        jsr     WorksetMoveX                           ; A02B 20 FA 97                  ..
 LA02E:
         lda     $23                             ; A02E A5 23                    .#
         cmp     #$10                            ; A030 C9 10                    ..
@@ -4304,7 +4361,7 @@ LA053:
         adc     #$00                            ; A06E 69 00                    i.
         sta     $31                             ; A070 85 31                    .1
 LA072:
-        jmp     StoreWorkingData                           ; A072 4C 61 97                 La.
+        jmp     WorksetSave                           ; A072 4C 61 97                 La.
 
 ; ----------------------------------------------------------------------------
 LA075:
@@ -4315,13 +4372,13 @@ LA075:
         bne     LA0E3                           ; A080 D0 61                    .a
         bit     $3F                             ; A082 24 3F                    $?
         bvc     LA0EE                           ; A084 50 68                    Ph
-        ldx     $0391                           ; A086 AE 91 03                 ...
-        lda     LA12D,x                         ; A089 BD 2D A1                 .-.
+        ldx     PlayerPowerLevel                           ; A086 AE 91 03                 ...
+        lda     JawsDamageByPowerLevel,x                         ; A089 BD 2D A1                 .-.
         sta     $16                             ; A08C 85 16                    ..
         lda     #$00                            ; A08E A9 00                    ..
         sta     $17                             ; A090 85 17                    ..
         ldx     $034A                           ; A092 AE 4A 03                 .J.
-        lda     LA128,x                         ; A095 BD 28 A1                 .(.
+        lda     JawsDamageMultipliers,x                         ; A095 BD 28 A1                 .(.
         beq     LA09E                           ; A098 F0 04                    ..
         asl     $16                             ; A09A 06 16                    ..
         rol     $17                             ; A09C 26 17                    &.
@@ -4342,7 +4399,7 @@ LA0B3:
         lda     $0306                           ; A0BB AD 06 03                 ...
         ora     #$20                            ; A0BE 09 20                    . 
         sta     $0306                           ; A0C0 8D 06 03                 ...
-        jmp     StoreWorkingData                           ; A0C3 4C 61 97                 La.
+        jmp     WorksetSave                           ; A0C3 4C 61 97                 La.
 
 ; ----------------------------------------------------------------------------
 LA0C6:
@@ -4355,7 +4412,7 @@ LA0C6:
         ora     #$40                            ; A0D6 09 40                    .@
         sta     $0304                           ; A0D8 8D 04 03                 ...
         lda     #$01                            ; A0DB A9 01                    ..
-        jsr     L8CD0                           ; A0DD 20 D0 8C                  ..
+        jsr     AwardPoints                           ; A0DD 20 D0 8C                  ..
         jmp     LA0EE                           ; A0E0 4C EE A0                 L..
 
 ; ----------------------------------------------------------------------------
@@ -4392,21 +4449,35 @@ LA117:
         jsr     L981B                           ; A117 20 1B 98                  ..
         jsr     L9A14                           ; A11A 20 14 9A                  ..
         jsr     L99D0                           ; A11D 20 D0 99                  ..
-        jmp     StoreWorkingData                           ; A120 4C 61 97                 La.
+        jmp     WorksetSave                           ; A120 4C 61 97                 La.
 
-; ----------------------------------------------------------------------------
+
+; sound effects to play when jaws takes damage
 JawsHitSounds:
-        .byte SFXEncounterJawsHit
-        .byte SFXEncounterJawsHarpoonHit
-        .byte SFXEncounterJawsHit
-        .byte SFXEncounterJawsHarpoonHit
-        .byte SFXEncounterJawsHarpoonHit
+        .byte SFXEncounterJawsHit               ; when hit with the boat
+        .byte SFXEncounterJawsHarpoonHit        ; when hit with a harpoon
+        .byte SFXEncounterJawsHit               ; when hit with the submarine
+        .byte SFXEncounterJawsHarpoonHit        ; unused powerup state
+        .byte SFXEncounterJawsHarpoonHit        ; unused powerup state
 
-LA128:
-        .byte   $01,$00,$01,$00,$00             ; A128 01 00 01 00 00           .....
-LA12D:
-        .byte   $08,$10,$20,$30,$40,$50,$60,$70 ; A12D 08 10 20 30 40 50 60 70  .. 0@P`p
-        .byte   $80                             ; A135 80                       .
+JawsDamageMultipliers:
+        .byte 1                                 ; extra damage with boat
+        .byte 0                                 ; normal damage with harpoon
+        .byte 1                                 ; extra damage with submarine
+        .byte 0                                 ; unused powerup state
+        .byte 0                                 ; unused powerup state
+
+JawsDamageByPowerLevel:
+        .byte $08                               ; power level 0
+        .byte $10                               ; power level 1
+        .byte $20                               ; power level 2
+        .byte $30                               ; power level 3
+        .byte $40                               ; power level 4
+        .byte $50                               ; power level 5
+        .byte $60                               ; power level 6
+        .byte $70                               ; power level 7
+        .byte $80                               ; power level 8
+
 ; ----------------------------------------------------------------------------
 LA136:
         lda     $0306                           ; A136 AD 06 03                 ...
@@ -4423,10 +4494,10 @@ LA136:
         sbc     #$00                            ; A152 E9 00                    ..
         sta     $0487                           ; A154 8D 87 04                 ...
 LA157:
-        lda     #$20                            ; A157 A9 20                    . 
-        sta     $40                             ; A159 85 40                    .@
-        lda     #$07                            ; A15B A9 07                    ..
-        sta     $41                             ; A15D 85 41                    .A
+        lda     #<PUp1Data                            ; A157 A9 20                    . 
+        sta     WorksetPtr                             ; A159 85 40                    .@
+        lda     #>PUp1Data                            ; A15B A9 07                    ..
+        sta     WorksetPtr+1                             ; A15D 85 41                    .A
         lda     $0480                           ; A15F AD 80 04                 ...
         sta     $46                             ; A162 85 46                    .F
 LA164:
@@ -4469,17 +4540,17 @@ LA1B0:
         lda     $0306                           ; A1B0 AD 06 03                 ...
         and     #$FE                            ; A1B3 29 FE                    ).
         sta     $0306                           ; A1B5 8D 06 03                 ...
-        jsr     LoadWorkingData                           ; A1B8 20 54 97                  T.
+        jsr     WorksetLoad                           ; A1B8 20 54 97                  T.
         jsr     LA206                           ; A1BB 20 06 A2                  ..
-        jsr     StoreWorkingData                           ; A1BE 20 61 97                  a.
+        jsr     WorksetSave                           ; A1BE 20 61 97                  a.
 LA1C1:
-        lda     $40                             ; A1C1 A5 40                    .@
+        lda     WorksetPtr                             ; A1C1 A5 40                    .@
         clc                                     ; A1C3 18                       .
         adc     #$20                            ; A1C4 69 20                    i 
-        sta     $40                             ; A1C6 85 40                    .@
-        lda     $41                             ; A1C8 A5 41                    .A
+        sta     WorksetPtr                             ; A1C6 85 40                    .@
+        lda     WorksetPtr+1                             ; A1C8 A5 41                    .A
         adc     #$00                            ; A1CA 69 00                    i.
-        sta     $41                             ; A1CC 85 41                    .A
+        sta     WorksetPtr+1                             ; A1CC 85 41                    .A
         dec     $46                             ; A1CE C6 46                    .F
         bne     LA164                           ; A1D0 D0 92                    ..
         lda     #$04                            ; A1D2 A9 04                    ..
@@ -4512,7 +4583,7 @@ LA205:
 ; ----------------------------------------------------------------------------
 LA206:
         lda     $21                             ; A206 A5 21                    .!
-        jsr     L8F39                           ; A208 20 39 8F                  9.
+        jsr     JumpEngine                           ; A208 20 39 8F                  9.
         .byte   $21,$A2,$79,$A3,$9D,$A2,$99,$A4 ; A20B 21 A2 79 A3 9D A2 99 A4  !.y.....
         .byte   $79,$A3,$00,$00,$00,$00,$00,$00 ; A213 79 A3 00 00 00 00 00 00  y.......
         .byte   $D3,$A5,$59,$A6,$BD,$A6         ; A21B D3 A5 59 A6 BD A6        ..Y...
@@ -4560,7 +4631,7 @@ LA25C:
 ; ----------------------------------------------------------------------------
 LA269:
         lda     #$04                            ; A269 A9 04                    ..
-        jsr     L8CD0                           ; A26B 20 D0 8C                  ..
+        jsr     AwardPoints                           ; A26B 20 D0 8C                  ..
         lda     #SFXEncounterEnemyDeath                            ; A26E A9 0E                    ..
         jsr     SoundPlay                           ; A270 20 CD E2                  ..
         lda     #$80                            ; A273 A9 80                    ..
@@ -4618,7 +4689,7 @@ LA32F:
         lda     $033F                           ; A337 AD 3F 03                 .?.
         adc     #$00                            ; A33A 69 00                    i.
         sta     $25                             ; A33C 85 25                    .%
-        lda     BoatX                           ; A33E AD 82 06                 ...
+        lda     PlayerX                           ; A33E AD 82 06                 ...
         and     #$F0                            ; A341 29 F0                    ).
         sta     $12                             ; A343 85 12                    ..
 LA345:
@@ -4661,11 +4732,11 @@ LA371:
         sta     $3A                             ; A383 85 3A                    .:
         lda     #$02                            ; A385 A9 02                    ..
         sta     $38                             ; A387 85 38                    .8
-        lda     BoatY                           ; A389 AD 84 06                 ...
+        lda     PlayerY                           ; A389 AD 84 06                 ...
         clc                                     ; A38C 18                       .
         adc     #$10                            ; A38D 69 10                    i.
         sta     $24                             ; A38F 85 24                    .$
-        lda     BoatY+1                           ; A391 AD 85 06                 ...
+        lda     PlayerY+1                           ; A391 AD 85 06                 ...
         adc     #$00                            ; A394 69 00                    i.
         sta     $25                             ; A396 85 25                    .%
         jsr     L99D0                           ; A398 20 D0 99                  ..
@@ -4679,7 +4750,7 @@ LA371:
 ; ----------------------------------------------------------------------------
 LA3AA:
         stx     $37                             ; A3AA 86 37                    .7
-        lda     BoatX                           ; A3AC AD 82 06                 ...
+        lda     PlayerX                           ; A3AC AD 82 06                 ...
         bmi     LA3BF                           ; A3AF 30 0E                    0.
         lda     #$D0                            ; A3B1 A9 D0                    ..
         sta     $20                             ; A3B3 85 20                    . 
@@ -4723,7 +4794,7 @@ LA3E7:
         jsr     L9940                           ; A3EA 20 40 99                  @.
         bit     $3F                             ; A3ED 24 3F                    $?
         bvs     LA449                           ; A3EF 70 58                    pX
-        jsr     MoveJawsX                           ; A3F1 20 FA 97                  ..
+        jsr     WorksetMoveX                           ; A3F1 20 FA 97                  ..
         lda     #$10                            ; A3F4 A9 10                    ..
         bit     $20                             ; A3F6 24 20                    $ 
         bne     LA419                           ; A3F8 D0 1F                    ..
@@ -4775,7 +4846,7 @@ LA449:
         dec     $38                             ; A449 C6 38                    .8
         beq     LA459                           ; A44B F0 0C                    ..
         lda     #$00                            ; A44D A9 00                    ..
-        jsr     L8CD0                           ; A44F 20 D0 8C                  ..
+        jsr     AwardPoints                           ; A44F 20 D0 8C                  ..
         lda     #$08                            ; A452 A9 08                    ..
         sta     $39                             ; A454 85 39                    .9
         jmp     LA488                           ; A456 4C 88 A4                 L..
@@ -4783,7 +4854,7 @@ LA449:
 ; ----------------------------------------------------------------------------
 LA459:
         lda     #$06                            ; A459 A9 06                    ..
-        jsr     L8CD0                           ; A45B 20 D0 8C                  ..
+        jsr     AwardPoints                           ; A45B 20 D0 8C                  ..
         lda     #SFXEncounterEnemyDeath                            ; A45E A9 0E                    ..
         jsr     SoundPlay                           ; A460 20 CD E2                  ..
         lda     #$80                            ; A463 A9 80                    ..
@@ -4826,9 +4897,9 @@ LA494:
 ; ----------------------------------------------------------------------------
         bit     $20                             ; A499 24 20                    $ 
         bvs     LA4F9                           ; A49B 70 5C                    p\
-        lda     BoatY                           ; A49D AD 84 06                 ...
+        lda     PlayerY                           ; A49D AD 84 06                 ...
         sta     $24                             ; A4A0 85 24                    .$
-        lda     BoatY+1                           ; A4A2 AD 85 06                 ...
+        lda     PlayerY+1                           ; A4A2 AD 85 06                 ...
         sta     $25                             ; A4A5 85 25                    .%
         lda     #$05                            ; A4A7 A9 05                    ..
         sta     $35                             ; A4A9 85 35                    .5
@@ -4842,11 +4913,11 @@ LA494:
         sta     $37                             ; A4BA 85 37                    .7
         lda     #$1F                            ; A4BC A9 1F                    ..
         jsr     L97AD                           ; A4BE 20 AD 97                  ..
-        lda     BoatX+1                           ; A4C1 AD 83 06                 ...
+        lda     PlayerX+1                           ; A4C1 AD 83 06                 ...
         cmp     #$10                            ; A4C4 C9 10                    ..
         bcc     LA4CF                           ; A4C6 90 07                    ..
         bne     LA4E4                           ; A4C8 D0 1A                    ..
-        lda     BoatX                           ; A4CA AD 82 06                 ...
+        lda     PlayerX                           ; A4CA AD 82 06                 ...
         bpl     LA4E4                           ; A4CD 10 15                    ..
 LA4CF:
         lda     #$C0                            ; A4CF A9 C0                    ..
@@ -4884,7 +4955,7 @@ LA500:
 LA50A:
         ror     $31                             ; A50A 66 31                    f1
         ror     $30                             ; A50C 66 30                    f0
-        jsr     MoveJawsX                           ; A50E 20 FA 97                  ..
+        jsr     WorksetMoveX                           ; A50E 20 FA 97                  ..
         asl     $30                             ; A511 06 30                    .0
         rol     $31                             ; A513 26 31                    &1
         jsr     L97BE                           ; A515 20 BE 97                  ..
@@ -4895,7 +4966,7 @@ LA50A:
 
 ; ----------------------------------------------------------------------------
 LA523:
-        jsr     MoveJawsX                           ; A523 20 FA 97                  ..
+        jsr     WorksetMoveX                           ; A523 20 FA 97                  ..
 LA526:
         jsr     L981B                           ; A526 20 1B 98                  ..
         jsr     L99F2                           ; A529 20 F2 99                  ..
@@ -4935,7 +5006,7 @@ LA56A:
         dec     $37                             ; A57C C6 37                    .7
         bne     LA58E                           ; A57E D0 0E                    ..
         lda     #$0A                            ; A580 A9 0A                    ..
-        jsr     L8CD0                           ; A582 20 D0 8C                  ..
+        jsr     AwardPoints                           ; A582 20 D0 8C                  ..
         lda     #$80                            ; A585 A9 80                    ..
         sta     $39                             ; A587 85 39                    .9
         lda     #$0F                            ; A589 A9 0F                    ..
@@ -4944,7 +5015,7 @@ LA56A:
 ; ----------------------------------------------------------------------------
 LA58E:
         lda     #$00                            ; A58E A9 00                    ..
-        jsr     L8CD0                           ; A590 20 D0 8C                  ..
+        jsr     AwardPoints                           ; A590 20 D0 8C                  ..
         lda     #$08                            ; A593 A9 08                    ..
         sta     $38                             ; A595 85 38                    .8
 LA597:
@@ -4993,11 +5064,11 @@ LA5C8:
         jmp     LA206                           ; A5D0 4C 06 A2                 L..
 
 ; ----------------------------------------------------------------------------
-        bit     $20                             ; A5D3 24 20                    $ 
-        bvs     LA5F7                           ; A5D5 70 20                    p 
-        lda     $0392                           ; A5D7 AD 92 03                 ...
-        cmp     #$03                            ; A5DA C9 03                    ..
-        bcc     LA5E5                           ; A5DC 90 07                    ..
+        bit $20                             ; A5D3 24 20                    $ 
+        bvs EncounterCrab                           ; A5D5 70 20                    p 
+        lda PlayerCrabLevel                           ; A5D7 AD 92 03                 ...
+        cmp #$03                            ; A5DA C9 03                    ..
+        bcc LA5E5                           ; A5DC 90 07                    ..
         lda #$0A
         sta $21
         jmp LA6BD
@@ -5014,52 +5085,58 @@ LA5E5:
         jmp     L97AD                           ; A5F4 4C AD 97                 L..
 
 ; ----------------------------------------------------------------------------
-LA5F7:
-        jsr     L9961                           ; A5F7 20 61 99                  a.
-        bcc     LA61A                           ; A5FA 90 1E                    ..
-        lda     #SFXEncounterPickup                            ; A5FC A9 15                    ..
-        jsr     SoundPlay                           ; A5FE 20 CD E2                  ..
-        lda     #$02                            ; A601 A9 02                    ..
-        jsr     L8CD0                           ; A603 20 D0 8C                  ..
-        inc     $0392                           ; A606 EE 92 03                 ...
-        lda     $0392                           ; A609 AD 92 03                 ...
-        cmp     #$04                            ; A60C C9 04                    ..
-        bcc     LA615                           ; A60E 90 05                    ..
-        .byte   $A9,$03,$8D,$92,$03             ; A610 A9 03 8D 92 03           .....
-; ----------------------------------------------------------------------------
-LA615:
-        lda     #$00                            ; A615 A9 00                    ..
-        sta     $20                             ; A617 85 20                    . 
-        rts                                     ; A619 60                       `
+EncounterCrab:
+        jsr HitDetectAgainstPlayer
+        bcc LA61A
+        ; play pickup sound
+        lda #SFXEncounterPickup
+        jsr SoundPlay
+        ; award 30 points
+        lda #$02
+        jsr AwardPoints
+        ; increment crab level
+        inc PlayerCrabLevel
+        lda PlayerCrabLevel
+        cmp #$04
+        bcc @Exit
+        ; make sure we don't go over 4
+        lda #$03
+        sta PlayerCrabLevel
+@Exit:
+        lda #$00
+        sta $20
+        rts
 
 ; ----------------------------------------------------------------------------
 LA61A:
-        lda     $38                             ; A61A A5 38                    .8
-        bne     LA642                           ; A61C D0 24                    .$
-        lda     #$08                            ; A61E A9 08                    ..
-        ldy     #$01                            ; A620 A0 01                    ..
-        jsr     L9841                           ; A622 20 41 98                  A.
-        jsr     L981B                           ; A625 20 1B 98                  ..
-        jsr     L99D0                           ; A628 20 D0 99                  ..
-        bcc     LA641                           ; A62B 90 14                    ..
-        inc     $38                             ; A62D E6 38                    .8
-        ldy     #$01                            ; A62F A0 01                    ..
-        lda     BoatX                           ; A631 AD 82 06                 ...
-        cmp     $22                             ; A634 C5 22                    ."
-        lda     BoatX+1                           ; A636 AD 83 06                 ...
-        sbc     $23                             ; A639 E5 23                    .#
-        bcs     LA63F                           ; A63B B0 02                    ..
-        .byte   $A0,$FF                         ; A63D A0 FF                    ..
-; ----------------------------------------------------------------------------
-LA63F:
-        sty     $31                             ; A63F 84 31                    .1
-LA641:
-        rts                                     ; A641 60                       `
+        lda     Workset + EntityV24
+        bne     LA642
+        lda     #$08
+        ldy     #$01
+        jsr     L9841
+        jsr     L981B
+        jsr     L99D0
+        bcc     @Exit
+        inc     Workset + EntityV24
+        ; set movement speed to +1
+        ldy     #$01
+        ; compare crab position to player x
+        lda     PlayerX
+        cmp     Workset + EntityX
+        lda     PlayerX+1
+        sbc     Workset + EntityX + 1
+        bcs     @StoreSpeed
+        ; set crab speed to -1 if player is to the left
+        ldy     #$FF
+@StoreSpeed:
+        sty     Workset + EntityXSpeed
+@Exit:
+        rts
 
 ; ----------------------------------------------------------------------------
 LA642:
         jsr     L97BE                           ; A642 20 BE 97                  ..
-        jsr     MoveJawsX                           ; A645 20 FA 97                  ..
+        jsr     WorksetMoveX                           ; A645 20 FA 97                  ..
         lda     $23                             ; A648 A5 23                    .#
         lda     #$01                            ; A64A A9 01                    ..
         and     $3F                             ; A64C 25 3F                    %?
@@ -5082,12 +5159,12 @@ LA658:
 
 ; ----------------------------------------------------------------------------
 LA66D:
-        jsr     L9961                           ; A66D 20 61 99                  a.
+        jsr     HitDetectAgainstPlayer                           ; A66D 20 61 99                  a.
         bcc     LA698                           ; A670 90 26                    .&
         lda     #SFXEncounterPickup                            ; A672 A9 15                    ..
         jsr     SoundPlay                           ; A674 20 CD E2                  ..
         lda     #$02                            ; A677 A9 02                    ..
-        jsr     L8CD0                           ; A679 20 D0 8C                  ..
+        jsr     AwardPoints                           ; A679 20 D0 8C                  ..
         inc     $0390                           ; A67C EE 90 03                 ...
         lda     $0390                           ; A67F AD 90 03                 ...
         cmp     #$64                            ; A682 C9 64                    .d
@@ -5150,7 +5227,7 @@ LA6D3:
 
 ; ----------------------------------------------------------------------------
 LA6E2:
-        jsr     L9961                           ; A6E2 20 61 99                  a.
+        jsr     HitDetectAgainstPlayer                           ; A6E2 20 61 99                  a.
         bcc     LA711                           ; A6E5 90 2A                    .*
         lda     #SFXEncounterPickup                            ; A6E7 A9 15                    ..
         jsr     SoundPlay                           ; A6E9 20 CD E2                  ..
@@ -5160,7 +5237,7 @@ LA6E2:
         lda     LA737,x                         ; A6F2 BD 37 A7                 .7.
         pha                                     ; A6F5 48                       H
         lda     LA736,x                         ; A6F6 BD 36 A7                 .6.
-        jsr     L8CD0                           ; A6F9 20 D0 8C                  ..
+        jsr     AwardPoints                           ; A6F9 20 D0 8C                  ..
         lda     #$80                            ; A6FC A9 80                    ..
         sta     $34                             ; A6FE 85 34                    .4
         lda     #$00                            ; A700 A9 00                    ..
@@ -5445,6 +5522,7 @@ LA902:
         rts                                     ; A902 60                       `
 
 ; ----------------------------------------------------------------------------
+LA903:
         lda     $0100                           ; A903 AD 00 01                 ...
         bpl     LA956                           ; A906 10 4E                    .N
         lda     $0101                           ; A908 AD 01 01                 ...
@@ -5573,7 +5651,7 @@ LA9E3:
         rts                                     ; A9E3 60                       `
 
 ; ----------------------------------------------------------------------------
-LA9E4:
+DrawEncounterWaves:
         jsr     PPURenderHorizontal                           ; A9E4 20 F6 8B                  ..
         lda     $033C                           ; A9E7 AD 3C 03                 .<.
         clc                                     ; A9EA 18                       .
@@ -5929,6 +6007,7 @@ LAC3F:
         rts                                     ; AC57 60                       `
 
 ; ----------------------------------------------------------------------------
+LAC58:
         jsr     LABA0                           ; AC58 20 A0 AB                  ..
         jsr     LAC1C                           ; AC5B 20 1C AC                  ..
         lda     #$02                            ; AC5E A9 02                    ..
@@ -5936,12 +6015,14 @@ LAC3F:
         rts                                     ; AC63 60                       `
 
 ; ----------------------------------------------------------------------------
+LAC64:
         jsr     LABDC                           ; AC64 20 DC AB                  ..
         lda     #$00                            ; AC67 A9 00                    ..
         sta     $0303                           ; AC69 8D 03 03                 ...
         rts                                     ; AC6C 60                       `
 
 ; ----------------------------------------------------------------------------
+LAC6D:
         jsr     LABDC                           ; AC6D 20 DC AB                  ..
         jsr     LAC1C                           ; AC70 20 1C AC                  ..
         lda     #$04                            ; AC73 A9 04                    ..
@@ -5949,6 +6030,7 @@ LAC3F:
         rts                                     ; AC78 60                       `
 
 ; ----------------------------------------------------------------------------
+LAC79:
         jsr     LABA0                           ; AC79 20 A0 AB                  ..
         lda     #$00                            ; AC7C A9 00                    ..
         sta     $0303                           ; AC7E 8D 03 03                 ...
@@ -6989,7 +7071,7 @@ LD0FB:
         .byte   $97,$D1                         ; D10D 97 D1                    ..
 ; ----------------------------------------------------------------------------
         lda     #$11                            ; D10F A9 11                    ..
-        jsr     L8CD0                           ; D111 20 D0 8C                  ..
+        jsr     AwardPoints                           ; D111 20 D0 8C                  ..
         lda     #SFXEncounterPickup                            ; D114 A9 15                    ..
         jsr     SoundPlay                           ; D116 20 CD E2                  ..
         lda     #$78                            ; D119 A9 78                    .x
@@ -7052,11 +7134,11 @@ LD146:
         .byte   $49,$4E,$54,$53,$21,$21         ; D1B0 49 4E 54 53 21 21        INTS!!
 ; ----------------------------------------------------------------------------
 LD1B6:
-        lda     #$80                            ; D1B6 A9 80                    ..
-        sta     $40                             ; D1B8 85 40                    .@
-        lda     #$06                            ; D1BA A9 06                    ..
-        sta     $41                             ; D1BC 85 41                    .A
-        jsr     LoadWorkingData                           ; D1BE 20 54 97                  T.
+        lda     #<PlayerData                            ; D1B6 A9 80                    ..
+        sta     WorksetPtr                             ; D1B8 85 40                    .@
+        lda     #>PlayerData                            ; D1BA A9 06                    ..
+        sta     WorksetPtr+1                             ; D1BC 85 41                    .A
+        jsr     WorksetLoad                           ; D1BE 20 54 97                  T.
         bit     $20                             ; D1C1 24 20                    $ 
         bmi     LD1E7                           ; D1C3 30 22                    0"
         lda     #$C0                            ; D1C5 A9 C0                    ..
@@ -7074,12 +7156,12 @@ LD1B6:
         sta     $31                             ; D1DD 85 31                    .1
         lda     #$22                            ; D1DF A9 22                    ."
         jsr     L97AD                           ; D1E1 20 AD 97                  ..
-        jmp     StoreWorkingData                           ; D1E4 4C 61 97                 La.
+        jmp     WorksetSave                           ; D1E4 4C 61 97                 La.
 
 ; ----------------------------------------------------------------------------
 LD1E7:
         jsr     L97BE                           ; D1E7 20 BE 97                  ..
-        jsr     MoveJawsX                           ; D1EA 20 FA 97                  ..
+        jsr     WorksetMoveX                           ; D1EA 20 FA 97                  ..
         lda     #$10                            ; D1ED A9 10                    ..
         bit     $20                             ; D1EF 24 20                    $ 
         bne     LD216                           ; D1F1 D0 23                    .#
@@ -7160,14 +7242,14 @@ LD271:
         lda     #$80                            ; D276 A9 80                    ..
         sta     $06A0,x                         ; D278 9D A0 06                 ...
 LD27B:
-        jmp     StoreWorkingData                           ; D27B 4C 61 97                 La.
+        jmp     WorksetSave                           ; D27B 4C 61 97                 La.
 
 ; ----------------------------------------------------------------------------
 LD27E:
-        lda     #$00                            ; D27E A9 00                    ..
-        sta     $40                             ; D280 85 40                    .@
-        lda     #$07                            ; D282 A9 07                    ..
-        sta     $41                             ; D284 85 41                    .A
+        lda     #<JawsData                            ; D27E A9 00                    ..
+        sta     WorksetPtr                             ; D280 85 40                    .@
+        lda     #>JawsData                            ; D282 A9 07                    ..
+        sta     WorksetPtr+1                             ; D284 85 41                    .A
         lda     #$05                            ; D286 A9 05                    ..
         sta     $46                             ; D288 85 46                    .F
         lda     #$00                            ; D28A A9 00                    ..
@@ -7177,11 +7259,11 @@ LD28E:
         lda     ($40),y                         ; D290 B1 40                    .@
         bpl     LD29F                           ; D292 10 0B                    ..
         inc     $00                             ; D294 E6 00                    ..
-        jsr     LoadWorkingData                           ; D296 20 54 97                  T.
+        jsr     WorksetLoad                           ; D296 20 54 97                  T.
         jsr     LD317                           ; D299 20 17 D3                  ..
-        jsr     StoreWorkingData                           ; D29C 20 61 97                  a.
+        jsr     WorksetSave                           ; D29C 20 61 97                  a.
 LD29F:
-        jsr     L976E                           ; D29F 20 6E 97                  n.
+        jsr     WorksetNext                           ; D29F 20 6E 97                  n.
         dec     $46                             ; D2A2 C6 46                    .F
         bne     LD28E                           ; D2A4 D0 E8                    ..
         lda     $00                             ; D2A6 A5 00                    ..
@@ -7374,7 +7456,7 @@ LD3C2:
         lda     LD4D8,x                         ; D3D6 BD D8 D4                 ...
         sta     $3C                             ; D3D9 85 3C                    .<
         lda     LD4DD,x                         ; D3DB BD DD D4                 ...
-        jsr     L8CD0                           ; D3DE 20 D0 8C                  ..
+        jsr     AwardPoints                           ; D3DE 20 D0 8C                  ..
         lda     #$80                            ; D3E1 A9 80                    ..
         sta     $3D                             ; D3E3 85 3D                    .=
         lda     #$00                            ; D3E5 A9 00                    ..
@@ -7425,7 +7507,7 @@ LD432:
 ; ----------------------------------------------------------------------------
 LD43E:
         jsr     L97BE                           ; D43E 20 BE 97                  ..
-        jsr     MoveJawsX                           ; D441 20 FA 97                  ..
+        jsr     WorksetMoveX                           ; D441 20 FA 97                  ..
         jsr     L981B                           ; D444 20 1B 98                  ..
         bit     $35                             ; D447 24 35                    $5
         bvs     LD458                           ; D449 70 0D                    p.
@@ -8412,11 +8494,11 @@ LDD8A:
         .byte   $DF                             ; DDC4 DF                       .
 ; ----------------------------------------------------------------------------
 LDDC5:
-        lda     #$80                            ; DDC5 A9 80                    ..
-        sta     $40                             ; DDC7 85 40                    .@
-        lda     #$06                            ; DDC9 A9 06                    ..
-        sta     $41                             ; DDCB 85 41                    .A
-        jsr     LoadWorkingData                           ; DDCD 20 54 97                  T.
+        lda     #<PlayerData                            ; DDC5 A9 80                    ..
+        sta     WorksetPtr                             ; DDC7 85 40                    .@
+        lda     #>PlayerData                            ; DDC9 A9 06                    ..
+        sta     WorksetPtr+1                             ; DDCB 85 41                    .A
+        jsr     WorksetLoad                           ; DDCD 20 54 97                  T.
         bit     $20                             ; DDD0 24 20                    $ 
         bmi     LDE00                           ; DDD2 30 2C                    0,
         lda     #$C0                            ; DDD4 A9 C0                    ..
@@ -8439,13 +8521,13 @@ LDDC5:
         sta     $33                             ; DDF6 85 33                    .3
         lda     #$08                            ; DDF8 A9 08                    ..
         jsr     L97AD                           ; DDFA 20 AD 97                  ..
-        jmp     StoreWorkingData                           ; DDFD 4C 61 97                 La.
+        jmp     WorksetSave                           ; DDFD 4C 61 97                 La.
 
 ; ----------------------------------------------------------------------------
 LDE00:
         lda     $34                             ; DE00 A5 34                    .4
         bne     LDE4D                           ; DE02 D0 49                    .I
-        jsr     MoveJawsX                           ; DE04 20 FA 97                  ..
+        jsr     WorksetMoveX                           ; DE04 20 FA 97                  ..
         jsr     L981B                           ; DE07 20 1B 98                  ..
         bit     $35                             ; DE0A 24 35                    $5
         bmi     LDE1B                           ; DE0C 30 0D                    0.
@@ -8455,7 +8537,7 @@ LDE00:
         lda     #$80                            ; DE14 A9 80                    ..
         sta     $35                             ; DE16 85 35                    .5
 LDE18:
-        jmp     StoreWorkingData                           ; DE18 4C 61 97                 La.
+        jmp     WorksetSave                           ; DE18 4C 61 97                 La.
 
 ; ----------------------------------------------------------------------------
 LDE1B:
@@ -8482,7 +8564,7 @@ LDE1B:
         sta     $36                             ; DE43 85 36                    .6
         lda     #$09                            ; DE45 A9 09                    ..
         jsr     L97AD                           ; DE47 20 AD 97                  ..
-        jmp     StoreWorkingData                           ; DE4A 4C 61 97                 La.
+        jmp     WorksetSave                           ; DE4A 4C 61 97                 La.
 
 ; ----------------------------------------------------------------------------
 LDE4D:
@@ -8491,11 +8573,11 @@ LDE4D:
         lda     $36                             ; DE51 A5 36                    .6
         beq     LDE5A                           ; DE53 F0 05                    ..
         dec     $36                             ; DE55 C6 36                    .6
-        jmp     StoreWorkingData                           ; DE57 4C 61 97                 La.
+        jmp     WorksetSave                           ; DE57 4C 61 97                 La.
 
 ; ----------------------------------------------------------------------------
 LDE5A:
-        jsr     MoveJawsX                           ; DE5A 20 FA 97                  ..
+        jsr     WorksetMoveX                           ; DE5A 20 FA 97                  ..
         jsr     L981B                           ; DE5D 20 1B 98                  ..
         bit     $35                             ; DE60 24 35                    $5
         bmi     LDE71                           ; DE62 30 0D                    0.
@@ -8505,7 +8587,7 @@ LDE5A:
         lda     #$80                            ; DE6A A9 80                    ..
         sta     $35                             ; DE6C 85 35                    .5
 LDE6E:
-        jmp     StoreWorkingData                           ; DE6E 4C 61 97                 La.
+        jmp     WorksetSave                           ; DE6E 4C 61 97                 La.
 
 ; ----------------------------------------------------------------------------
 LDE71:
@@ -8516,7 +8598,7 @@ LDE71:
         sta     $34                             ; DE7A 85 34                    .4
         lda     #$0A                            ; DE7C A9 0A                    ..
         jsr     L97AD                           ; DE7E 20 AD 97                  ..
-        jmp     StoreWorkingData                           ; DE81 4C 61 97                 La.
+        jmp     WorksetSave                           ; DE81 4C 61 97                 La.
 
 ; ----------------------------------------------------------------------------
 LDE84:
@@ -8526,17 +8608,17 @@ LDE84:
         lda     #$00                            ; DE8B A9 00                    ..
         sta     $20                             ; DE8D 85 20                    . 
 LDE8F:
-        jmp     StoreWorkingData                           ; DE8F 4C 61 97                 La.
+        jmp     WorksetSave                           ; DE8F 4C 61 97                 La.
 
 ; ----------------------------------------------------------------------------
 LDE92:
-        lda     #$80                            ; DE92 A9 80                    ..
-        sta     $40                             ; DE94 85 40                    .@
-        lda     #$06                            ; DE96 A9 06                    ..
-        sta     $41                             ; DE98 85 41                    .A
-        jsr     LoadWorkingData                           ; DE9A 20 54 97                  T.
+        lda     #<PlayerData                            ; DE92 A9 80                    ..
+        sta     WorksetPtr                             ; DE94 85 40                    .@
+        lda     #>PlayerData                            ; DE96 A9 06                    ..
+        sta     WorksetPtr+1                             ; DE98 85 41                    .A
+        jsr     WorksetLoad                           ; DE9A 20 54 97                  T.
         jsr     LDEA3                           ; DE9D 20 A3 DE                  ..
-        jmp     StoreWorkingData                           ; DEA0 4C 61 97                 La.
+        jmp     WorksetSave                           ; DEA0 4C 61 97                 La.
 
 ; ----------------------------------------------------------------------------
 LDEA3:
@@ -8559,7 +8641,7 @@ LDEA3:
 
 ; ----------------------------------------------------------------------------
 LDEC4:
-        jsr     MoveJawsX                           ; DEC4 20 FA 97                  ..
+        jsr     WorksetMoveX                           ; DEC4 20 FA 97                  ..
         jsr     L981B                           ; DEC7 20 1B 98                  ..
         dec     $34                             ; DECA C6 34                    .4
         bne     LDED2                           ; DECC D0 04                    ..
@@ -8723,7 +8805,7 @@ SoundInit:
 ; ----------------------------------------------------------------------------
 SoundPlay:
         ldx     #$01                            ; E2CD A2 01                    ..
-        stx     $055D                           ; E2CF 8E 5D 05                 .].
+        stx     SoundIsPlaying                           ; E2CF 8E 5D 05                 .].
         cmp     #$E0                            ; E2D2 C9 E0                    ..
         bcs     LE331                           ; E2D4 B0 5B                    .[
         asl     a                               ; E2D6 0A                       .
@@ -8789,14 +8871,14 @@ LE340:
         bne     LE337                           ; E346 D0 EF                    ..
 LE348:
         lda     #$00                            ; E348 A9 00                    ..
-        sta     $055D                           ; E34A 8D 5D 05                 .].
+        sta     SoundIsPlaying                           ; E34A 8D 5D 05                 .].
         rts                                     ; E34D 60                       `
 
 ; ----------------------------------------------------------------------------
 LE34E:
         .byte   $00,$1C,$38,$54,$70             ; E34E 00 1C 38 54 70           ..8Tp
 ; ----------------------------------------------------------------------------
-LE353:
+SoundUpdate:
         lda     #$30                            ; E353 A9 30                    .0
         sta     $0567                           ; E355 8D 67 05                 .g.
         sta     $0568                           ; E358 8D 68 05                 .h.
