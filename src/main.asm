@@ -43,8 +43,9 @@ Joy1Inputs            = $0330
 Joy1Pressed           = $0332
 Joy2Inputs            = $0331
 Joy2Pressed           = $0333
-
+ShowStatusBarTextLine = $0305
 CurrentScore          = $0380
+ActivePalette         = $046F
 
 
 PlayerData            = $0680
@@ -167,8 +168,7 @@ VBOOT:
         ; initialize 352, probably does something!
         lda #$01
         sta $0352
-        ; check if controller 2 has Left + Up + B pressed
-        ; and initialize some value
+        ; check joypad 2 to enable soundtest
         jsr ReadJoypads
         lda Joy2Inputs
         cmp #(JOY_LEFT | JOY_UP | JOY_B)
@@ -183,10 +183,10 @@ VBOOT:
         jsr SoundInit
         lda #SFXSTOP
         jsr SoundPlay
-        lda #$10
+        lda #%00010000                         ; set bg pattern to $1000
         sta PPUCTRL_MIRROR
         sta PPUCTRL
-        lda #$00
+        lda #$00                               ;  clear ppu mask mirror
         sta PPUMASK_MIRROR
         jsr DrawTitleScreen
         jmp L8277
@@ -198,7 +198,7 @@ DrawTitleScreen:
         jsr     ClearScreenAndSprites                           ; 816C 20 12 8E                  ..
         lda     #$00                            ; 816F A9 00                    ..
         sta     ActiveCHR                           ; 8171 8D 07 03                 ...
-        jsr     L8EBD                           ; 8174 20 BD 8E                  ..
+        jsr     StoreActivePaletteAndWaitFor1Frame                           ; 8174 20 BD 8E                  ..
         lda     #RomGraphicsTitleScreen                            ; 8177 A9 00                    ..
         jsr     DrawROMGraphics                           ; 8179 20 69 8D                  i.
         lda     #$00                            ; 817C A9 00                    ..
@@ -209,7 +209,7 @@ DrawTitleScreen:
         sta     $0323                           ; 818A 8D 23 03                 .#.
         sta     CameraY                           ; 818D 8D 3A 03                 .:.
         sta     CameraY+1                           ; 8190 8D 3B 03                 .;.
-        jsr     L977C                           ; 8193 20 7C 97                  |.
+        jsr     ClearEntityMemory                           ; 8193 20 7C 97                  |.
         jsr     LoadPlayerWorkset                           ; 8196 20 4C 97                  L.
         lda     #$C0                            ; 8199 A9 C0                    ..
         sta     $20                             ; 819B 85 20                    . 
@@ -420,20 +420,20 @@ L8304:
         lda     #RomGraphicsTrackerIcon                            ; 830F A9 0C                    ..
         jsr     DrawROMGraphics                           ; 8311 20 69 8D                  i.
 L8314:
-        jsr     L977C                           ; 8314 20 7C 97                  |.
+        jsr     ClearEntityMemory                           ; 8314 20 7C 97                  |.
         lda     #$00                            ; 8317 A9 00                    ..
         sta     $0306                           ; 8319 8D 06 03                 ...
         jsr     L8A16                           ; 831C 20 16 8A                  ..
         jsr     L9746                           ; 831F 20 46 97                  F.
         lda     #$01                            ; 8322 A9 01                    ..
-        jsr     L8EBD                           ; 8324 20 BD 8E                  ..
+        jsr     StoreActivePaletteAndWaitFor1Frame                           ; 8324 20 BD 8E                  ..
         lda     #$01                            ; 8327 A9 01                    ..
         sta     ActiveCHR                           ; 8329 8D 07 03                 ...
         jsr     L966E                           ; 832C 20 6E 96                  n.
         jsr     LAAB3                           ; 832F 20 B3 AA                  ..
         lda     #$01                            ; 8332 A9 01                    ..
         sta     $0302                           ; 8334 8D 02 03                 ...
-        sta     $0305                           ; 8337 8D 05 03                 ...
+        sta     ShowStatusBarTextLine                           ; 8337 8D 05 03                 ...
         jsr     PPUEnableNMI                           ; 833A 20 DE 8B                  ..
         jsr     PPUEnableAndWaitFor1Frame                           ; 833D 20 C2 8B                  ..
         lda     #MusicMapScreen                            ; 8340 A9 00                    ..
@@ -518,7 +518,7 @@ L840A:
 ; ----------------------------------------------------------------------------
 L840F:
         lda     #$81                            ; 840F A9 81                    ..
-        sta     $0305                           ; 8411 8D 05 03                 ...
+        sta     ShowStatusBarTextLine                           ; 8411 8D 05 03                 ...
         lda     #$01                            ; 8414 A9 01                    ..
         sta     $0302                           ; 8416 8D 02 03                 ...
 L8419:
@@ -530,14 +530,14 @@ L8419:
         lda     $0574                           ; 8427 AD 74 05                 .t.
         bmi     L8419                           ; 842A 30 ED                    0.
         lda     #$01                            ; 842C A9 01                    ..
-        sta     $0305                           ; 842E 8D 05 03                 ...
+        sta     ShowStatusBarTextLine                           ; 842E 8D 05 03                 ...
         jsr     PPUDisableNMI                           ; 8431 20 EA 8B                  ..
         lda     #SFXSTOP                            ; 8434 A9 FF                    ..
         jsr     SoundPlay                           ; 8436 20 CD E2                  ..
         jsr     PPUDisableRendering                           ; 8439 20 B6 8B                  ..
         jsr     L8A41                           ; 843C 20 41 8A                  A.
         jsr     L8A5E                           ; 843F 20 5E 8A                  ^.
-        jsr     L977C                           ; 8442 20 7C 97                  |.
+        jsr     ClearEntityMemory                           ; 8442 20 7C 97                  |.
         lda     #$00                            ; 8445 A9 00                    ..
         sta     $0306                           ; 8447 8D 06 03                 ...
         jsr     LAC82                           ; 844A 20 82 AC                  ..
@@ -567,29 +567,63 @@ L8476:
         lda     $0306                           ; 848B AD 06 03                 ...
         and     #$E0                            ; 848E 29 E0                    ).
         bne     L850A                           ; 8490 D0 78                    .x
-        lda     #$08                            ; 8492 A9 08                    ..
+        lda     #(JOY_START)                            ; 8492 A9 08                    ..
         bit     Joy1Pressed                           ; 8494 2C 32 03                 ,2.
-        bne     L84A5                           ; 8497 D0 0C                    ..
+        bne     PauseGame                           ; 8497 D0 0C                    ..
         jsr     L8B83                           ; 8499 20 83 8B                  ..
         jsr     LA9B6                           ; 849C 20 B6 A9                  ..
         jsr     L8B5F                           ; 849F 20 5F 8B                  _.
         jmp     L8476                           ; 84A2 4C 76 84                 Lv.
 
-; ----------------------------------------------------------------------------
-L84A5:
-        .byte   $A9,$81,$8D,$05,$03,$A9,$01,$8D ; 84A5 A9 81 8D 05 03 A9 01 8D  ........
-        .byte   $02,$03,$85,$4A,$A9,$16,$20,$CD ; 84AD 02 03 85 4A A9 16 20 CD  ...J.. .
-        .byte   $E2,$20,$A1,$A8,$A0,$F6,$20,$83 ; 84B5 E2 20 A1 A8 A0 F6 20 83  . .... .
-        .byte   $8B,$20,$5F,$8B,$20,$40,$8C,$20 ; 84BD 8B 20 5F 8B 20 40 8C 20  . _. @. 
-        .byte   $87,$8C,$A9,$08,$2C,$32,$03,$D0 ; 84C5 87 8C A9 08 2C 32 03 D0  ....,2..
-        .byte   $08,$A0,$02,$20,$60,$8C,$4C,$BB ; 84CD 08 A0 02 20 60 8C 4C BB  ... `.L.
-        .byte   $84,$A9,$00,$85,$4A,$A9,$01,$8D ; 84D5 84 A9 00 85 4A A9 01 8D  ....J...
-        .byte   $05,$03,$2C,$08,$03,$10,$92,$AD ; 84DD 05 03 2C 08 03 10 92 AD  ..,.....
-        .byte   $31,$03,$29,$03,$F0,$8B,$AA,$CA ; 84E5 31 03 29 03 F0 8B AA CA  1.).....
-        .byte   $D0,$08,$A9,$40,$8D,$06,$03,$4C ; 84ED D0 08 A9 40 8D 06 03 4C  ...@...L
-        .byte   $76,$84,$CA,$D0,$08,$A9,$20,$8D ; 84F5 76 84 CA D0 08 A9 20 8D  v..... .
-        .byte   $06,$03,$4C,$76,$84,$A9,$09,$8D ; 84FD 06 03 4C 76 84 A9 09 8D  ..Lv....
-        .byte   $87,$03,$4C,$76,$84             ; 8505 87 03 4C 76 84           ..Lv.
+PauseGame:                   
+        lda #$81
+        sta ShowStatusBarTextLine
+        lda #$01
+        sta $0302
+        sta $4A
+        lda #SFXPause
+        jsr SoundPlay
+        jsr CopyToVRAMBuffer
+        .addr CopyTextPause
+L84BB:                   
+        jsr L8B83
+        jsr L8B5F
+        jsr WaitFor1Frame
+        jsr ReadJoypads
+        lda #$08
+        bit $0332
+        bne L84D6
+        ldy #$02
+        jsr WaitForYSpins
+        jmp L84BB
+L84D6:                   
+        lda #$00
+        sta $4A
+        lda #$01
+        sta ShowStatusBarTextLine
+        bit $0308
+        bpl L8476
+        lda $0331
+        and #$03
+        beq L8476
+        tax
+        dex
+        bne @Continue
+        lda #$40
+        sta $0306
+        jmp L8476
+@Continue:
+        dex
+        bne @Done
+        lda #$20
+        sta $0306
+        jmp L8476
+@Done:
+        lda #$09
+        sta $0387
+        jmp L8476
+
+
 ; ----------------------------------------------------------------------------
 L850A:
         lda     #$20                            ; 850A A9 20                    . 
@@ -794,8 +828,8 @@ DrawGetReadyScreen:
         jsr     DrawStatusLine                           ; 86EA 20 8F A7                  ..
         lda     #RomGraphicsGetReadyScreen                            ; 86ED A9 0E                    ..
         jsr     DrawROMGraphics                           ; 86EF 20 69 8D                  i.
-        lda     #$08                            ; 86F2 A9 08                    ..
-        jsr     L8EBD                           ; 86F4 20 BD 8E                  ..
+        lda     #PaletteGetReadyScreen                            ; 86F2 A9 08                    ..
+        jsr     StoreActivePaletteAndWaitFor1Frame                           ; 86F4 20 BD 8E                  ..
         jsr     PPURenderHorizontal                           ; 86F7 20 F6 8B                  ..
         lda     #$00                            ; 86FA A9 00                    ..
         sta     SCROLL_X                           ; 86FC 8D 20 03                 . .
@@ -803,7 +837,7 @@ DrawGetReadyScreen:
         sta     SCROLL_Y                           ; 8702 8D 22 03                 .".
         sta     $0323                           ; 8705 8D 23 03                 .#.
         lda     #$01                            ; 8708 A9 01                    ..
-        sta     $0305                           ; 870A 8D 05 03                 ...
+        sta     ShowStatusBarTextLine                           ; 870A 8D 05 03                 ...
         sta     $0302                           ; 870D 8D 02 03                 ...
         lda     #$02                            ; 8710 A9 02                    ..
         sta     ActiveCHR                           ; 8712 8D 07 03                 ...
@@ -902,7 +936,7 @@ L87F9:
         jsr     PPUDisableRendering                           ; 87FC 20 B6 8B                  ..
         jsr     L8A41                           ; 87FF 20 41 8A                  A.
         jsr     L8A5E                           ; 8802 20 5E 8A                  ^.
-        jsr     L977C                           ; 8805 20 7C 97                  |.
+        jsr     ClearEntityMemory                           ; 8805 20 7C 97                  |.
         lda     #$00                            ; 8808 A9 00                    ..
         sta     $0306                           ; 880A 8D 06 03                 ...
         sta     ActiveCHR                           ; 880D 8D 07 03                 ...
@@ -910,8 +944,8 @@ L87F9:
         lda     #RomGraphicsGotTrackerScreen                            ; 8813 A9 08                    ..
         jsr     DrawROMGraphics                           ; 8815 20 69 8D                  i.
         jsr     DrawStatusLine                           ; 8818 20 8F A7                  ..
-        lda     #$07                            ; 881B A9 07                    ..
-        jsr     L8EBD                           ; 881D 20 BD 8E                  ..
+        lda     #PaletteBlackScreen                            ; 881B A9 07                    ..
+        jsr     StoreActivePaletteAndWaitFor1Frame                           ; 881D 20 BD 8E                  ..
         lda     #$00                            ; 8820 A9 00                    ..
         sta     SCROLL_X                           ; 8822 8D 20 03                 . .
         sta     CameraX                           ; 8825 8D 38 03                 .8.
@@ -936,7 +970,7 @@ L87F9:
         jsr     WorksetSave                           ; 8853 20 61 97                  a.
         jsr     L9A37                           ; 8856 20 37 9A                  7.
         lda     #$01                            ; 8859 A9 01                    ..
-        sta     $0305                           ; 885B 8D 05 03                 ...
+        sta     ShowStatusBarTextLine                           ; 885B 8D 05 03                 ...
         jsr     PPUEnableNMI                           ; 885E 20 DE 8B                  ..
         jsr     PPUEnableAndWaitFor1Frame                           ; 8861 20 C2 8B                  ..
         lda     #$78                            ; 8864 A9 78                    .x
@@ -966,7 +1000,7 @@ L888D:
         sta     PPUCTRL_MIRROR
         jsr     L8A41                           ; 889B 20 41 8A                  A.
         jsr     L8A5E                           ; 889E 20 5E 8A                  ^.
-        jsr     L977C                           ; 88A1 20 7C 97                  |.
+        jsr     ClearEntityMemory                           ; 88A1 20 7C 97                  |.
         lda     #$00                            ; 88A4 A9 00                    ..
         sta     $0306                           ; 88A6 8D 06 03                 ...
         sta     ActiveCHR                           ; 88A9 8D 07 03                 ...
@@ -975,8 +1009,8 @@ L888D:
         jsr     DrawROMGraphics                           ; 88B1 20 69 8D                  i.
         jsr     DrawStatusLine                           ; 88B4 20 8F A7                  ..
         jsr     DrawStatusLine_PowerLabel                           ; 88B7 20 D3 87                  ..
-        lda     #$06                            ; 88BA A9 06                    ..
-        jsr     L8EBD                           ; 88BC 20 BD 8E                  ..
+        lda     #Palette6                            ; 88BA A9 06                    ..
+        jsr     StoreActivePaletteAndWaitFor1Frame                           ; 88BC 20 BD 8E                  ..
         lda     #$00                            ; 88BF A9 00                    ..
         sta     SCROLL_X                           ; 88C1 8D 20 03                 . .
         sta     CameraX                           ; 88C4 8D 38 03                 .8.
@@ -1009,7 +1043,7 @@ L888D:
         jsr     WorksetSave                           ; 8902 20 61 97                  a.
         jsr     L9A37                           ; 8905 20 37 9A                  7.
         lda     #$01                            ; 8908 A9 01                    ..
-        sta     $0305                           ; 890A 8D 05 03                 ...
+        sta     ShowStatusBarTextLine                           ; 890A 8D 05 03                 ...
         jsr     PPUEnableNMI                           ; 890D 20 DE 8B                  ..
         jsr     PPUEnableAndWaitFor1Frame                           ; 8910 20 C2 8B                  ..
 L8913:
@@ -1065,14 +1099,14 @@ L893A:
         sta     $0304                           ; 897C 8D 04 03                 ...
         jsr     L8768                           ; 897F 20 68 87                  h.
         lda     #$81                            ; 8982 A9 81                    ..
-        sta     $0305                           ; 8984 8D 05 03                 ...
+        sta     ShowStatusBarTextLine                           ; 8984 8D 05 03                 ...
         lda     #$B4                            ; 8987 A9 B4                    ..
         jsr     LD11F                           ; 8989 20 1F D1                  ..
         lda     PPUCTRL_MIRROR                           ; 898C AD 0E 03                 ...
         ora     #$10                            ; 898F 09 10                    ..
         sta     PPUCTRL_MIRROR                           ; 8991 8D 0E 03                 ...
         lda     #$01                            ; 8994 A9 01                    ..
-        sta     $0305                           ; 8996 8D 05 03                 ...
+        sta     ShowStatusBarTextLine                           ; 8996 8D 05 03                 ...
         jmp     L82ED                           ; 8999 4C ED 82                 L..
 
 ; ----------------------------------------------------------------------------
@@ -1167,7 +1201,7 @@ VNMI:
         lda $0302
         beq @DrawUIOrChangePalette
         lda #$01
-        bit $0305
+        bit ShowStatusBarTextLine
         beq @CopySprites
         bmi @L8AA0
         lda #$40
@@ -1602,7 +1636,6 @@ AwardPoints:
 DrawROMGraphics:
         @ROMPointer = $10           ; pointer to location in rom where the graphics are stored
         @PPUPointer = $12           ; pointer to the ppu address that we are drawing to
-
         asl a
         tax
         lda RomGraphicsPtrs,x
@@ -1706,7 +1739,7 @@ ClearScreenAndSprites:
         sta     $0303
         sta     $0302
         sta     $0304
-        sta     $0305
+        sta     ShowStatusBarTextLine
         jsr     ClearScreen
         jsr     MoveAllSpritesOffscreen
         rts
@@ -1799,67 +1832,67 @@ DMACopySprites:
         rts
 
 ; ----------------------------------------------------------------------------
-L8EBD:
-        sta     $046F                           ; 8EBD 8D 6F 04                 .o.
-        lda     $0300                           ; 8EC0 AD 00 03                 ...
-        ora     #$01                            ; 8EC3 09 01                    ..
-        sta     $0300                           ; 8EC5 8D 00 03                 ...
-        lda     PPUMASK_MIRROR                           ; 8EC8 AD 0F 03                 ...
-        pha                                     ; 8ECB 48                       H
-        jsr     PPUDisableRendering                           ; 8ECC 20 B6 8B                  ..
-        lda     PPUCTRL_MIRROR                           ; 8ECF AD 0E 03                 ...
-        pha                                     ; 8ED2 48                       H
-        jsr     PPUEnableNMI                           ; 8ED3 20 DE 8B                  ..
-        jsr     WaitFor1Frame                           ; 8ED6 20 40 8C                  @.
-        pla                                     ; 8ED9 68                       h
-        sta     PPUCTRL_MIRROR                           ; 8EDA 8D 0E 03                 ...
-        sta     PPUMASK                           ; 8EDD 8D 01 20                 .. 
-        pla                                     ; 8EE0 68                       h
-        sta     PPUMASK_MIRROR                           ; 8EE1 8D 0F 03                 ...
-        sta     PPUMASK                           ; 8EE4 8D 01 20                 .. 
-        rts                                     ; 8EE7 60                       `
+StoreActivePaletteAndWaitFor1Frame:
+        sta     ActivePalette
+        lda     $0300
+        ora     #$01
+        sta     $0300
+        lda     PPUMASK_MIRROR
+        pha
+        jsr     PPUDisableRendering
+        lda     PPUCTRL_MIRROR
+        pha
+        jsr     PPUEnableNMI
+        jsr     WaitFor1Frame
+        pla
+        sta     PPUCTRL_MIRROR
+        sta     PPUMASK
+        pla
+        sta     PPUMASK_MIRROR
+        sta     PPUMASK
+        rts
 
 ; ----------------------------------------------------------------------------
 WritePalette:
-        lda     PPUCTRL_MIRROR                           ; 8EE8 AD 0E 03                 ...
-        and     #$FB                            ; 8EEB 29 FB                    ).
-        sta     PPUCTRL                           ; 8EED 8D 00 20                 .. 
-        lda     $046F                           ; 8EF0 AD 6F 04                 .o.
-        sta     $F9                             ; 8EF3 85 F9                    ..
-        lda     #$00                            ; 8EF5 A9 00                    ..
-        lsr     $F9                             ; 8EF7 46 F9                    F.
-        ror     a                               ; 8EF9 6A                       j
-        lsr     $F9                             ; 8EFA 46 F9                    F.
-        ror     a                               ; 8EFC 6A                       j
-        lsr     $F9                             ; 8EFD 46 F9                    F.
-        ror     a                               ; 8EFF 6A                       j
-        adc     #$EE                            ; 8F00 69 EE                    i.
-        sta     $F8                             ; 8F02 85 F8                    ..
-        lda     $F9                             ; 8F04 A5 F9                    ..
-        adc     #$CD                            ; 8F06 69 CD                    i.
-        sta     $F9                             ; 8F08 85 F9                    ..
-        lda     #$3F                            ; 8F0A A9 3F                    .?
-        sta     PPUADDR                           ; 8F0C 8D 06 20                 .. 
-        lda     #$00                            ; 8F0F A9 00                    ..
-        sta     PPUADDR                           ; 8F11 8D 06 20                 .. 
-        tay                                     ; 8F14 A8                       .
-        ldx     #$20                            ; 8F15 A2 20                    . 
+        lda     PPUCTRL_MIRROR
+        and     #%11111011                      ; clear vertical rendering flag
+        sta     PPUCTRL
+        lda     ActivePalette
+        sta     $F9
+        lda     #$00
+        lsr     $F9
+        ror     a
+        lsr     $F9
+        ror     a
+        lsr     $F9
+        ror     a
+        adc     #<PaletteData
+        sta     $F8
+        lda     $F9
+        adc     #>PaletteData
+        sta     $F9
+        lda     #$3F
+        sta     PPUADDR
+        lda     #$00
+        sta     PPUADDR
+        tay
+        ldx     #$20
 L8F17:
-        lda     ($F8),y                         ; 8F17 B1 F8                    ..
-        sta     PPUDATA                           ; 8F19 8D 07 20                 .. 
-        iny                                     ; 8F1C C8                       .
-        dex                                     ; 8F1D CA                       .
-        bne     L8F17                           ; 8F1E D0 F7                    ..
-        lda     #$3F                            ; 8F20 A9 3F                    .?
-        sta     PPUADDR                           ; 8F22 8D 06 20                 .. 
-        lda     #$00                            ; 8F25 A9 00                    ..
-        sta     PPUADDR                           ; 8F27 8D 06 20                 .. 
-        sta     PPUADDR                           ; 8F2A 8D 06 20                 .. 
-        sta     PPUADDR                           ; 8F2D 8D 06 20                 .. 
-        lda     $0300                           ; 8F30 AD 00 03                 ...
-        and     #$FE                            ; 8F33 29 FE                    ).
-        sta     $0300                           ; 8F35 8D 00 03                 ...
-        rts                                     ; 8F38 60                       `
+        lda     ($F8),y
+        sta     PPUDATA
+        iny
+        dex
+        bne     L8F17
+        lda     #$3F
+        sta     PPUADDR
+        lda     #$00
+        sta     PPUADDR
+        sta     PPUADDR
+        sta     PPUADDR
+        lda     $0300
+        and     #$FE
+        sta     $0300
+        rts
 
 ; # Procedure: JumpEngine
 ; Reads a list of pointers after the code that JSR'ed
@@ -3086,37 +3119,35 @@ WorksetNext:
         rts                                     ; 977B 60                       `
 
 ; ----------------------------------------------------------------------------
-L977C:
-        lda     #$80                            ; 977C A9 80                    ..
-        sta     $16                             ; 977E 85 16                    ..
-        lda     #$06                            ; 9780 A9 06                    ..
-        sta     $17                             ; 9782 85 17                    ..
-        lda     #$80                            ; 9784 A9 80                    ..
-        sta     $18                             ; 9786 85 18                    ..
-        lda     #$01                            ; 9788 A9 01                    ..
-        sta     $19                             ; 978A 85 19                    ..
-        jmp     L978F                           ; 978C 4C 8F 97                 L..
-
-; ----------------------------------------------------------------------------
-L978F:
-        ldy     #$00                            ; 978F A0 00                    ..
-L9791:
-        lda     #$00                            ; 9791 A9 00                    ..
-        sta     ($16),y                         ; 9793 91 16                    ..
-        inc     $16                             ; 9795 E6 16                    ..
-        bne     L979B                           ; 9797 D0 02                    ..
-        inc     $17                             ; 9799 E6 17                    ..
-L979B:
-        lda     $18                             ; 979B A5 18                    ..
-        sec                                     ; 979D 38                       8
-        sbc     #$01                            ; 979E E9 01                    ..
-        sta     $18                             ; 97A0 85 18                    ..
-        lda     $19                             ; 97A2 A5 19                    ..
-        sbc     #$00                            ; 97A4 E9 00                    ..
-        sta     $19                             ; 97A6 85 19                    ..
-        ora     $18                             ; 97A8 05 18                    ..
-        bne     L9791                           ; 97AA D0 E5                    ..
-        rts                                     ; 97AC 60                       `
+ClearEntityMemory:
+        lda     #<PlayerData
+        sta     $16
+        lda     #>PlayerData
+        sta     $17
+        lda     #$80
+        sta     $18
+        lda     #$01
+        sta     $19
+        jmp     @ClearMemory
+@ClearMemory:
+        ldy     #$00
+@KeepClearing:
+        lda     #$00
+        sta     ($16),y
+        inc     $16
+        bne     @Continue
+        inc     $17
+@Continue:
+        lda     $18
+        sec
+        sbc     #$01
+        sta     $18
+        lda     $19
+        sbc     #$00
+        sta     $19
+        ora     $18
+        bne     @KeepClearing
+        rts
 
 ; ----------------------------------------------------------------------------
 L97AD:
@@ -6158,7 +6189,7 @@ LAC82:
         jsr     DrawStatusLine                           ; ACA7 20 8F A7                  ..
         jsr     DrawStatusLine_PowerLabel                           ; ACAA 20 D3 87                  ..
         lda     #$01                            ; ACAD A9 01                    ..
-        sta     $0305                           ; ACAF 8D 05 03                 ...
+        sta     ShowStatusBarTextLine                           ; ACAF 8D 05 03                 ...
         sta     $0302                           ; ACB2 8D 02 03                 ...
         ldy     #$00                            ; ACB5 A0 00                    ..
         lda     ($44),y                         ; ACB7 B1 44                    .D
@@ -6180,7 +6211,7 @@ LAC82:
         iny                                     ; ACD9 C8                       .
         sta     $033F                           ; ACDA 8D 3F 03                 .?.
         lda     ($44),y                         ; ACDD B1 44                    .D
-        jsr     L8EBD                           ; ACDF 20 BD 8E                  ..
+        jsr     StoreActivePaletteAndWaitFor1Frame                           ; ACDF 20 BD 8E                  ..
         jsr     PPUEnableNMI                           ; ACE2 20 DE 8B                  ..
         rts                                     ; ACE5 60                       `
 
@@ -7084,13 +7115,30 @@ UnknownData:
 .byte   $80,$B0,$B1,$B3,$FF,$07,$A9,$81 ; CDD1 80 B0 B1 B3 FF 07 A9 81  ........
 .byte   $AB,$AC,$AD,$AE,$AF,$FF,$09,$9C ; CDD9 AB AC AD AE AF FF 09 9C  ........
 .byte   $9D,$FF,$0C,$93,$9A,$9B,$9E,$9F ; CDE1 9D FF 0C 93 9A 9B 9E 9F  ........
-.byte   $FF,$06,$93,$FF,$00,$02,$20,$21 ; CDE9 FF 06 93 FF 00 02 20 21  ...... !
-.byte   $12,$02,$3C,$0C,$1C,$02,$16,$21 ; CDF1 12 02 3C 0C 1C 02 16 21  ..<....!
-.byte   $06,$02,$30,$0F,$0F,$02,$20,$10 ; CDF9 06 02 30 0F 0F 02 20 10  ..0... .
-.byte   $0F,$02,$3C,$0C,$1C,$02,$20,$16 ; CE01 0F 02 3C 0C 1C 02 20 16  ..<... .
-.byte   $06,$02,$20,$21,$12
+.byte   $FF,$06,$93,$FF,$00
 
-; a bunch of palettes here
+
+Palette0 = (Palette0Data - PaletteData) / $20 ; 32 bytes per palette
+Palette1 = (Palette1Data - PaletteData) / $20 ; 32 bytes per palette
+Palette2 = (Palette2Data - PaletteData) / $20 ; 32 bytes per palette
+Palette3 = (Palette3Data - PaletteData) / $20 ; 32 bytes per palette
+Palette4 = (Palette4Data - PaletteData) / $20 ; 32 bytes per palette
+Palette5 = (Palette5Data - PaletteData) / $20 ; 32 bytes per palette
+Palette6 = (Palette6Data - PaletteData) / $20 ; 32 bytes per palette
+PaletteBlackScreen = (PaletteBlackScreenData - PaletteData) / $20 ; 32 bytes per palette
+PaletteGetReadyScreen = (PaletteGetReadyScreenData - PaletteData) / $20 ; 32 bytes per palette
+
+PaletteData:
+Palette0Data:
+.byte $02,$20,$21,$12
+.byte $02,$3C,$0C,$1C
+.byte $02,$16,$21,$06
+.byte $02,$30,$0F,$0F
+.byte $02,$20,$10,$0F
+.byte $02,$3C,$0C,$1C
+.byte $02,$20,$16,$06
+.byte $02,$20,$21,$12
+Palette1Data:
 .byte $0F,$20,$15,$27
 .byte $0F,$20,$17,$07
 .byte $0F,$12,$21,$20
@@ -7099,6 +7147,7 @@ UnknownData:
 .byte $0F,$20,$0F,$27
 .byte $0F,$20,$03,$00
 .byte $0F,$0F,$27,$17
+Palette2Data:
 .byte $0F,$20,$16,$27
 .byte $0F,$11,$02,$2C
 .byte $0F,$11,$18,$28
@@ -7107,6 +7156,7 @@ UnknownData:
 .byte $0F,$20,$0F,$27
 .byte $0F,$20,$03,$00
 .byte $0F,$0F,$27,$17
+Palette3Data:
 .byte $0F,$20,$16,$27
 .byte $0F,$12,$0C,$21
 .byte $0F,$0C,$07,$17
@@ -7115,6 +7165,7 @@ UnknownData:
 .byte $0F,$20,$0F,$27
 .byte $0F,$20,$03,$00
 .byte $0F,$0F,$27,$17
+Palette4Data:
 .byte $0F,$20,$21,$10
 .byte $0F,$00,$00,$00
 .byte $0F,$21,$17,$1A
@@ -7123,6 +7174,7 @@ UnknownData:
 .byte $0F,$20,$0F,$00
 .byte $0F,$20,$26,$0F
 .byte $0F,$16,$26,$0F
+Palette5Data:
 .byte $0F,$20,$26,$16
 .byte $0F,$20,$0C,$23
 .byte $0F,$00,$00,$00
@@ -7131,6 +7183,7 @@ UnknownData:
 .byte $0F,$13,$23,$33
 .byte $0F,$16,$26,$36
 .byte $0F,$19,$29,$39
+Palette6Data:
 .byte $0F,$20,$12,$26
 .byte $0F,$0A,$12,$17
 .byte $0F,$20,$1C,$13
@@ -7139,6 +7192,7 @@ UnknownData:
 .byte $0F,$20,$0F,$26
 .byte $0F,$20,$0F,$00
 .byte $0F,$20,$0F,$0F
+PaletteBlackScreenData:
 .byte $0F,$20,$15,$27
 .byte $0F,$12,$10,$00
 .byte $0F,$18,$08,$28
@@ -7147,6 +7201,7 @@ UnknownData:
 .byte $0F,$25,$16,$12
 .byte $0F,$00,$00,$00
 .byte $0F,$00,$00,$00
+PaletteGetReadyScreenData:
 .byte $0F,$20,$12,$26
 .byte $0F,$20,$16,$1C
 .byte $0F,$20,$10,$12
@@ -7160,11 +7215,11 @@ LCF0E:
         jsr     PPUDisableNMI                           ; CF0E 20 EA 8B                  ..
         lda     #SFXSTOP                            ; CF11 A9 FF                    ..
         jsr     SoundPlay                           ; CF13 20 CD E2                  ..
-        jsr     L977C                           ; CF16 20 7C 97                  |.
+        jsr     ClearEntityMemory                           ; CF16 20 7C 97                  |.
         jsr     ClearScreenAndSprites                           ; CF19 20 12 8E                  ..
         jsr     DrawStatusLine                           ; CF1C 20 8F A7                  ..
-        lda     #$07                            ; CF1F A9 07                    ..
-        jsr     L8EBD                           ; CF21 20 BD 8E                  ..
+        lda     #PaletteBlackScreen                            ; CF1F A9 07                    ..
+        jsr     StoreActivePaletteAndWaitFor1Frame                           ; CF21 20 BD 8E                  ..
         lda     #RomGraphicsBonusStartScreen                            ; CF24 A9 09                    ..
         jsr     DrawROMGraphics                           ; CF26 20 69 8D                  i.
         lda     #$00                            ; CF29 A9 00                    ..
@@ -7174,7 +7229,7 @@ LCF0E:
         sta     ActiveCHR                           ; CF34 8D 07 03                 ...
         lda     #$01                            ; CF37 A9 01                    ..
         sta     $0302                           ; CF39 8D 02 03                 ...
-        sta     $0305                           ; CF3C 8D 05 03                 ...
+        sta     ShowStatusBarTextLine                           ; CF3C 8D 05 03                 ...
         lda     #MusicBonusScreenStart                            ; CF3F A9 03                    ..
         jsr     SoundPlay                           ; CF41 20 CD E2                  ..
         jsr     PPUEnableNMI                           ; CF44 20 DE 8B                  ..
@@ -7198,7 +7253,7 @@ LCF4E:
         lda     #RomGraphicsEncounterDeep                            ; CF70 A9 03                    ..
         jsr     DrawROMGraphics                           ; CF72 20 69 8D                  i.
         lda     #$03                            ; CF75 A9 03                    ..
-        jsr     L8EBD                           ; CF77 20 BD 8E                  ..
+        jsr     StoreActivePaletteAndWaitFor1Frame                           ; CF77 20 BD 8E                  ..
         lda     #$02                            ; CF7A A9 02                    ..
         sta     ActiveCHR                           ; CF7C 8D 07 03                 ...
         lda     #$00                            ; CF7F A9 00                    ..
@@ -7221,7 +7276,7 @@ LCF4E:
         sta     $033F                           ; CFAB 8D 3F 03                 .?.
         lda     #$01                            ; CFAE A9 01                    ..
         sta     $0302                           ; CFB0 8D 02 03                 ...
-        sta     $0305                           ; CFB3 8D 05 03                 ...
+        sta     ShowStatusBarTextLine                           ; CFB3 8D 05 03                 ...
         lda     $038B                           ; CFB6 AD 8B 03                 ...
         asl     a                               ; CFB9 0A                       .
         adc     $038B                           ; CFBA 6D 8B 03                 m..
@@ -7272,7 +7327,7 @@ LD002:
         sta     ActiveCHR                           ; D01F 8D 07 03                 ...
         lda     #$01                            ; D022 A9 01                    ..
         sta     $0302                           ; D024 8D 02 03                 ...
-        sta     $0305                           ; D027 8D 05 03                 ...
+        sta     ShowStatusBarTextLine                           ; D027 8D 05 03                 ...
         jsr     PPUEnableNMI                           ; D02A 20 DE 8B                  ..
         jsr     PPUEnableAndWaitFor1Frame                           ; D02D 20 C2 8B                  ..
         lda     #MusicBonusScreenEnd                            ; D030 A9 1A                    ..
@@ -8033,7 +8088,7 @@ LD762:
         jsr     PPUDisableRendering                           ; D76A 20 B6 8B                  ..
         jsr     ClearScreenAndSprites                           ; D76D 20 12 8E                  ..
         lda     #$04                            ; D770 A9 04                    ..
-        jsr     L8EBD                           ; D772 20 BD 8E                  ..
+        jsr     StoreActivePaletteAndWaitFor1Frame                           ; D772 20 BD 8E                  ..
         lda     #$03                            ; D775 A9 03                    ..
         sta     ActiveCHR                           ; D777 8D 07 03                 ...
         lda     #RomGraphics4                            ; D77A A9 04                    ..
@@ -8731,7 +8786,7 @@ LDCC1:
         lda     #RomGraphicsEncounterDeep                            ; DCD4 A9 03                    ..
         jsr     DrawROMGraphics                           ; DCD6 20 69 8D                  i.
         lda     #$03                            ; DCD9 A9 03                    ..
-        jsr     L8EBD                           ; DCDB 20 BD 8E                  ..
+        jsr     StoreActivePaletteAndWaitFor1Frame                           ; DCDB 20 BD 8E                  ..
         lda     #$02                            ; DCDE A9 02                    ..
         sta     ActiveCHR                           ; DCE0 8D 07 03                 ...
         lda     #$00                            ; DCE3 A9 00                    ..
@@ -8743,7 +8798,7 @@ LDCC1:
         lda     #$20                            ; DCF4 A9 20                    . 
         sta     SCROLL_Y                           ; DCF6 8D 22 03                 .".
         sta     CameraY                           ; DCF9 8D 3A 03                 .:.
-        jsr     L977C                           ; DCFC 20 7C 97                  |.
+        jsr     ClearEntityMemory                           ; DCFC 20 7C 97                  |.
         sta     $0302                           ; DCFF 8D 02 03                 ...
         jsr     PPUEnableNMI                           ; DD02 20 DE 8B                  ..
         jsr     PPUEnableAndWaitFor1Frame                           ; DD05 20 C2 8B                  ..
@@ -8760,7 +8815,7 @@ LDD08:
         sta     PPUCTRL_MIRROR                           ; DD21 8D 0E 03                 ...
         jsr     ClearScreenAndSprites                           ; DD24 20 12 8E                  ..
         lda     #$05                            ; DD27 A9 05                    ..
-        jsr     L8EBD                           ; DD29 20 BD 8E                  ..
+        jsr     StoreActivePaletteAndWaitFor1Frame                           ; DD29 20 BD 8E                  ..
         lda     #$03                            ; DD2C A9 03                    ..
         sta     ActiveCHR                           ; DD2E 8D 07 03                 ...
         lda     #RomGraphics6                            ; DD31 A9 06                    ..
@@ -8773,7 +8828,7 @@ LDD08:
         sta     CameraX+1                           ; DD44 8D 39 03                 .9.
         sta     CameraY                           ; DD47 8D 3A 03                 .:.
         sta     CameraY+1                           ; DD4A 8D 3B 03                 .;.
-        jsr     L977C                           ; DD4D 20 7C 97                  |.
+        jsr     ClearEntityMemory                           ; DD4D 20 7C 97                  |.
         lda     #$01                            ; DD50 A9 01                    ..
         sta     $0302                           ; DD52 8D 02 03                 ...
         jsr     PPUEnableNMI                           ; DD55 20 DE 8B                  ..
@@ -9948,7 +10003,7 @@ SFXPlayerDeath                 = 18
 SFXSilent                      = 19
 SFXMapTrackerPulse             = 20
 SFXEncounterPickup             = 21
-SFXUnknown1                    = 22
+SFXPause                       = 22
 SFXFinaleStrobe                = 23
 SFXFinaleHit                   = 24
 SFXUnknown2                    = 25
@@ -9982,7 +10037,7 @@ SoundPointers:
         .addr SFXSilentData
         .addr SFXMapTrackerPulseData
         .addr SFXEncounterPickupData
-        .addr SFXUnknown1Data                          ; unused beeps?
+        .addr SFXPauseData                          ; unused beeps?
         .addr SFXFinaleStrobeData
         .addr SFXFinaleHitData
         .addr SFXUnknown2Data                          ; unused chime?
@@ -10472,7 +10527,7 @@ SFXEncounterPickupData:
 .byte   $27,$37,$29,$39,$2B,$3B,$F1,$00
 .byte   $EF,$04,$F9,$FF
 
-SFXUnknown1Data:
+SFXPauseData:
 .byte $04,$01,$E9,$F4
 .byte   $FF,$EC,$06,$ED,$80,$EE,$01,$F0
 .byte   $0C,$C3,$8E,$27,$37,$F9,$FF
@@ -10634,11 +10689,13 @@ LF696:
         .byte   $88                             ; F696 88                       .
 LF697:
         .byte   $F6,$8F,$F6,$87,$F6,$8E,$F6,$86 ; F697 F6 8F F6 87 F6 8E F6 86  ........
-        .byte   $F6,$20,$2B,$20,$20,$20,$20,$20 ; F69F F6 20 2B 20 20 20 20 20  . +     
-        .byte   $20,$20,$20,$20,$20,$20,$20,$20 ; F6A7 20 20 20 20 20 20 20 20          
-        .byte   $20,$50,$41,$55,$53,$45,$20,$20 ; F6AF 20 50 41 55 53 45 20 20   PAUSE  
-        .byte   $20,$20,$20,$20,$20,$20,$20,$20 ; F6B7 20 20 20 20 20 20 20 20          
-        .byte   $20,$20,$20,$20,$00,$00,$00,$00 ; F6BF 20 20 20 20 00 00 00 00      ....
+        .byte   $F6 ; F69F F6
+
+CopyTextPause:
+.byte $20, $2B ; length + ascii file separator
+.byte "              PAUSE              "
+        
+        .byte $00,$00,$00,$00 ; F6BF 20 20 20 20 00 00 00 00      ....
         .byte   $00,$FF,$FF,$FF,$FF,$FC,$F8,$F0 ; F6C7 00 FF FF FF FF FC F8 F0  ........
         .byte   $E3,$00,$00,$00,$00,$00,$00,$00 ; F6CF E3 00 00 00 00 00 00 00  ........
         .byte   $00,$87,$E1,$C0,$00,$00,$00,$80 ; F6D7 00 87 E1 C0 00 00 00 80  ........
