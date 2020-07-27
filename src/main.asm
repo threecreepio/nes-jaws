@@ -36,10 +36,10 @@ SND_MASTERCTRL        = $4015
 JOYPAD_PORT1          = $4016
 JOYPAD_PORT2          = $4017
 
-HeldInputs1           = $0330
-PressedInputs1        = $0332
-HeldInputs2           = $0331
-PressedInputs2        = $0333
+Joy1Inputs            = $0330
+Joy1Pressed           = $0332
+Joy2Inputs            = $0331
+Joy2Pressed           = $0333
 
 CurrentScore          = $0380
 
@@ -171,7 +171,7 @@ VBOOT:
         ; check if controller 2 has B + Start + Left held
         ; and initialize some value
         jsr ReadJoypads
-        lda HeldInputs2
+        lda Joy2Inputs
         cmp #(JOY_B | JOY_START | JOY_LEFT)
         bne @ContinueStartup
         lda #$80
@@ -237,7 +237,7 @@ L81BF:
         jsr     L81D8                           ; 81CA 20 D8 81                  ..
         jsr     L8B5F                           ; 81CD 20 5F 8B                  _.
         lda     #$08                            ; 81D0 A9 08                    ..
-        bit     PressedInputs1                           ; 81D2 2C 32 03                 ,2.
+        bit     Joy1Pressed                           ; 81D2 2C 32 03                 ,2.
         beq     L81BF                           ; 81D5 F0 E8                    ..
         rts                                     ; 81D7 60                       `
 
@@ -404,7 +404,7 @@ L8384:
 ; ----------------------------------------------------------------------------
 L838A:
         lda     #$08                            ; 838A A9 08                    ..
-        bit     PressedInputs1                           ; 838C 2C 32 03                 ,2.
+        bit     Joy1Pressed                           ; 838C 2C 32 03                 ,2.
         bne     L83A0                           ; 838F D0 0F                    ..
         jsr     LA7CB                           ; 8391 20 CB A7                  ..
         jsr     L8B5F                           ; 8394 20 5F 8B                  _.
@@ -493,7 +493,7 @@ L8476:
         and     #$E0                            ; 848E 29 E0                    ).
         bne     L850A                           ; 8490 D0 78                    .x
         lda     #$08                            ; 8492 A9 08                    ..
-        bit     PressedInputs1                           ; 8494 2C 32 03                 ,2.
+        bit     Joy1Pressed                           ; 8494 2C 32 03                 ,2.
         bne     L84A5                           ; 8497 D0 0C                    ..
         jsr     L8B83                           ; 8499 20 83 8B                  ..
         jsr     LA9B6                           ; 849C 20 B6 A9                  ..
@@ -1406,11 +1406,11 @@ ReadJoypads:
         dex
         bne @LoopCTL1
         lda $13
-        eor HeldInputs1
+        eor Joy1Inputs
         and $13
-        sta PressedInputs1
+        sta Joy1Pressed
         lda $13
-        sta HeldInputs1
+        sta Joy1Inputs
         ldx #$08
 @LoopCTL2:
         lda JOYPAD_PORT2
@@ -1422,11 +1422,11 @@ ReadJoypads:
         dex
         bne @LoopCTL2
         lda $13
-        eor HeldInputs2
+        eor Joy2Inputs
         and $13
-        sta PressedInputs2
+        sta Joy2Pressed
         lda $13
-        sta HeldInputs2
+        sta Joy2Inputs
         rts
 
 ; ----------------------------------------------------------------------------
@@ -2033,7 +2033,7 @@ L90F4:
         sta     $44                             ; 90FB 85 44                    .D
         lda     PTRS+1,x                         ; 90FD BD 0E 91                 ...
         sta     $45                             ; 9100 85 45                    .E
-        lda     HeldInputs1                           ; 9102 AD 30 03                 .0.
+        lda     Joy1Inputs                           ; 9102 AD 30 03                 .0.
         lsr     a                               ; 9105 4A                       J
         lsr     a                               ; 9106 4A                       J
         lsr     a                               ; 9107 4A                       J
@@ -2236,7 +2236,7 @@ L9258:
 
 ; ----------------------------------------------------------------------------
 L925F:
-        bit     HeldInputs1                           ; 925F 2C 30 03                 ,0.
+        bit     Joy1Inputs                           ; 925F 2C 30 03                 ,0.
         bpl     L9297                           ; 9262 10 33                    .3
         lda     $20                             ; 9264 A5 20                    . 
         and     #$EF                            ; 9266 29 EF                    ).
@@ -2262,7 +2262,7 @@ L925F:
         .byte   $A9,$10,$85,$23                 ; 9293 A9 10 85 23              ...#
 ; ----------------------------------------------------------------------------
 L9297:
-        bit     HeldInputs1                           ; 9297 2C 30 03                 ,0.
+        bit     Joy1Inputs                           ; 9297 2C 30 03                 ,0.
         bvc     L92CF                           ; 929A 50 33                    P3
         lda     $20                             ; 929C A5 20                    . 
         ora     #$10                            ; 929E 09 10                    ..
@@ -2292,14 +2292,14 @@ L9297:
         sta     $23                             ; 92CD 85 23                    .#
 L92CF:
         lda     #$03                            ; 92CF A9 03                    ..
-        bit     PressedInputs1                           ; 92D1 2C 32 03                 ,2.
+        bit     Joy1Pressed                           ; 92D1 2C 32 03                 ,2.
         beq     L92F1                           ; 92D4 F0 1B                    ..
         jsr     L95D0                           ; 92D6 20 D0 95                  ..
         bmi     L92F1                           ; 92D9 30 16                    0.
         lda     #$00                            ; 92DB A9 00                    ..
         sta     $06A1,x                         ; 92DD 9D A1 06                 ...
         lda     #$01                            ; 92E0 A9 01                    ..
-        bit     PressedInputs1                           ; 92E2 2C 32 03                 ,2.
+        bit     Joy1Pressed                           ; 92E2 2C 32 03                 ,2.
         beq     L92EC                           ; 92E5 F0 05                    ..
         lda     #$80                            ; 92E7 A9 80                    ..
         jmp     L92EE                           ; 92E9 4C EE 92                 L..
@@ -2360,7 +2360,7 @@ L9328:
 
 ; ----------------------------------------------------------------------------
 L9343:
-        bit     HeldInputs1                           ; 9343 2C 30 03                 ,0.
+        bit     Joy1Inputs                           ; 9343 2C 30 03                 ,0.
         bpl     L936D                           ; 9346 10 25                    .%
         lda     #$20                            ; 9348 A9 20                    . 
         sta     $16                             ; 934A 85 16                    ..
@@ -2407,7 +2407,7 @@ L9377:
         sta     $20                             ; 9397 85 20                    . 
 L9399:
         lda     #$20                            ; 9399 A9 20                    . 
-        bit     HeldInputs1                           ; 939B 2C 30 03                 ,0.
+        bit     Joy1Inputs                           ; 939B 2C 30 03                 ,0.
         beq     L93BF                           ; 939E F0 1F                    ..
         lda     #$20                            ; 93A0 A9 20                    . 
         sta     $16                             ; 93A2 85 16                    ..
@@ -2427,7 +2427,7 @@ L9399:
 ; ----------------------------------------------------------------------------
 L93BF:
         lda     #$10                            ; 93BF A9 10                    ..
-        bit     HeldInputs1                           ; 93C1 2C 30 03                 ,0.
+        bit     Joy1Inputs                           ; 93C1 2C 30 03                 ,0.
         bne     L93CE                           ; 93C4 D0 08                    ..
         ldy     #$10                            ; 93C6 A0 10                    ..
         jsr     L98BD                           ; 93C8 20 BD 98                  ..
@@ -2476,12 +2476,12 @@ L9414:
         jsr     L99D0                           ; 9419 20 D0 99                  ..
 L941C:
         lda     #$03                            ; 941C A9 03                    ..
-        bit     PressedInputs1                           ; 941E 2C 32 03                 ,2.
+        bit     Joy1Pressed                           ; 941E 2C 32 03                 ,2.
         beq     L943F                           ; 9421 F0 1C                    ..
         jsr     L95D0                           ; 9423 20 D0 95                  ..
         bmi     L943F                           ; 9426 30 17                    0.
         lda     #$01                            ; 9428 A9 01                    ..
-        bit     PressedInputs1                           ; 942A 2C 32 03                 ,2.
+        bit     Joy1Pressed                           ; 942A 2C 32 03                 ,2.
         beq     L9433                           ; 942D F0 04                    ..
         lda     #$02                            ; 942F A9 02                    ..
         bne     L9435                           ; 9431 D0 02                    ..
@@ -2543,11 +2543,11 @@ L9480:
 
 ; ----------------------------------------------------------------------------
 L948F:
-        bit     HeldInputs1                           ; 948F 2C 30 03                 ,0.
+        bit     Joy1Inputs                           ; 948F 2C 30 03                 ,0.
         bpl     L94C2                           ; 9492 10 2E                    ..
         ldy     #$10                            ; 9494 A0 10                    ..
         lda     #$01                            ; 9496 A9 01                    ..
-        bit     PressedInputs1                           ; 9498 2C 32 03                 ,2.
+        bit     Joy1Pressed                           ; 9498 2C 32 03                 ,2.
         beq     L949F                           ; 949B F0 02                    ..
         ldy     #$80                            ; 949D A0 80                    ..
 L949F:
@@ -2573,7 +2573,7 @@ L94C2:
         bvs     L94D5                           ; 94C2 70 11                    p.
         ldy     #$10                            ; 94C4 A0 10                    ..
         lda     #$01                            ; 94C6 A9 01                    ..
-        bit     PressedInputs1                           ; 94C8 2C 32 03                 ,2.
+        bit     Joy1Pressed                           ; 94C8 2C 32 03                 ,2.
         beq     L94CF                           ; 94CB F0 02                    ..
         ldy     #$80                            ; 94CD A0 80                    ..
 L94CF:
@@ -2584,7 +2584,7 @@ L94CF:
 L94D5:
         ldy     #$F0                            ; 94D5 A0 F0                    ..
         lda     #$01                            ; 94D7 A9 01                    ..
-        bit     PressedInputs1                           ; 94D9 2C 32 03                 ,2.
+        bit     Joy1Pressed                           ; 94D9 2C 32 03                 ,2.
         beq     L94E0                           ; 94DC F0 02                    ..
         ldy     #$80                            ; 94DE A0 80                    ..
 L94E0:
@@ -2605,11 +2605,11 @@ L94E0:
         sta     $20                             ; 94FE 85 20                    . 
 L9500:
         lda     #$20                            ; 9500 A9 20                    . 
-        bit     HeldInputs1                           ; 9502 2C 30 03                 ,0.
+        bit     Joy1Inputs                           ; 9502 2C 30 03                 ,0.
         beq     L952F                           ; 9505 F0 28                    .(
         ldy     #$10                            ; 9507 A0 10                    ..
         lda     #$01                            ; 9509 A9 01                    ..
-        bit     PressedInputs1                           ; 950B 2C 32 03                 ,2.
+        bit     Joy1Pressed                           ; 950B 2C 32 03                 ,2.
         beq     L9512                           ; 950E F0 02                    ..
         ldy     #$80                            ; 9510 A0 80                    ..
 L9512:
@@ -2630,11 +2630,11 @@ L9512:
 ; ----------------------------------------------------------------------------
 L952F:
         lda     #$10                            ; 952F A9 10                    ..
-        bit     HeldInputs1                           ; 9531 2C 30 03                 ,0.
+        bit     Joy1Inputs                           ; 9531 2C 30 03                 ,0.
         bne     L9547                           ; 9534 D0 11                    ..
         ldy     #$10                            ; 9536 A0 10                    ..
         lda     #$01                            ; 9538 A9 01                    ..
-        bit     PressedInputs1                           ; 953A 2C 32 03                 ,2.
+        bit     Joy1Pressed                           ; 953A 2C 32 03                 ,2.
         beq     L9541                           ; 953D F0 02                    ..
         ldy     #$80                            ; 953F A0 80                    ..
 L9541:
@@ -2645,7 +2645,7 @@ L9541:
 L9547:
         ldy     #$F0                            ; 9547 A0 F0                    ..
         lda     #$01                            ; 9549 A9 01                    ..
-        bit     PressedInputs1                           ; 954B 2C 32 03                 ,2.
+        bit     Joy1Pressed                           ; 954B 2C 32 03                 ,2.
         beq     L9552                           ; 954E F0 02                    ..
         .byte   $A0,$80                         ; 9550 A0 80                    ..
 ; ----------------------------------------------------------------------------
@@ -2689,7 +2689,7 @@ L9599:
         jsr     L99D0                           ; 959E 20 D0 99                  ..
 L95A1:
         lda     #$02                            ; 95A1 A9 02                    ..
-        bit     PressedInputs1                           ; 95A3 2C 32 03                 ,2.
+        bit     Joy1Pressed                           ; 95A3 2C 32 03                 ,2.
         beq     L95B9                           ; 95A6 F0 11                    ..
         jsr     L95D0                           ; 95A8 20 D0 95                  ..
         bmi     L95B9                           ; 95AB 30 0C                    0.
@@ -7167,7 +7167,7 @@ LD1E7:
         bne     LD216                           ; D1F1 D0 23                    .#
         ldx     #$F8                            ; D1F3 A2 F8                    ..
         ldy     #$01                            ; D1F5 A0 01                    ..
-        bit     HeldInputs1                           ; D1F7 2C 30 03                 ,0.
+        bit     Joy1Inputs                           ; D1F7 2C 30 03                 ,0.
         bvs     LD205                           ; D1FA 70 09                    p.
         bmi     LD201                           ; D1FC 30 03                    0.
         .byte   $C8,$D0,$02                     ; D1FE C8 D0 02                 ...
@@ -7189,7 +7189,7 @@ LD205:
 LD216:
         ldx     #$08                            ; D216 A2 08                    ..
         ldy     #$FF                            ; D218 A0 FF                    ..
-        bit     HeldInputs1                           ; D21A 2C 30 03                 ,0.
+        bit     Joy1Inputs                           ; D21A 2C 30 03                 ,0.
         bmi     LD228                           ; D21D 30 09                    0.
         bvs     LD224                           ; D21F 70 03                    p.
         .byte   $88,$D0,$02                     ; D221 88 D0 02                 ...
@@ -7225,7 +7225,7 @@ LD24F:
         cmp     #$10                            ; D251 C9 10                    ..
         bne     LD27B                           ; D253 D0 26                    .&
         lda     #$03                            ; D255 A9 03                    ..
-        bit     PressedInputs1                           ; D257 2C 32 03                 ,2.
+        bit     Joy1Pressed                           ; D257 2C 32 03                 ,2.
         beq     LD27B                           ; D25A F0 1F                    ..
         ldx     #$00                            ; D25C A2 00                    ..
         lda     $06A0,x                         ; D25E BD A0 06                 ...
@@ -7779,7 +7779,7 @@ LD7EC:
         jsr     LD963                           ; D7FA 20 63 D9                  c.
         jsr     LF600                           ; D7FD 20 00 F6                  ..
         jsr     ReadJoypads
-        lda     HeldInputs1
+        lda     Joy1Inputs
         and     #(JOY_A|JOY_B)
         beq     LD831                           ; D808 F0 27                    .'
         bpl     LD820                           ; D80A 10 14                    ..
@@ -7896,7 +7896,7 @@ LD963:
         lda     $0393                           ; D967 AD 93 03                 ...
         beq     LD9AB                           ; D96A F0 3F                    .?
         lda     #$01                            ; D96C A9 01                    ..
-        bit     PressedInputs1                           ; D96E 2C 32 03                 ,2.
+        bit     Joy1Pressed                           ; D96E 2C 32 03                 ,2.
         beq     LD9AB                           ; D971 F0 38                    .8
         dec     $0393                           ; D973 CE 93 03                 ...
         lda     $21                             ; D976 A5 21                    .!
@@ -7918,7 +7918,7 @@ LD98C:
         bit     $08                             ; D992 24 08                    $.
         beq     LD99D                           ; D994 F0 07                    ..
         lda     #$02                            ; D996 A9 02                    ..
-        bit     PressedInputs1                           ; D998 2C 32 03                 ,2.
+        bit     Joy1Pressed                           ; D998 2C 32 03                 ,2.
         bne     LD99E                           ; D99B D0 01                    ..
 LD99D:
         rts                                     ; D99D 60                       `
@@ -8121,7 +8121,7 @@ LDAFE:
         asl     a                               ; DB00 0A                       .
         tax                                     ; DB01 AA                       .
         lda     #$C0                            ; DB02 A9 C0                    ..
-        and     HeldInputs1                           ; DB04 2D 30 03                 -0.
+        and     Joy1Inputs                           ; DB04 2D 30 03                 -0.
         beq     LDB2F                           ; DB07 F0 26                    .&
         bpl     LDB1D                           ; DB09 10 12                    ..
         lda     $30                             ; DB0B A5 30                    .0
@@ -8484,7 +8484,7 @@ LDD8A:
         bmi     LDD8A                           ; DD90 30 F8                    0.
         jsr     ReadJoypads                           ; DD92 20 87 8C                  ..
         lda     #$08                            ; DD95 A9 08                    ..
-        bit     PressedInputs1                           ; DD97 2C 32 03                 ,2.
+        bit     Joy1Pressed                           ; DD97 2C 32 03                 ,2.
         beq     LDD8A                           ; DD9A F0 EE                    ..
         .byte   $AD,$0E,$03,$29,$E7,$09,$08,$8D ; DD9C AD 0E 03 29 E7 09 08 8D  ...)....
         .byte   $0E,$03,$4C,$48,$81,$56,$23,$08 ; DDA4 0E 03 4C 48 81 56 23 08  ..LH.V#.
@@ -10227,7 +10227,7 @@ LF611:
         sta     PPUSCROLL                           ; F614 8D 05 20                 .. 
         lda     #$00                            ; F617 A9 00                    ..
         sta     PPUSCROLL                           ; F619 8D 05 20                 .. 
-        lda     HeldInputs1                           ; F61C AD 30 03                 .0.
+        lda     Joy1Inputs                           ; F61C AD 30 03                 .0.
         and     #(JOY_A|JOY_B)                            ; F61F 29 C0                    ).
         beq     LF655                           ; F621 F0 32                    .2
         bpl     LF63E                           ; F623 10 19                    ..
