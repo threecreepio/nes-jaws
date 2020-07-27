@@ -36,6 +36,9 @@ SND_MASTERCTRL        = $4015
 JOYPAD_PORT1          = $4016
 JOYPAD_PORT2          = $4017
 
+SoundtestEnabled      = $0308
+SoundtestSelected     = $00
+
 Joy1Inputs            = $0330
 Joy1Pressed           = $0332
 Joy2Inputs            = $0331
@@ -95,14 +98,14 @@ EntityV24             = $18
 
 ; ---
 
-JOY_A                 = %10000000
-JOY_B                 = %01000000
-JOY_SELECT            = %00100000
-JOY_START             = %00010000
-JOY_UP                = %00001000
-JOY_DOWN              = %00000100
-JOY_LEFT              = %00000010
-JOY_RIGHT             = %00000001
+JOY_A                 = %00000001
+JOY_B                 = %00000010
+JOY_SELECT            = %00000100
+JOY_START             = %00001000
+JOY_UP                = %00010000
+JOY_DOWN              = %00100000
+JOY_LEFT              = %01000000
+JOY_RIGHT             = %10000000
 
 ; ----------------------------------------------------------------------------
 
@@ -164,14 +167,14 @@ VBOOT:
         ; initialize 352, probably does something!
         lda #$01
         sta $0352
-        ; check if controller 2 has B + Start + Left held
+        ; check if controller 2 has Left + Up + B pressed
         ; and initialize some value
         jsr ReadJoypads
         lda Joy2Inputs
-        cmp #(JOY_B | JOY_START | JOY_LEFT)
+        cmp #(JOY_LEFT | JOY_UP | JOY_B)
         bne @ContinueStartup
         lda #$80
-        sta $0308
+        sta SoundtestEnabled
 
 @ContinueStartup:
         ; clear stack
@@ -229,7 +232,7 @@ L81BF:
         lda     #$01                            ; 81C2 A9 01                    ..
         sta     $0302                           ; 81C4 8D 02 03                 ...
         jsr     ReadJoypads                           ; 81C7 20 87 8C                  ..
-        jsr     L81D8                           ; 81CA 20 D8 81                  ..
+        jsr     Soundtest                           ; 81CA 20 D8 81                  ..
         jsr     L8B5F                           ; 81CD 20 5F 8B                  _.
         lda     #$08                            ; 81D0 A9 08                    ..
         bit     Joy1Pressed                           ; 81D2 2C 32 03                 ,2.
@@ -237,34 +240,111 @@ L81BF:
         rts                                     ; 81D7 60                       `
 
 ; ----------------------------------------------------------------------------
-L81D8:
-        bit     $0308                           ; 81D8 2C 08 03                 ,..
-        bpl     L8221                           ; 81DB 10 44                    .D
-        .byte   $A9,$02,$2C,$32,$03,$F0,$05,$A9 ; 81DD A9 02 2C 32 03 F0 05 A9  ..,2....
-        .byte   $FF,$20,$CD,$E2,$A4,$00,$2C,$32 ; 81E5 FF 20 CD E2 A4 00 2C 32  . ....,2
-        .byte   $03,$10,$01,$C8,$50,$01,$88,$A9 ; 81ED 03 10 01 C8 50 01 88 A9  ....P...
-        .byte   $20,$2C,$32,$03,$F0,$05,$98,$18 ; 81F5 20 2C 32 03 F0 05 98 18   ,2.....
-        .byte   $69,$10,$A8,$A9,$10,$2C,$32,$03 ; 81FD 69 10 A8 A9 10 2C 32 03  i....,2.
-        .byte   $F0,$05,$98,$38,$E9,$10,$A8,$C4 ; 8205 F0 05 98 38 E9 10 A8 C4  ...8....
-        .byte   $00,$F0,$05,$84,$00,$20,$22,$82 ; 820D 00 F0 05 84 00 20 22 82  ..... ".
-        .byte   $A9,$01,$2C,$32,$03,$F0,$05,$A5 ; 8215 A9 01 2C 32 03 F0 05 A5  ..,2....
-        .byte   $00,$20,$CD,$E2                 ; 821D 00 20 CD E2              . ..
-; ----------------------------------------------------------------------------
-L8221:
-        rts                                     ; 8221 60                       `
+Soundtest:
+        bit SoundtestEnabled
+        bpl @Done
+        lda #JOY_B
+        bit Joy1Pressed
+        beq @L81E9
+        lda #SFXSTOP
+        jsr SoundPlay
+@L81E9:
+        ldy SoundtestSelected
+        bit Joy1Pressed
+        bpl @L81F1
+        iny
+@L81F1:
+        bvc @L81F4
+        dey
+@L81F4:
+        lda #JOY_DOWN
+        bit Joy1Pressed
+        beq @CheckStartButton
+        tya
+        clc
+        adc #$10
+        tay
+@CheckStartButton:
+        lda #JOY_UP
+        bit Joy1Pressed
+        beq @L820C
+        tya
+        sec
+        sbc #$10
+        tay
+@L820C:
+        cpy SoundtestSelected
+        beq @L8215
+        sty $00
+        jsr SoundtestDrawSelection
+@L8215:
+        lda #JOY_A
+        bit Joy1Pressed
+        beq @Done
+        lda SoundtestSelected
+        jsr SoundPlay
+@Done:
+        rts
 
-; ----------------------------------------------------------------------------
-        .byte   $A9,$00,$8D,$00,$01,$AE,$01,$01 ; 8222 A9 00 8D 00 01 AE 01 01  ........
-        .byte   $A9,$22,$9D,$02,$01,$E8,$A9,$4F ; 822A A9 22 9D 02 01 E8 A9 4F  .".....O
-        .byte   $9D,$02,$01,$E8,$A5,$00,$4A,$4A ; 8232 9D 02 01 E8 A5 00 4A 4A  ......JJ
-        .byte   $4A,$4A,$18,$69,$30,$C9,$3A,$90 ; 823A 4A 4A 18 69 30 C9 3A 90  JJ.i0.:.
-        .byte   $02,$69,$06,$9D,$02,$01,$E8,$A9 ; 8242 02 69 06 9D 02 01 E8 A9  .i......
-        .byte   $22,$9D,$02,$01,$E8,$A9,$50,$9D ; 824A 22 9D 02 01 E8 A9 50 9D  ".....P.
-        .byte   $02,$01,$E8,$A5,$00,$29,$0F,$18 ; 8252 02 01 E8 A5 00 29 0F 18  .....)..
-        .byte   $69,$30,$C9,$3A,$90,$02,$69,$06 ; 825A 69 30 C9 3A 90 02 69 06  i0.:..i.
-        .byte   $9D,$02,$01,$E8,$8E,$01,$01,$A9 ; 8262 9D 02 01 E8 8E 01 01 A9  ........
-        .byte   $80,$8D,$00,$01,$AD,$04,$03,$09 ; 826A 80 8D 00 01 AD 04 03 09  ........
-        .byte   $10,$8D,$04,$03,$60             ; 8272 10 8D 04 03 60           ....`
+SoundtestDrawSelection:
+        ; clear vram buffer
+        lda #$00
+        sta $0100
+        ldx $0101
+        ; set ppu address to $224F for 1st character
+        lda #$22
+        sta $0102,X
+        inx
+        lda #$4F
+        sta $0102,X
+        inx
+        ; get high nybble of selected sound
+        lda SoundtestSelected
+        lsr a
+        lsr a
+        lsr a
+        lsr a
+        clc
+        ; add chr number base
+        adc #$30
+        ; A-F is stored 6 characters after 9
+        cmp #$3A
+        bcc @DrawHighNybbleHex
+        ; so add 6 onto our value if we're above 9
+        adc #$06
+@DrawHighNybbleHex:
+        sta $0102,X
+        ; set ppu address to $2250 for 2nd character
+        inx
+        lda #$22
+        sta $0102,X
+        inx
+        lda #$50
+        sta $0102,X
+        inx
+        ; get low nybble of selected sound
+        lda SoundtestSelected
+        and #$0F
+        clc
+        ; add chr number base
+        adc #$30
+        ; A-F is stored 6 characters after 9
+        cmp #$3A
+        ; so add 6 onto our value if we're above 9
+        bcc @DrawLowNybbleHex
+        adc #$06
+@DrawLowNybbleHex:                   
+        sta $0102,X
+        ; update vram position
+        inx
+        stx $0101
+        lda #$80
+        sta $0100
+        lda $0304
+        ora #$10
+        sta $0304
+        rts
+
 ; ----------------------------------------------------------------------------
 L8277:
         ; clear stack.. again.
@@ -426,14 +506,14 @@ L83F8:
         jsr     SoundPlay                           ; 83FA 20 CD E2                  ..
         lda     $034B                           ; 83FD AD 4B 03                 .K.
         beq     L840A                           ; 8400 F0 08                    ..
-        jsr     CopyFromNextPtr                           ; 8402 20 A1 A8                  ..
+        jsr     CopyToVRAMBuffer                           ; 8402 20 A1 A8                  ..
         .addr CopyTextYouveHitSomething
 ; ----------------------------------------------------------------------------
         jmp     L840F                           ; 8407 4C 0F 84                 L..
 
 ; ----------------------------------------------------------------------------
 L840A:
-        jsr     CopyFromNextPtr                           ; 840A 20 A1 A8                  ..
+        jsr     CopyToVRAMBuffer                           ; 840A 20 A1 A8                  ..
         .addr CopyTextYouveHitJaws
 ; ----------------------------------------------------------------------------
 L840F:
@@ -861,10 +941,10 @@ L87F9:
         jsr     PPUEnableAndWaitFor1Frame                           ; 8861 20 C2 8B                  ..
         lda     #$78                            ; 8864 A9 78                    .x
         jsr     LD11F                           ; 8866 20 1F D1                  ..
-        jsr     CopyFromNextPtr                           ; 8869 20 A1 A8                  ..
+        jsr     CopyToVRAMBuffer                           ; 8869 20 A1 A8                  ..
         .byte   $83,$88                         ; 886C 83 88                    ..
 ; ----------------------------------------------------------------------------
-        jsr     CopyFromNextPtr                           ; 886E 20 A1 A8                  ..
+        jsr     CopyToVRAMBuffer                           ; 886E 20 A1 A8                  ..
         .byte   $88,$88                         ; 8871 88 88                    ..
 ; ----------------------------------------------------------------------------
         jsr     L8768                           ; 8873 20 68 87                  h.
@@ -956,7 +1036,7 @@ L893A:
         lda     PlayerPowerLevel                           ; 893A AD 91 03                 ...
         cmp     #$08                            ; 893D C9 08                    ..
         bcs     L899C                           ; 893F B0 5B                    .[
-        jsr     CopyFromNextPtr                           ; 8941 20 A1 A8                  ..
+        jsr     CopyToVRAMBuffer                           ; 8941 20 A1 A8                  ..
         .addr   CopyTextPowerLevelRaised                         ; 8944 D0 89                    ..
 ; ----------------------------------------------------------------------------
         jsr     L8B83                           ; 8946 20 83 8B                  ..
@@ -1157,30 +1237,30 @@ VNMI:
 ; ----------------------------------------------------------------------------
 DrawUI:
         @TempJumpTarget = $0334
-        ldx     $0303
-        dex
-        bpl     @KeepDrawingUI
+        ldx $0303
+        dex 
+        bpl @KeepDrawingUI
         rts
 @KeepDrawingUI:
         txa
-        asl     a
+        asl a
         tax
-        lda     DrawUIPointers,x
-        sta     @TempJumpTarget
-        lda     DrawUIPointers+1,x
-        sta     @TempJumpTarget+1
-        jmp     (@TempJumpTarget)
+        lda UIPointers,x
+        sta @TempJumpTarget
+        lda UIPointers+1,x
+        sta @TempJumpTarget+1
+        jmp (@TempJumpTarget)
 
-DrawUIPointers:
-.addr LAC58
-.addr LAC64
-.addr LAC6D
-.addr LAC79
-.addr DrawUIStatusLineScore
-.addr DrawUIStatusLineJawsPower
-.addr DrawUIEncounterWaves
-.addr LA903
-.addr DrawUIStatusLineShells
+UIPointers:
+        .addr LAC58
+        .addr LAC64
+        .addr LAC6D
+        .addr LAC79
+        .addr DrawUIStatusLineScore
+        .addr DrawUIStatusLineJawsPower
+        .addr DrawUIEncounterWaves
+        .addr DrawVRAMBuffer
+        .addr DrawUIStatusLineShells
 
 
 ; ----------------------------------------------------------------------------
@@ -1924,8 +2004,11 @@ L9006:
 
 ; ----------------------------------------------------------------------------
 L901B:
-        .byte   $AD,$90,$03,$C9,$0A,$90,$18,$A9 ; 901B AD 90 03 C9 0A 90 18 A9  ........
-        .byte   $0A                             ; 9023 0A                       .
+        lda $0390
+        cmp #$0a
+        bcc L903A
+        lda #$0a
+
 ; ----------------------------------------------------------------------------
 L9024:
         sta     $034C                           ; 9024 8D 4C 03                 .L.
@@ -1939,8 +2022,11 @@ L9024:
 
 ; ----------------------------------------------------------------------------
 L903A:
-        .byte   $AD,$06,$03,$09,$08,$8D,$06,$03 ; 903A AD 06 03 09 08 8D 06 03  ........
-        .byte   $4C,$9C,$90                     ; 9042 4C 9C 90                 L..
+        lda $0306
+        ora #$08
+        sta $0306
+        jmp L909C
+
 ; ----------------------------------------------------------------------------
 L9045:
         bit     $0397                           ; 9045 2C 97 03                 ,..
@@ -5464,10 +5550,10 @@ LA890:
 
 
 ; ----------------------------------------------------------------------
-; Copy data from a pointer after the callsite into $102, offset by $101
+; Copy data from rom into vram buffer
 ; Example:
 ;
-;   jsr CopyFromNextPtr
+;   jsr CopyToVRAMBuffer
 ;   .addr DataToCopy
 ;   rts
 ;
@@ -5476,7 +5562,7 @@ LA890:
 ;
 ; Running this code will write $81 $03 "HEY" into $102
 ;
-CopyFromNextPtr:
+CopyToVRAMBuffer:
         @TempPointer    = $44
         @TempCopyLength = $0F
         @TempTarget     = $102
@@ -5542,89 +5628,85 @@ CopyFromNextPtr:
         rts
 
 ; ----------------------------------------------------------------------------
-LA903:
-        lda     $0100                           ; A903 AD 00 01                 ...
-        bpl     LA956                           ; A906 10 4E                    .N
-        lda     $0101                           ; A908 AD 01 01                 ...
-        beq     LA956                           ; A90B F0 49                    .I
-        lda     PPUCTRL_MIRROR                           ; A90D AD 0E 03                 ...
-        and     #$FB                            ; A910 29 FB                    ).
-        sta     PPUCTRL                           ; A912 8D 00 20                 .. 
-        ldx     #$00                            ; A915 A2 00                    ..
-LA917:
-        lda     $0102,x                         ; A917 BD 02 01                 ...
-        bmi     LA931                           ; A91A 30 15                    0.
-        sta     PPUADDR                           ; A91C 8D 06 20                 .. 
-        inx                                     ; A91F E8                       .
-        lda     $0102,x                         ; A920 BD 02 01                 ...
-        sta     PPUADDR                           ; A923 8D 06 20                 .. 
-        inx                                     ; A926 E8                       .
-        lda     $0102,x                         ; A927 BD 02 01                 ...
-        sta     PPUDATA                           ; A92A 8D 07 20                 .. 
-        inx                                     ; A92D E8                       .
-        jmp     LA94C                           ; A92E 4C 4C A9                 LL.
-
-; ----------------------------------------------------------------------------
-LA931:
-        and     #$7F                            ; A931 29 7F                    ).
-        sta     PPUADDR                           ; A933 8D 06 20                 .. 
-        inx                                     ; A936 E8                       .
-        lda     $0102,x                         ; A937 BD 02 01                 ...
-        sta     PPUADDR                           ; A93A 8D 06 20                 .. 
-        inx                                     ; A93D E8                       .
-        ldy     $0102,x                         ; A93E BC 02 01                 ...
-        inx                                     ; A941 E8                       .
-LA942:
-        lda     $0102,x                         ; A942 BD 02 01                 ...
-        sta     PPUDATA                           ; A945 8D 07 20                 .. 
-        inx                                     ; A948 E8                       .
-        dey                                     ; A949 88                       .
-        bne     LA942                           ; A94A D0 F6                    ..
-LA94C:
-        cpx     $0101                           ; A94C EC 01 01                 ...
-        bcc     LA917                           ; A94F 90 C6                    ..
-        lda     #$00                            ; A951 A9 00                    ..
-        sta     $0101                           ; A953 8D 01 01                 ...
-LA956:
-        lda     #$00                            ; A956 A9 00                    ..
-        sta     $0303                           ; A958 8D 03 03                 ...
-        rts                                     ; A95B 60                       `
+DrawVRAMBuffer:
+        lda $0100
+        bpl @Done
+        lda $0101
+        beq @Done
+        lda PPUCTRL_MIRROR
+        and #%11111011                   ; clear vertical rendering flag
+        sta PPUCTRL
+        ldx #$00
+@CopyNextBuffer:
+        lda $0102,x
+        bmi @DrawMultipleBytes           ; check if negative flag is set, otherwise draw single byte
+        sta PPUADDR
+        inx
+        lda $0102,x
+        sta PPUADDR
+        inx
+        lda $0102,x
+        sta PPUDATA
+        inx
+        jmp @NextBuffer
+@DrawMultipleBytes:
+        and #$7F
+        sta PPUADDR
+        inx
+        lda $0102,x
+        sta PPUADDR
+        inx
+        ldy $0102,x
+        inx
+@KeepDrawing:
+        lda $0102,x
+        sta PPUDATA
+        inx
+        dey
+        bne @KeepDrawing
+@NextBuffer:
+        cpx $0101
+        bcc @CopyNextBuffer
+        lda #$00
+        sta $0101
+@Done:
+        lda #$00
+        sta $0303
+        rts
 
 ; ----------------------------------------------------------------------------
 DrawStatusLine_JawsPower:
-        jsr     PPURenderHorizontal                           ; A95C 20 F6 8B                  ..
-        lda     #$2B                            ; A95F A9 2B                    .+
-        sta     PPUADDR                           ; A961 8D 06 20                 .. 
-        lda     #$94                            ; A964 A9 94                    ..
-        sta     PPUADDR                           ; A966 8D 06 20                 .. 
-        ldy     #$08                            ; A969 A0 08                    ..
-        ldx     #$0A                            ; A96B A2 0A                    ..
-        lda     JawsHP+1                           ; A96D AD 89 03                 ...
-LA970:
-        cmp     #$02                            ; A970 C9 02                    ..
-        bcc     LA97D                           ; A972 90 09                    ..
-        sty     PPUDATA                           ; A974 8C 07 20                 .. 
-        sbc     #$02                            ; A977 E9 02                    ..
-        dex                                     ; A979 CA                       .
-        bne     LA970                           ; A97A D0 F4                    ..
-        rts                                     ; A97C 60                       `
-
-; ----------------------------------------------------------------------------
-LA97D:
-        cmp     #$00                            ; A97D C9 00                    ..
-        beq     LA989                           ; A97F F0 08                    ..
-        ldy     #$09                            ; A981 A0 09                    ..
-        sty     PPUDATA                           ; A983 8C 07 20                 .. 
-        dex                                     ; A986 CA                       .
-        beq     LA991                           ; A987 F0 08                    ..
-LA989:
-        ldy     #$0A                            ; A989 A0 0A                    ..
-LA98B:
-        sty     PPUDATA                           ; A98B 8C 07 20                 .. 
-        dex                                     ; A98E CA                       .
-        bne     LA98B                           ; A98F D0 FA                    ..
-LA991:
-        rts                                     ; A991 60                       `
+        jsr     PPURenderHorizontal
+        lda     #$2B                        ; set drawing position to jaws power meter
+        sta     PPUADDR
+        lda     #$94
+        sta     PPUADDR
+        ldy     #$08                        ; set Y to solid bar tile
+        ldx     #$0A                        ; set X to maximum bars to show
+        lda     JawsHP+1
+@DrawFullBar:
+        cmp     #$02
+        bcc     @DrawHalfBar
+        sty     PPUDATA
+        sbc     #$02
+        dex
+        bne     @DrawFullBar
+        rts
+@DrawHalfBar:
+        cmp     #$00
+        beq     @DrawEmptyBars
+        ldy     #$09
+        sty     PPUDATA
+        dex
+        beq     @Done
+@DrawEmptyBars:
+        ldy     #$0A
+@DrawEmptyBar:
+        sty     PPUDATA
+        dex
+        bne     @DrawEmptyBar
+@Done:
+        rts
 
 ; ----------------------------------------------------------------------------
 DrawStatusLine_Shells:
@@ -7197,7 +7279,7 @@ LD002:
         jsr     SoundPlay                           ; D032 20 CD E2                  ..
         lda     #$78                            ; D035 A9 78                    .x
         jsr     LD11F                           ; D037 20 1F D1                  ..
-        jsr     CopyFromNextPtr                           ; D03A 20 A1 A8                  ..
+        jsr     CopyToVRAMBuffer                           ; D03A 20 A1 A8                  ..
         .addr   CopyTextBonusNumberOfHits                         ; D03D 50 D1                    P.
 ; ----------------------------------------------------------------------------
         lda     #$00                            ; D03F A9 00                    ..
@@ -7228,7 +7310,7 @@ LD002:
         sta     $0304                           ; D077 8D 04 03                 ...
         lda     #$78                            ; D07A A9 78                    .x
         jsr     LD11F                           ; D07C 20 1F D1                  ..
-        jsr     CopyFromNextPtr                           ; D07F 20 A1 A8                  ..
+        jsr     CopyToVRAMBuffer                           ; D07F 20 A1 A8                  ..
         .addr   CopyTextBonusShellsCollected                         ; D082 67 D1                    g.
 ; ----------------------------------------------------------------------------
         lda     #$00                            ; D084 A9 00                    ..
@@ -7295,12 +7377,12 @@ LD0DF:
 LD0FB:
         lda     #$3C                            ; D0FB A9 3C                    .<
         jsr     LD11F                           ; D0FD 20 1F D1                  ..
-        jsr     CopyFromNextPtr                           ; D100 20 A1 A8                  ..
+        jsr     CopyToVRAMBuffer                           ; D100 20 A1 A8                  ..
         .addr   CopyTextBonusGotThemAll                        ; D103 82 D1                    ..
 ; ----------------------------------------------------------------------------
         lda     #$3C                            ; D105 A9 3C                    .<
         jsr     LD11F                           ; D107 20 1F D1                  ..
-        jsr     CopyFromNextPtr                           ; D10A 20 A1 A8                  ..
+        jsr     CopyToVRAMBuffer                           ; D10A 20 A1 A8                  ..
         .addr   CopyTextBonus10000BonusPoints                         ; D10D 97 D1                    ..
 ; ----------------------------------------------------------------------------
         lda     #$11                            ; D10F A9 11                    ..
@@ -8020,7 +8102,7 @@ LD7EC:
         jsr     LF600                           ; D7FD 20 00 F6                  ..
         jsr     ReadJoypads
         lda     Joy1Inputs
-        and     #(JOY_A|JOY_B)
+        and     #(JOY_LEFT | JOY_RIGHT)
         beq     LD831                           ; D808 F0 27                    .'
         bpl     LD820                           ; D80A 10 14                    ..
         lda     $0460                           ; D80C AD 60 04                 .`.
@@ -8706,13 +8788,13 @@ LDD60:
         bne     LDD60                           ; DD6C D0 F2                    ..
         ldy     #$3C                            ; DD6E A0 3C                    .<
         jsr     WaitForYFrames                           ; DD70 20 50 8C                  P.
-        jsr     CopyFromNextPtr                           ; DD73 20 A1 A8                  ..
+        jsr     CopyToVRAMBuffer                           ; DD73 20 A1 A8                  ..
         .addr   LDDA9
 ; ----------------------------------------------------------------------------
-        jsr     CopyFromNextPtr                           ; DD78 20 A1 A8                  ..
+        jsr     CopyToVRAMBuffer                           ; DD78 20 A1 A8                  ..
         .addr   LDDB4                         ; DD7B B4 DD                    ..
 ; ----------------------------------------------------------------------------
-        jsr     CopyFromNextPtr                           ; DD7D 20 A1 A8                  ..
+        jsr     CopyToVRAMBuffer                           ; DD7D 20 A1 A8                  ..
         .addr   LDDBF                        ; DD80 BF DD                    ..
 ; ----------------------------------------------------------------------------
         jsr     L8B5F                           ; DD82 20 5F 8B                  _.
@@ -10473,7 +10555,7 @@ LF611:
         lda     #$00                            ; F617 A9 00                    ..
         sta     PPUSCROLL                           ; F619 8D 05 20                 .. 
         lda     Joy1Inputs                           ; F61C AD 30 03                 .0.
-        and     #(JOY_A|JOY_B)                            ; F61F 29 C0                    ).
+        and     #(JOY_LEFT|JOY_RIGHT)                            ; F61F 29 C0                    ).
         beq     LF655                           ; F621 F0 32                    .2
         bpl     LF63E                           ; F623 10 19                    ..
         jmp     LF628                           ; F625 4C 28 F6                 L(.
