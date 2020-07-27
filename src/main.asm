@@ -141,7 +141,6 @@ VBOOT:
         bpl :-
 :       lda PPUSTATUS
         bpl :-
-
         ; Clear ZP
         lda #$00
         tax
@@ -149,7 +148,6 @@ VBOOT:
         sta $00,x
         inx
         bne @ClearMemoryZP
-
         ; Clear memory
         ldx #$06
         lda #$01
@@ -163,11 +161,9 @@ VBOOT:
         inc $01
         dex
         bne @ClearMemory
-
         ; initialize 352, probably does something!
         lda #$01
         sta $0352
-
         ; check if controller 2 has B + Start + Left held
         ; and initialize some value
         jsr ReadJoypads
@@ -181,17 +177,16 @@ VBOOT:
         ; clear stack
         ldx #$FF
         txs
-
-        jsr     SoundInit                           ; 814B 20 99 E2                  ..
-        lda     #SFXSTOP                            ; 814E A9 FF                    ..
-        jsr     SoundPlay                           ; 8150 20 CD E2                  ..
-        lda     #$10                            ; 8153 A9 10                    ..
-        sta     PPUCTRL_MIRROR                           ; 8155 8D 0E 03                 ...
-        sta     PPUCTRL                           ; 8158 8D 00 20                 .. 
-        lda     #$00                            ; 815B A9 00                    ..
-        sta     PPUMASK_MIRROR                           ; 815D 8D 0F 03                 ...
-        jsr     DrawTitleScreen                           ; 8160 20 66 81                  f.
-        jmp     L8277                           ; 8163 4C 77 82                 Lw.
+        jsr SoundInit
+        lda #SFXSTOP
+        jsr SoundPlay
+        lda #$10
+        sta PPUCTRL_MIRROR
+        sta PPUCTRL
+        lda #$00
+        sta PPUMASK_MIRROR
+        jsr DrawTitleScreen
+        jmp L8277
 
 ; ----------------------------------------------------------------------------
 DrawTitleScreen:
@@ -224,7 +219,7 @@ DrawTitleScreen:
         jsr     WorksetSave                           ; 81AA 20 61 97                  a.
         jsr     L9A37                           ; 81AD 20 37 9A                  7.
         jsr     PPUEnableNMI                           ; 81B0 20 DE 8B                  ..
-        jsr     L8BC2                           ; 81B3 20 C2 8B                  ..
+        jsr     PPUEnableAndWaitFor1Frame                           ; 81B3 20 C2 8B                  ..
         lda     #MusicTitleScreen                            ; 81B6 A9 06                    ..
         jsr     SoundPlay                           ; 81B8 20 CD E2                  ..
         lda     #$00                            ; 81BB A9 00                    ..
@@ -272,7 +267,7 @@ L8221:
         .byte   $10,$8D,$04,$03,$60             ; 8272 10 8D 04 03 60           ....`
 ; ----------------------------------------------------------------------------
 L8277:
-        ; clear stack
+        ; clear stack.. again.
         ldx     #$FF
         txs
         jsr     PPUDisableNMI
@@ -329,7 +324,7 @@ L82C3:
 L82ED:
         jsr     PPUDisableNMI                           ; 82ED 20 EA 8B                  ..
         jsr     PPUDisableRendering                           ; 82F0 20 B6 8B                  ..
-        jsr     L8E2D                           ; 82F3 20 2D 8E                  -.
+        jsr     PPUClear                           ; 82F3 20 2D 8E                  -.
         jsr     DrawStatusLine                           ; 82F6 20 8F A7                  ..
         bit     $0341                           ; 82F9 2C 41 03                 ,A.
         bmi     L8304                           ; 82FC 30 06                    0.
@@ -342,7 +337,7 @@ L8304:
         sta     $0341                           ; 8306 8D 41 03                 .A.
         sta     $0344                           ; 8309 8D 44 03                 .D.
         sta     $0346                           ; 830C 8D 46 03                 .F.
-        lda     #RomGraphicsC                            ; 830F A9 0C                    ..
+        lda     #RomGraphicsTrackerIcon                            ; 830F A9 0C                    ..
         jsr     DrawROMGraphics                           ; 8311 20 69 8D                  i.
 L8314:
         jsr     L977C                           ; 8314 20 7C 97                  |.
@@ -360,7 +355,7 @@ L8314:
         sta     $0302                           ; 8334 8D 02 03                 ...
         sta     $0305                           ; 8337 8D 05 03                 ...
         jsr     PPUEnableNMI                           ; 833A 20 DE 8B                  ..
-        jsr     L8BC2                           ; 833D 20 C2 8B                  ..
+        jsr     PPUEnableAndWaitFor1Frame                           ; 833D 20 C2 8B                  ..
         lda     #MusicMapScreen                            ; 8340 A9 00                    ..
         jsr     SoundPlay                           ; 8342 20 CD E2                  ..
         jsr     WaitFor1Frame                           ; 8345 20 40 8C                  @.
@@ -431,15 +426,15 @@ L83F8:
         jsr     SoundPlay                           ; 83FA 20 CD E2                  ..
         lda     $034B                           ; 83FD AD 4B 03                 .K.
         beq     L840A                           ; 8400 F0 08                    ..
-        jsr     LA8A1                           ; 8402 20 A1 A8                  ..
-        .byte   $9B,$86                         ; 8405 9B 86                    ..
+        jsr     CopyFromNextPtr                           ; 8402 20 A1 A8                  ..
+        .addr CopyTextYouveHitSomething
 ; ----------------------------------------------------------------------------
         jmp     L840F                           ; 8407 4C 0F 84                 L..
 
 ; ----------------------------------------------------------------------------
 L840A:
-        jsr     LA8A1                           ; 840A 20 A1 A8                  ..
-        .byte   $BE,$86                         ; 840D BE 86                    ..
+        jsr     CopyFromNextPtr                           ; 840A 20 A1 A8                  ..
+        .addr CopyTextYouveHitJaws
 ; ----------------------------------------------------------------------------
 L840F:
         lda     #$81                            ; 840F A9 81                    ..
@@ -475,7 +470,7 @@ L8419:
         jsr     LA749                           ; 845C 20 49 A7                  I.
         jsr     L96F1                           ; 845F 20 F1 96                  ..
         jsr     PPUEnableNMI                           ; 8462 20 DE 8B                  ..
-        jsr     L8BC2                           ; 8465 20 C2 8B                  ..
+        jsr     PPUEnableAndWaitFor1Frame                           ; 8465 20 C2 8B                  ..
         ldx     $038A                           ; 8468 AE 8A 03                 ...
         lda     L8697,x                         ; 846B BD 97 86                 ...
         jsr     SoundPlay                           ; 846E 20 CD E2                  ..
@@ -703,10 +698,12 @@ L8697:
         .byte MusicBonusScreenStart
         .byte MusicEncounterScreen
 
-        .byte $20, $2B ; space + ascii file separator
+CopyTextYouveHitSomething:
+        .byte $20, $2B ; string length + ascii file separator
         .byte "       YOU/VE HIT SOMETHING!     "
 
-        .byte $20, $2B ; space + ascii file separator
+CopyTextYouveHitJaws:
+        .byte $20, $2B ; string length + ascii file separator
         .byte "         YOU/VE HIT JAWS!        "
 
 ; ----------------------------------------------------------------------------
@@ -746,7 +743,7 @@ DrawGetReadyScreen:
         lda     #MusicGetReadyScreen                            ; 8735 A9 1B                    ..
         jsr     SoundPlay                           ; 8737 20 CD E2                  ..
         jsr     PPUEnableNMI                           ; 873A 20 DE 8B                  ..
-        jsr     L8BC2                           ; 873D 20 C2 8B                  ..
+        jsr     PPUEnableAndWaitFor1Frame                           ; 873D 20 C2 8B                  ..
 L8740:
         lda     #$01                            ; 8740 A9 01                    ..
         jsr     LD11F                           ; 8742 20 1F D1                  ..
@@ -830,7 +827,7 @@ L87F9:
         sta     $0306                           ; 880A 8D 06 03                 ...
         sta     ActiveCHR                           ; 880D 8D 07 03                 ...
         jsr     ClearScreenAndSprites                           ; 8810 20 12 8E                  ..
-        lda     #RomGraphics8                            ; 8813 A9 08                    ..
+        lda     #RomGraphicsGotTrackerScreen                            ; 8813 A9 08                    ..
         jsr     DrawROMGraphics                           ; 8815 20 69 8D                  i.
         jsr     DrawStatusLine                           ; 8818 20 8F A7                  ..
         lda     #$07                            ; 881B A9 07                    ..
@@ -861,13 +858,13 @@ L87F9:
         lda     #$01                            ; 8859 A9 01                    ..
         sta     $0305                           ; 885B 8D 05 03                 ...
         jsr     PPUEnableNMI                           ; 885E 20 DE 8B                  ..
-        jsr     L8BC2                           ; 8861 20 C2 8B                  ..
+        jsr     PPUEnableAndWaitFor1Frame                           ; 8861 20 C2 8B                  ..
         lda     #$78                            ; 8864 A9 78                    .x
         jsr     LD11F                           ; 8866 20 1F D1                  ..
-        jsr     LA8A1                           ; 8869 20 A1 A8                  ..
+        jsr     CopyFromNextPtr                           ; 8869 20 A1 A8                  ..
         .byte   $83,$88                         ; 886C 83 88                    ..
 ; ----------------------------------------------------------------------------
-        jsr     LA8A1                           ; 886E 20 A1 A8                  ..
+        jsr     CopyFromNextPtr                           ; 886E 20 A1 A8                  ..
         .byte   $88,$88                         ; 8871 88 88                    ..
 ; ----------------------------------------------------------------------------
         jsr     L8768                           ; 8873 20 68 87                  h.
@@ -934,7 +931,7 @@ L888D:
         lda     #$01                            ; 8908 A9 01                    ..
         sta     $0305                           ; 890A 8D 05 03                 ...
         jsr     PPUEnableNMI                           ; 890D 20 DE 8B                  ..
-        jsr     L8BC2                           ; 8910 20 C2 8B                  ..
+        jsr     PPUEnableAndWaitFor1Frame                           ; 8910 20 C2 8B                  ..
 L8913:
         jsr     WaitFor1Frame                           ; 8913 20 40 8C                  @.
         lda     #<PlayerData                            ; 8916 A9 80                    ..
@@ -959,8 +956,8 @@ L893A:
         lda     PlayerPowerLevel                           ; 893A AD 91 03                 ...
         cmp     #$08                            ; 893D C9 08                    ..
         bcs     L899C                           ; 893F B0 5B                    .[
-        jsr     LA8A1                           ; 8941 20 A1 A8                  ..
-        .byte   $D0,$89                         ; 8944 D0 89                    ..
+        jsr     CopyFromNextPtr                           ; 8941 20 A1 A8                  ..
+        .addr   CopyTextPowerLevelRaised                         ; 8944 D0 89                    ..
 ; ----------------------------------------------------------------------------
         jsr     L8B83                           ; 8946 20 83 8B                  ..
         lda     #$3C                            ; 8949 A9 3C                    .<
@@ -1007,11 +1004,13 @@ L899C:
         .byte   $B4,$20,$1F,$D1,$AD,$0E,$03,$09 ; 89BC B4 20 1F D1 AD 0E 03 09  . ......
         .byte   $10,$8D,$0E,$03,$A9,$01,$8D,$05 ; 89C4 10 8D 0E 03 A9 01 8D 05  ........
         .byte   $03,$4C,$ED,$82
-        
-        .byte $20, $2B ; space + ascii file separator
+
+CopyTextPowerLevelRaised:
+        .byte $20, $2B ; copy length + ascii file separator
         .byte "        POWER LEVEL RAISED.      "
 
-        .byte $20, $2B ; space + ascii file separator
+UnusedCopyTextCollectOneStrobe:
+        .byte $20, $2B ; copy length + ascii file separator
         .byte "        COLLECT ONE STROBE.      "
         
 ; ----------------------------------------------------------------------------
@@ -1275,7 +1274,7 @@ PPUDisableRendering:
         rts
 
 ; ----------------------------------------------------------------------------
-L8BC2:
+PPUEnableAndWaitFor1Frame:
         lda PPUMASK_MIRROR
         ora #%00011000
         sta PPUMASK_MIRROR
@@ -1633,47 +1632,47 @@ ClearScreenAndSprites:
         rts
 
 ; ----------------------------------------------------------------------------
-L8E2D:
-        lda     #$00                            ; 8E2D A9 00                    ..
-        sta     $0303                           ; 8E2F 8D 03 03                 ...
-        sta     $0304                           ; 8E32 8D 04 03                 ...
-        jsr     PPUDisableRendering                           ; 8E35 20 B6 8B                  ..
-        jsr     MoveAllSpritesOffscreen                           ; 8E38 20 9C 8E                  ..
-        jsr     PPURenderHorizontal                           ; 8E3B 20 F6 8B                  ..
-        lda     #$20                            ; 8E3E A9 20                    . 
-        sta     PPUADDR                           ; 8E40 8D 06 20                 .. 
-        lda     #$00                            ; 8E43 A9 00                    ..
-        sta     PPUADDR                           ; 8E45 8D 06 20                 .. 
-        tax                                     ; 8E48 AA                       .
-        ldy     #$04                            ; 8E49 A0 04                    ..
-L8E4B:
-        sta     PPUDATA                           ; 8E4B 8D 07 20                 .. 
-        dex                                     ; 8E4E CA                       .
-        bne     L8E4B                           ; 8E4F D0 FA                    ..
-        dey                                     ; 8E51 88                       .
-        bne     L8E4B                           ; 8E52 D0 F7                    ..
-        lda     #$28                            ; 8E54 A9 28                    .(
-        sta     PPUADDR                           ; 8E56 8D 06 20                 .. 
-        stx     PPUADDR                           ; 8E59 8E 06 20                 .. 
-        txa                                     ; 8E5C 8A                       .
-        ldy     #$04                            ; 8E5D A0 04                    ..
-        ldx     #$40                            ; 8E5F A2 40                    .@
-L8E61:
-        sta     PPUDATA                           ; 8E61 8D 07 20                 .. 
-        dex                                     ; 8E64 CA                       .
-        bne     L8E61                           ; 8E65 D0 FA                    ..
-        dey                                     ; 8E67 88                       .
-        bne     L8E61                           ; 8E68 D0 F7                    ..
-        lda     #$2B                            ; 8E6A A9 2B                    .+
-        sta     PPUADDR                           ; 8E6C 8D 06 20                 .. 
-        lda     #$C0                            ; 8E6F A9 C0                    ..
-        sta     PPUADDR                           ; 8E71 8D 06 20                 .. 
-        ldx     #$30                            ; 8E74 A2 30                    .0
-L8E76:
-        sty     PPUDATA                           ; 8E76 8C 07 20                 .. 
-        dex                                     ; 8E79 CA                       .
-        bne     L8E76                           ; 8E7A D0 FA                    ..
-        rts                                     ; 8E7C 60                       `
+PPUClear:
+        lda     #$00
+        sta     $0303
+        sta     $0304
+        jsr     PPUDisableRendering
+        jsr     MoveAllSpritesOffscreen
+        jsr     PPURenderHorizontal
+        lda     #$20
+        sta     PPUADDR
+        lda     #$00
+        sta     PPUADDR
+        tax
+        ldy     #$04
+@Draw0:
+        sta     PPUDATA
+        dex
+        bne     @Draw0
+        dey
+        bne     @Draw0
+        lda     #$28
+        sta     PPUADDR
+        stx     PPUADDR
+        txa
+        ldy     #$04
+        ldx     #$40
+@Draw1:
+        sta     PPUDATA
+        dex
+        bne     @Draw1
+        dey
+        bne     @Draw1
+        lda     #$2B
+        sta     PPUADDR
+        lda     #$C0
+        sta     PPUADDR
+        ldx     #$30
+@Draw2:
+        sty     PPUDATA
+        dex
+        bne     @Draw2
+        rts
 
 ; ----------------------------------------------------------------------------
 ClearScreen:
@@ -5290,39 +5289,40 @@ LA73E:
 
 ; ----------------------------------------------------------------------------
 LA749:
-        lda     $038E                           ; A749 AD 8E 03                 ...
-        asl     a                               ; A74C 0A                       .
-        tax                                     ; A74D AA                       .
-        lda     UnknownData3_Pointers,x                         ; A74E BD 48 BF                 .H.
-        sta     $44                             ; A751 85 44                    .D
-        lda     UnknownData3_Pointers+1,x                         ; A753 BD 49 BF                 .I.
-        sta     $45                             ; A756 85 45                    .E
-        ldy     #$00                            ; A758 A0 00                    ..
-        lda     ($44),y                         ; A75A B1 44                    .D
-        iny                                     ; A75C C8                       .
-        cmp     #$03                            ; A75D C9 03                    ..
-        bcc     LA76A                           ; A75F 90 09                    ..
-        ldx     $034B                           ; A761 AE 4B 03                 .K.
-        cpx     #$02                            ; A764 E0 02                    ..
-        bcs     LA76A                           ; A766 B0 02                    ..
-        lda     #$03                            ; A768 A9 03                    ..
-LA76A:
-        sta     $0480                           ; A76A 8D 80 04                 ...
-        lda     ($44),y                         ; A76D B1 44                    .D
-        iny                                     ; A76F C8                       .
-        sta     $0484                           ; A770 8D 84 04                 ...
-        sta     $0486                           ; A773 8D 86 04                 ...
-        lda     ($44),y                         ; A776 B1 44                    .D
-        iny                                     ; A778 C8                       .
-        sta     $0482                           ; A779 8D 82 04                 ...
-        lda     ($44),y                         ; A77C B1 44                    .D
-        sta     $0483                           ; A77E 8D 83 04                 ...
-        lda     #$00                            ; A781 A9 00                    ..
-        sta     $0481                           ; A783 8D 81 04                 ...
-        lda     #$00                            ; A786 A9 00                    ..
-        sta     $0485                           ; A788 8D 85 04                 ...
-        sta     $0487                           ; A78B 8D 87 04                 ...
-        rts                                     ; A78E 60                       `
+        @TempPointer = $44
+        lda     $038E
+        asl     a
+        tax
+        lda     UnknownData3_Pointers,x
+        sta     @TempPointer
+        lda     UnknownData3_Pointers+1,x
+        sta     @TempPointer+1
+        ldy     #$00
+        lda     (@TempPointer),y
+        iny
+        cmp     #$03
+        bcc     @LA76A
+        ldx     $034B
+        cpx     #$02
+        bcs     @LA76A
+        lda     #$03
+@LA76A:
+        sta     $0480
+        lda     (@TempPointer),y
+        iny
+        sta     $0484
+        sta     $0486
+        lda     (@TempPointer),y
+        iny
+        sta     $0482
+        lda     (@TempPointer),y
+        sta     $0483
+        lda     #$00
+        sta     $0481
+        lda     #$00
+        sta     $0485
+        sta     $0487
+        rts
 
 ; ----------------------------------------------------------------------------
 DrawStatusLine:
@@ -5461,65 +5461,85 @@ LA890:
         .byte   $0C,$1D,$0C,$0E,$0F,$1E,$1F,$24 ; A890 0C 1D 0C 0E 0F 1E 1F 24  .......$
         .byte   $25,$0B,$27,$0B,$28,$0B,$29,$0B ; A898 25 0B 27 0B 28 0B 29 0B  %.'.(.).
         .byte   $0C                             ; A8A0 0C                       .
-; ----------------------------------------------------------------------------
-LA8A1:
-        pla                                     ; A8A1 68                       h
-        sta     $44                             ; A8A2 85 44                    .D
-        pla                                     ; A8A4 68                       h
-        sta     $45                             ; A8A5 85 45                    .E
-        jsr     LA8FC                           ; A8A7 20 FC A8                  ..
-        ldy     #$00                            ; A8AA A0 00                    ..
-        lda     ($44),y                         ; A8AC B1 44                    .D
-        tax                                     ; A8AE AA                       .
-        jsr     LA8FC                           ; A8AF 20 FC A8                  ..
-        lda     ($44),y                         ; A8B2 B1 44                    .D
-        tay                                     ; A8B4 A8                       .
-        lda     $45                             ; A8B5 A5 45                    .E
-        pha                                     ; A8B7 48                       H
-        lda     $44                             ; A8B8 A5 44                    .D
-        pha                                     ; A8BA 48                       H
-        stx     $44                             ; A8BB 86 44                    .D
-        sty     $45                             ; A8BD 84 45                    .E
-        ldy     #$00                            ; A8BF A0 00                    ..
-        sty     $0100                           ; A8C1 8C 00 01                 ...
-        ldx     $0101                           ; A8C4 AE 01 01                 ...
-        lda     ($44),y                         ; A8C7 B1 44                    .D
-        sta     $0103,x                         ; A8C9 9D 03 01                 ...
-        inx                                     ; A8CC E8                       .
-        iny                                     ; A8CD C8                       .
-        lda     ($44),y                         ; A8CE B1 44                    .D
-        ora     #$80                            ; A8D0 09 80                    ..
-        sta     $0101,x                         ; A8D2 9D 01 01                 ...
-        inx                                     ; A8D5 E8                       .
-        iny                                     ; A8D6 C8                       .
-        lda     ($44),y                         ; A8D7 B1 44                    .D
-        sta     $0102,x                         ; A8D9 9D 02 01                 ...
-        sta     $0F                             ; A8DC 85 0F                    ..
-        inx                                     ; A8DE E8                       .
-        iny                                     ; A8DF C8                       .
-LA8E0:
-        lda     ($44),y                         ; A8E0 B1 44                    .D
-        sta     $0102,x                         ; A8E2 9D 02 01                 ...
-        inx                                     ; A8E5 E8                       .
-        iny                                     ; A8E6 C8                       .
-        dec     $0F                             ; A8E7 C6 0F                    ..
-        bne     LA8E0                           ; A8E9 D0 F5                    ..
-        stx     $0101                           ; A8EB 8E 01 01                 ...
-        lda     #$80                            ; A8EE A9 80                    ..
-        sta     $0100                           ; A8F0 8D 00 01                 ...
-        lda     $0304                           ; A8F3 AD 04 03                 ...
-        ora     #$10                            ; A8F6 09 10                    ..
-        sta     $0304                           ; A8F8 8D 04 03                 ...
-        rts                                     ; A8FB 60                       `
 
-; ----------------------------------------------------------------------------
-LA8FC:
-        inc     $44                             ; A8FC E6 44                    .D
-        bne     LA902                           ; A8FE D0 02                    ..
-        .byte   $E6,$45                         ; A900 E6 45                    .E
-; ----------------------------------------------------------------------------
-LA902:
-        rts                                     ; A902 60                       `
+
+; ----------------------------------------------------------------------
+; Copy data from a pointer after the callsite into $102, offset by $101
+; Example:
+;
+;   jsr CopyFromNextPtr
+;   .addr DataToCopy
+;   rts
+;
+;   DataToCopy:
+;   .byte 3, 1, "HEY"
+;
+; Running this code will write $81 $03 "HEY" into $102
+;
+CopyFromNextPtr:
+        @TempPointer    = $44
+        @TempCopyLength = $0F
+        @TempTarget     = $102
+        ; start by setting the pointer to our callsite
+        pla
+        sta @TempPointer
+        pla
+        sta @TempPointer+1
+        jsr @IncrementPointer
+        ldy #0
+        ; then get the next address from that pointer
+        lda (@TempPointer),y
+        tax
+        jsr @IncrementPointer
+        lda (@TempPointer),y
+        tay
+        ; put return site back onto the stack
+        lda @TempPointer+1
+        pha
+        lda @TempPointer
+        pha
+        ; and update the pointer to our data
+        stx @TempPointer
+        sty @TempPointer+1
+        ldy #0
+        sty $0100
+        ; use $101 as a copy offset
+        ldx $0101
+        lda (@TempPointer),y
+        sta $0103,x
+        inx
+        iny
+        lda (@TempPointer),y
+        ora #$80
+        sta $0101,x
+        inx
+        iny
+        lda (@TempPointer),y
+        sta $0102,x
+        sta @TempCopyLength
+        inx
+        iny
+@KeepCopying:
+        lda (@TempPointer),y
+        sta $0102,x
+        inx
+        iny
+        dec @TempCopyLength
+        bne @KeepCopying
+        ; store new offset at $101
+        stx $0101
+        lda #$80
+        sta $0100
+        lda $0304
+        ora #$10
+        sta $0304
+        rts
+@IncrementPointer:
+        inc @TempPointer
+        bne @Done
+        inc @TempPointer+1
+@Done:
+        rts
 
 ; ----------------------------------------------------------------------------
 LA903:
@@ -6632,73 +6652,283 @@ UnknownData3_Pointers:
 @UnknownData3_30:
 .byte $04, $04, $5b, $c1
 @UnknownData3_31:
-.byte $04, $04, $7c, $c1, $00, $01, $00, $01, $00, $01, $00, $01, $00, $01, $00, $01, $00, $01, $00, $01, $00, $01, $00, $01, $00, $01, $00, $01, $ff, $01, $01, $00, $01, $01, $00, $01, $01, $00, $01, $01, $00, $01, $01, $00, $01, $01, $00, $01, $01, $00, $01, $01, $03, $ff, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $01, $00, $00, $00, $01, $00, $01, $00, $01, $00, $01, $00, $01, $01, $01, $01, $00, $01, $01, $01, $03, $ff, $00, $01, $02, $00, $01, $02, $00, $01, $02, $03, $00, $01, $02, $00, $01, $02, $00, $01, $02, $03, $00, $01, $02, $00, $01, $02, $00, $01, $02, $00, $01, $03, $ff, $01, $01, $01, $01, $01, $01, $01, $01, $01, $01, $01, $03, $01, $01, $01, $01, $01, $01, $01, $03, $01, $01, $01, $01, $01, $03, $01, $01, $01, $01, $01, $03, $01, $01, $01, $03, $01, $01, $01, $03, $ff, $02, $02, $02, $02, $02, $02, $02, $02, $02, $02, $02, $02, $02, $02, $02, $02, $02, $02, $02, $02, $02, $02, $02, $02, $02, $02, $02, $02, $02, $02, $02, $02, $ff, $03, $03, $03, $03, $03, $03, $03, $03, $03, $03, $03, $03, $03, $03, $03, $03, $ff, $02, $02, $02, $03, $02, $02, $02, $03, $02, $02, $02, $03, $02, $02, $02, $03, $02, $02, $02, $03, $02, $02, $02, $03, $02, $02, $02, $03, $02, $02, $02, $03, $ff, $00, $01, $02, $03, $00, $01, $02, $03, $00, $01, $02, $03, $00, $01, $02, $03, $00, $01, $02, $03, $00, $01, $02, $03, $00, $01, $02, $03, $00, $01, $02, $03, $ff, $00, $01, $00, $01, $00, $01, $00, $03, $00, $01, $00, $01, $00, $01, $00, $03, $00, $01, $00, $01, $00, $01, $00, $03, $00, $01, $00, $01, $00, $01, $00, $03, $ff, $00, $01, $02, $03, $04, $00, $01, $02, $03, $04, $00, $01, $02, $03, $04, $00, $01, $02, $03, $04, $00, $01, $02, $03, $04, $00, $01, $02, $03, $04, $00, $01, $ff, $04, $04, $04, $04, $04, $04, $04, $03, $04, $04, $04, $04, $04, $04, $04, $03, $04, $04, $04, $04, $04, $04, $04, $03, $04, $04, $04, $04, $04, $04, $04, $03, $ff, $04, $02, $04, $03, $04, $02, $04, $03, $04, $02, $04, $03, $04, $02, $04, $03, $04, $02, $04, $03, $04, $02, $04, $03, $04, $02, $04, $03, $04, $02, $04, $03, $ff
+.byte $04, $04, $7c, $c1
+.byte $00, $01, $00, $01, $00, $01, $00, $01, $00, $01, $00, $01, $00, $01, $00, $01, $00, $01, $00, $01, $00, $01, $00, $01, $ff, $01, $01, $00, $01, $01, $00, $01, $01, $00, $01, $01, $00, $01, $01, $00, $01, $01, $00, $01, $01, $00, $01, $01, $03, $ff, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $01, $00, $00, $00, $01, $00, $01, $00, $01, $00, $01, $00, $01, $01, $01, $01, $00, $01, $01, $01, $03, $ff, $00, $01, $02, $00, $01, $02, $00, $01, $02, $03, $00, $01, $02, $00, $01, $02, $00, $01, $02, $03, $00, $01, $02, $00, $01, $02, $00, $01, $02, $00, $01, $03, $ff, $01, $01, $01, $01, $01, $01, $01, $01, $01, $01, $01, $03, $01, $01, $01, $01, $01, $01, $01, $03, $01, $01, $01, $01, $01, $03, $01, $01, $01, $01, $01, $03, $01, $01, $01, $03, $01, $01, $01, $03, $ff, $02, $02, $02, $02, $02, $02, $02, $02, $02, $02, $02, $02, $02, $02, $02, $02, $02, $02, $02, $02, $02, $02, $02, $02, $02, $02, $02, $02, $02, $02, $02, $02, $ff, $03, $03, $03, $03, $03, $03, $03, $03, $03, $03, $03, $03, $03, $03, $03, $03, $ff, $02, $02, $02, $03, $02, $02, $02, $03, $02, $02, $02, $03, $02, $02, $02, $03, $02, $02, $02, $03, $02, $02, $02, $03, $02, $02, $02, $03, $02, $02, $02, $03, $ff, $00, $01, $02, $03, $00, $01, $02, $03, $00, $01, $02, $03, $00, $01, $02, $03, $00, $01, $02, $03, $00, $01, $02, $03, $00, $01, $02, $03, $00, $01, $02, $03, $ff, $00, $01, $00, $01, $00, $01, $00, $03, $00, $01, $00, $01, $00, $01, $00, $03, $00, $01, $00, $01, $00, $01, $00, $03, $00, $01, $00, $01, $00, $01, $00, $03, $ff, $00, $01, $02, $03, $04, $00, $01, $02, $03, $04, $00, $01, $02, $03, $04, $00, $01, $02, $03, $04, $00, $01, $02, $03, $04, $00, $01, $02, $03, $04, $00, $01, $ff, $04, $04, $04, $04, $04, $04, $04, $03, $04, $04, $04, $04, $04, $04, $04, $03, $04, $04, $04, $04, $04, $04, $04, $03, $04, $04, $04, $04, $04, $04, $04, $03, $ff, $04, $02, $04, $03, $04, $02, $04, $03, $04, $02, $04, $03, $04, $02, $04, $03, $04, $02, $04, $03, $04, $02, $04, $03, $04, $02, $04, $03, $04, $02, $04, $03, $ff
 
 
 
 RomGraphicsTitleScreen = 0
 RomGraphicsStatusLineText = 1
-RomGraphics2 = 2
-RomGraphics3 = 3
+RomGraphicsEncounterShallow = 2
+RomGraphicsEncounterDeep = 3
 RomGraphics4 = 4
-RomGraphics5 = 5
+RomGraphicsBonusScreenHitsLabel = 5
 RomGraphics6 = 6
 RomGraphics7 = 7
-RomGraphics8 = 8
-RomGraphics9 = 9
-RomGraphicsA = 10
+RomGraphicsGotTrackerScreen = 8
+RomGraphicsBonusStartScreen = 9
+RomGraphicsBonusEndScreen = 10
 RomGraphicsStatusPowerLabel = 11
-RomGraphicsC = 12
+RomGraphicsTrackerIcon = 12
 RomGraphicsD = 13
 RomGraphicsGetReadyScreen = 14
 
 RomGraphicsPtrs:
 .addr @RomGraphicsTitleScreen
 .addr @RomGraphicsStatusLineText
-.addr @RomGraphics2
-.addr @RomGraphics3
+.addr @RomGraphicsEncounterShallow
+.addr @RomGraphicsEncounterDeep
 .addr @RomGraphics4
-.addr @RomGraphics5
+.addr @RomGraphicsBonusScreenHitsLabel
 .addr @RomGraphics6
 .addr @RomGraphics7
-.addr @RomGraphics8
-.addr @RomGraphics9
-.addr @RomGraphicsA
+.addr @RomGraphicsGotTrackerScreen
+.addr @RomGraphicsBonusStartScreen
+.addr @RomGraphicsBonusEndScreen
 .addr @RomGraphicsStatusPowerLabel
-.addr @RomGraphicsC
+.addr @RomGraphicsTrackerIcon
 .addr @RomGraphicsD
 .addr @RomGraphicsGetReadyScreen
 
 @RomGraphicsTitleScreen:
-.byte $00, $20, $FF, $FF, $20, $10, $02, $FF, $01, $D7, $20, $A5, $B5, $FF, $0E, $01, $01, $FF, $05, $62, $01, $61, $A2, $A0, $02, $B2, $A4, $D0, $01, $01, $D3, $FF, $0D, $01, $01, $FF, $05, $72, $01, $71, $B2, $01, $E0, $01, $B4, $01, $01, $E2, $E3, $22, $23, $FF, $0B, $01, $01, $FF, $05, $82, $01, $81, $01, $01, $F0, $01, $C4, $01, $01, $F2, $F3, $FF, $0A, $60, $90, $91, $01, $01, $02, $68, $69, $6A, $6B, $92, $01, $01, $01, $01, $01, $65, $D4, $D5, $01, $01, $C5, $FF, $0A, $70, $01, $A1, $01, $A3, $02, $78, $79, $7A, $7B, $02, $62, $01, $63, $64, $01, $75, $E4, $E5, $F5, $01, $01, $FF, $0A, $80, $B0, $01, $01, $B3, $02, $88, $89, $8A, $8B, $02, $72, $01, $73, $74, $01, $85, $F4, $01, $01, $01, $66, $FF, $0B, $C0, $C1, $C2, $C3, $02, $98, $99, $9A, $9B, $02, $93, $94, $83, $84, $94, $95, $B1, $D1, $D2, $E1, $F1, $FF, $0B, $86, $87, $A6, $A7, $02, $A8, $A9, $AA, $AB, $02, $8C, $8D, $8E, $8F, $02, $02, $02, $02, $02, $02, $02, $02, $02, $02, $FF, $08, $96, $97, $B6, $B7, $02, $B8, $B9, $BA, $BB, $02, $9C, $9D, $9E, $9F, $FF, $0D, $5C, $5D, $5D, $5F, $5C, $5D, $5E, $5F, $6C, $6D, $6E, $6F, $7C, $7D, $7E, $7F, $5C, $5D, $5E, $5F, $5C, $5D, $5E, $5F, $5C, $5D, $5E, $5F, $5C, $5D, $5E, $5F, $04, $05, $06, $07, $04, $05, $06, $07, $04, $05, $06, $07, $04, $05, $06, $07, $04, $05, $06, $07, $04, $05, $06, $07, $04, $05, $06, $07, $04, $05, $06, $07, $14, $15, $16, $17, $14, $15, $16, $17, $14, $15, $16, $17, $14, $15, $16, $17, $14, $15, $16, $17, $14, $15, $16, $17, $14, $15, $16, $17, $14, $15, $16, $17, $FF, $01, $86, $22, $40, $31, $39, $38, $37, $20, $4C, $4A, $4E, $20, $54, $4F, $59, $53, $2C, $4C, $54, $44, $2E, $FF, $13, $54, $4D, $26, $40, $31, $39, $38, $37, $FF, $0F, $55, $4E, $49, $56, $45, $52, $53, $41, $4C, $20, $43, $49, $54, $59, $20, $53, $54, $55, $44, $49, $4F, $53, $2C, $49, $4E, $43, $2E, $FF, $08, $41, $4C, $4C, $20, $52, $49, $47, $48, $54, $53, $20, $52, $45, $53, $45, $52, $56, $45, $44, $2E, $FF, $09, $4C, $49, $43, $45, $4E, $53, $45, $44, $20, $42, $59, $20, $4D, $45, $52, $43, $48, $41, $4E, $44, $49, $53, $49, $4E, $47, $FF, $07, $43, $4F, $52, $50, $4F, $52, $41, $54, $49, $4F, $4E, $20, $4F, $46, $20, $41, $4D, $45, $52, $49, $43, $41, $2C, $49, $4E, $43, $2E, $FF, $06, $4C, $49, $43, $45, $4E, $53, $45, $44, $20, $42, $59, $20, $4E, $49, $4E, $54, $45, $4E, $44, $4F, $20, $4F, $46, $FF, $0F, $41, $4D, $45, $52, $49, $43, $41, $2C, $49, $4E, $43, $2E, $FF, $01, $C0, $23, $FF, $FF, $12, $01, $AA, $FF, $01, $D2, $23, $6A, $9A, $AA, $AA, $AA, $AA, $AA, $0A, $46, $19, $0A, $AA, $AA, $AA, $FF, $FF, $20, $01, $00, $FF, $00
+.byte $00, $20, $FF
+.byte $FF, $20, $10, $02, $FF
+.byte $01, $D7, $20, $A5, $B5, $FF
+.byte $0E, $01, $01, $FF
+.byte $05, $62, $01, $61, $A2, $A0, $02, $B2, $A4, $D0, $01, $01, $D3, $FF
+.byte $0D, $01, $01, $FF
+.byte $05, $72, $01, $71, $B2, $01, $E0, $01, $B4, $01, $01, $E2, $E3, $22, $23, $FF
+.byte $0B, $01, $01, $FF
+.byte $05, $82, $01, $81, $01, $01, $F0, $01, $C4, $01, $01, $F2, $F3, $FF
+.byte $0A, $60, $90, $91, $01, $01, $02, $68, $69, $6A, $6B, $92, $01, $01, $01, $01, $01, $65, $D4, $D5, $01, $01, $C5, $FF
+.byte $0A, $70, $01, $A1, $01, $A3, $02, $78, $79, $7A, $7B, $02, $62, $01, $63, $64, $01, $75, $E4, $E5, $F5, $01, $01, $FF
+.byte $0A, $80, $B0, $01, $01, $B3, $02, $88, $89, $8A, $8B, $02, $72, $01, $73, $74, $01, $85, $F4, $01, $01, $01, $66, $FF
+.byte $0B, $C0, $C1, $C2, $C3, $02, $98, $99, $9A, $9B, $02, $93, $94, $83, $84, $94, $95, $B1, $D1, $D2, $E1, $F1, $FF
+.byte $0B, $86, $87, $A6, $A7, $02, $A8, $A9, $AA, $AB, $02, $8C, $8D, $8E, $8F, $02, $02, $02, $02, $02, $02, $02, $02, $02, $02, $FF
+.byte $08, $96, $97, $B6, $B7, $02, $B8, $B9, $BA, $BB, $02, $9C, $9D, $9E, $9F, $FF
+.byte $0D, $5C, $5D, $5D, $5F, $5C, $5D, $5E, $5F, $6C, $6D, $6E, $6F, $7C, $7D, $7E, $7F, $5C, $5D, $5E, $5F, $5C, $5D, $5E, $5F, $5C, $5D, $5E, $5F, $5C, $5D, $5E, $5F, $04, $05, $06, $07, $04, $05, $06, $07, $04, $05, $06, $07, $04, $05, $06, $07, $04, $05, $06, $07, $04, $05, $06, $07, $04, $05, $06, $07, $04, $05, $06, $07, $14, $15, $16, $17, $14, $15, $16, $17, $14, $15, $16, $17, $14, $15, $16, $17, $14, $15, $16, $17, $14, $15, $16, $17, $14, $15, $16, $17, $14, $15, $16, $17, $FF
+.byte $01, $86, $22, $40, $31, $39, $38, $37, $20, $4C, $4A, $4E, $20, $54, $4F, $59, $53, $2C, $4C, $54, $44, $2E, $FF
+.byte $13, $54, $4D, $26, $40, $31, $39, $38, $37, $FF
+.byte $0F, $55, $4E, $49, $56, $45, $52, $53, $41, $4C, $20, $43, $49, $54, $59, $20, $53, $54, $55, $44, $49, $4F, $53, $2C, $49, $4E, $43, $2E, $FF
+.byte $08, $41, $4C, $4C, $20, $52, $49, $47, $48, $54, $53, $20, $52, $45, $53, $45, $52, $56, $45, $44, $2E, $FF
+.byte $09, $4C, $49, $43, $45, $4E, $53, $45, $44, $20, $42, $59, $20, $4D, $45, $52, $43, $48, $41, $4E, $44, $49, $53, $49, $4E, $47, $FF
+.byte $07, $43, $4F, $52, $50, $4F, $52, $41, $54, $49, $4F, $4E, $20, $4F, $46, $20, $41, $4D, $45, $52, $49, $43, $41, $2C, $49, $4E, $43, $2E, $FF
+.byte $06, $4C, $49, $43, $45, $4E, $53, $45, $44, $20, $42, $59, $20, $4E, $49, $4E, $54, $45, $4E, $44, $4F, $20, $4F, $46, $FF
+.byte $0F, $41, $4D, $45, $52, $49, $43, $41, $2C, $49, $4E, $43, $2E, $FF
+.byte $01, $C0, $23, $FF
+.byte $FF, $12, $01, $AA, $FF
+.byte $01, $D2, $23, $6A, $9A, $AA, $AA, $AA, $AA, $AA, $0A, $46, $19, $0A, $AA, $AA, $AA, $FF
+.byte $FF, $20, $01, $00, $FF
+.byte $00
 @RomGraphicsStatusLineText:
-.byte $00, $2B, $FF, $FF, $20, $06, $20, $FF, $01, $F0, $2B, $FF, $FF, $10, $01, $00, $FF, $01, $61, $2B, $53, $43, $4F, $52, $45, $FF, $03, $10, $11, $12, $13, $10, $FF, $06, $4A, $41, $57, $53, $2F, $50, $4F, $57, $45, $52, $FF, $00
-@RomGraphics2:
-.byte $C8, $23, $FF, $FF, $18, $01, $FF, $FF, $01, $E0, $23, $55, $55, $55, $55, $55, $55, $55, $55, $6A, $AA, $AA, $9A, $AA, $AA, $AA, $AA, $A6, $AA, $A9, $A9, $AA, $AA, $A6, $A9, $FF, $00
-@RomGraphics3:
-.byte $C8, $23, $FF, $FF, $10, $01, $FF, $FF, $01, $D8, $23, $5F, $5F, $5F, $5F, $5F, $5F, $5F, $5F, $FF, $FF, $18, $01, $55, $FF, $01, $F8, $23, $05, $05, $05, $05, $05, $05, $05, $05, $FF, $01, $C0, $2B, $55, $55, $55, $55, $55, $55, $55, $55, $AA, $AA, $AA, $AA, $AA, $AA, $AA, $AA, $FF, $FF, $08, $01, $0A, $FF, $00
+.byte $00, $2B, $FF
+.byte $FF, $20, $06, $20, $FF
+.byte $01, $F0, $2B, $FF
+.byte $FF, $10, $01, $00, $FF
+.byte $01, $61, $2B, $53, $43, $4F, $52, $45, $FF
+.byte $03, $10, $11, $12, $13, $10, $FF
+.byte $06, $4A, $41, $57, $53, $2F, $50, $4F, $57, $45, $52, $FF
+.byte $00
+@RomGraphicsEncounterShallow:
+.byte $C8, $23, $FF
+.byte $FF, $18, $01, $FF
+.byte $FF, $01, $E0, $23, $55, $55, $55, $55, $55, $55, $55, $55, $6A, $AA, $AA, $9A, $AA, $AA, $AA, $AA, $A6, $AA, $A9, $A9, $AA, $AA, $A6, $A9, $FF
+.byte $00
+@RomGraphicsEncounterDeep:
+.byte $C8, $23, $FF
+.byte $FF, $10, $01, $FF
+.byte $FF, $01, $D8, $23, $5F, $5F, $5F, $5F, $5F, $5F, $5F, $5F, $FF
+.byte $FF, $18, $01, $55, $FF
+.byte $01, $F8, $23, $05, $05, $05, $05, $05, $05, $05, $05, $FF
+.byte $01, $C0, $2B, $55, $55, $55, $55, $55, $55, $55, $55, $AA, $AA, $AA, $AA, $AA, $AA, $AA, $AA, $FF
+.byte $FF, $08, $01, $0A, $FF
+.byte $00
 @RomGraphics4:
-.byte $00, $20, $FF, $FF, $20, $1A, $02, $FF, $FF, $20, $04, $00, $FF, $01, $40, $20, $0E, $0F, $FF, $04, $0A, $0B, $0C, $0D, $0E, $0F, $FF, $10, $0A, $0B, $0C, $0D, $1E, $1F, $FF, $04, $1A, $1B, $1C, $1D, $1E, $1F, $02, $24, $25, $26, $27, $02, $0A, $0B, $0C, $0D, $0E, $0F, $25, $26, $27, $02, $1A, $1B, $1C, $1D, $74, $02, $24, $25, $26, $27, $FF, $05, $74, $02, $34, $35, $36, $37, $02, $1A, $1B, $1C, $1D, $1E, $1F, $35, $36, $37, $FF, $04, $74, $02, $02, $34, $35, $36, $37, $74, $75, $02, $17, $18, $19, $FF, $03, $17, $18, $19, $FF, $03, $74, $02, $02, $74, $75, $02, $17, $18, $19, $02, $02, $74, $75, $02, $02, $74, $75, $FF, $05, $74, $74, $75, $FF, $04, $74, $75, $02, $02, $17, $18, $19, $FF, $03, $74, $75, $FF, $30, $01, $01, $01, $01, $FF, $02, $01, $01, $01, $01, $01, $01, $FF, $14, $04, $05, $09, $01, $FF, $02, $04, $05, $06, $07, $08, $09, $FF, $06, $10, $11, $12, $13, $10, $11, $12, $13, $10, $11, $12, $13, $10, $11, $12, $13, $10, $11, $12, $13, $10, $11, $12, $13, $10, $11, $12, $13, $10, $11, $12, $13, $20, $21, $22, $23, $20, $21, $22, $23, $20, $21, $22, $23, $20, $21, $22, $23, $20, $21, $22, $23, $20, $21, $22, $23, $20, $21, $22, $23, $20, $21, $22, $23, $30, $31, $32, $33, $30, $31, $32, $33, $30, $31, $32, $33, $30, $31, $32, $33, $30, $31, $32, $33, $30, $31, $32, $33, $30, $31, $32, $33, $30, $31, $32, $33, $40, $41, $42, $43, $44, $44, $40, $41, $42, $43, $44, $44, $40, $41, $42, $43, $44, $44, $40, $41, $42, $43, $44, $44, $40, $41, $42, $43, $44, $44, $40, $41, $54, $54, $54, $54, $45, $46, $54, $54, $54, $54, $45, $46, $54, $54, $54, $54, $45, $46, $54, $54, $54, $54, $45, $46, $54, $54, $54, $54, $45, $46, $54, $54, $51, $52, $54, $54, $54, $54, $54, $54, $51, $52, $54, $54, $54, $54, $53, $50, $51, $52, $54, $54, $54, $54, $54, $54, $51, $52, $54, $54, $54, $54, $54, $54, $16, $16, $16, $16, $14, $15, $16, $16, $16, $16, $14, $15, $16, $16, $16, $16, $16, $16, $16, $16, $14, $15, $16, $16, $16, $16, $14, $15, $16, $16, $16, $16, $55, $55, $55, $55, $55, $55, $60, $61, $62, $63, $55, $55, $55, $55, $55, $55, $55, $55, $55, $55, $55, $55, $60, $61, $62, $63, $55, $55, $55, $55, $55, $55, $60, $61, $62, $63, $55, $55, $55, $55, $55, $55, $55, $55, $60, $61, $62, $63, $55, $55, $55, $55, $55, $55, $55, $55, $55, $55, $60, $61, $62, $63, $55, $55, $16, $16, $16, $16, $16, $16, $64, $65, $16, $16, $16, $16, $16, $16, $16, $16, $16, $16, $64, $65, $16, $16, $16, $16, $16, $16, $64, $65, $16, $16, $16, $16, $FF, $20, $73, $73, $70, $71, $72, $73, $73, $73, $73, $73, $73, $73, $70, $71, $72, $73, $73, $73, $73, $73, $73, $73, $70, $71, $72, $73, $73, $73, $73, $73, $73, $73, $FF, $01, $C0, $23, $FF, $FF, $10, $01, $00, $FF, $01, $D0, $23, $F0, $F0, $F0, $F8, $F2, $FA, $F2, $F0, $FF, $FF, $28, $01, $FF, $FF, $00
-@RomGraphics5:
-.byte $6F, $2B, $48, $49, $54, $53, $FF, $01, $91, $2B, $30, $30, $FF, $00
+.byte $00, $20, $FF
+.byte $FF, $20, $1A, $02, $FF
+.byte $FF, $20, $04, $00, $FF
+.byte $01, $40, $20, $0E, $0F, $FF
+.byte $04, $0A, $0B, $0C, $0D, $0E, $0F, $FF
+.byte $10, $0A, $0B, $0C, $0D, $1E, $1F, $FF
+.byte $04, $1A, $1B, $1C, $1D, $1E, $1F, $02, $24, $25, $26, $27, $02, $0A, $0B, $0C, $0D, $0E, $0F, $25, $26, $27, $02, $1A, $1B, $1C, $1D, $74, $02, $24, $25, $26, $27, $FF
+.byte $05, $74, $02, $34, $35, $36, $37, $02, $1A, $1B, $1C, $1D, $1E, $1F, $35, $36, $37, $FF
+.byte $04, $74, $02, $02, $34, $35, $36, $37, $74, $75, $02, $17, $18, $19, $FF
+.byte $03, $17, $18, $19, $FF
+.byte $03, $74, $02, $02, $74, $75, $02, $17, $18, $19, $02, $02, $74, $75, $02, $02, $74, $75, $FF
+.byte $05, $74, $74, $75, $FF
+.byte $04, $74, $75, $02, $02, $17, $18, $19, $FF
+.byte $03, $74, $75, $FF
+.byte $30, $01, $01, $01, $01, $FF
+.byte $02, $01, $01, $01, $01, $01, $01, $FF
+.byte $14, $04, $05, $09, $01, $FF
+.byte $02, $04, $05, $06, $07, $08, $09, $FF
+.byte $06, $10, $11, $12, $13, $10, $11, $12, $13, $10, $11, $12, $13, $10, $11, $12, $13, $10, $11, $12, $13, $10, $11, $12, $13, $10, $11, $12, $13, $10, $11, $12, $13, $20, $21, $22, $23, $20, $21, $22, $23, $20, $21, $22, $23, $20, $21, $22, $23, $20, $21, $22, $23, $20, $21, $22, $23, $20, $21, $22, $23, $20, $21, $22, $23, $30, $31, $32, $33, $30, $31, $32, $33, $30, $31, $32, $33, $30, $31, $32, $33, $30, $31, $32, $33, $30, $31, $32, $33, $30, $31, $32, $33, $30, $31, $32, $33, $40, $41, $42, $43, $44, $44, $40, $41, $42, $43, $44, $44, $40, $41, $42, $43, $44, $44, $40, $41, $42, $43, $44, $44, $40, $41, $42, $43, $44, $44, $40, $41, $54, $54, $54, $54, $45, $46, $54, $54, $54, $54, $45, $46, $54, $54, $54, $54, $45, $46, $54, $54, $54, $54, $45, $46, $54, $54, $54, $54, $45, $46, $54, $54, $51, $52, $54, $54, $54, $54, $54, $54, $51, $52, $54, $54, $54, $54, $53, $50, $51, $52, $54, $54, $54, $54, $54, $54, $51, $52, $54, $54, $54, $54, $54, $54, $16, $16, $16, $16, $14, $15, $16, $16, $16, $16, $14, $15, $16, $16, $16, $16, $16, $16, $16, $16, $14, $15, $16, $16, $16, $16, $14, $15, $16, $16, $16, $16, $55, $55, $55, $55, $55, $55, $60, $61, $62, $63, $55, $55, $55, $55, $55, $55, $55, $55, $55, $55, $55, $55, $60, $61, $62, $63, $55, $55, $55, $55, $55, $55, $60, $61, $62, $63, $55, $55, $55, $55, $55, $55, $55, $55, $60, $61, $62, $63, $55, $55, $55, $55, $55, $55, $55, $55, $55, $55, $60, $61, $62, $63, $55, $55, $16, $16, $16, $16, $16, $16, $64, $65, $16, $16, $16, $16, $16, $16, $16, $16, $16, $16, $64, $65, $16, $16, $16, $16, $16, $16, $64, $65, $16, $16, $16, $16, $FF
+.byte $20, $73, $73, $70, $71, $72, $73, $73, $73, $73, $73, $73, $73, $70, $71, $72, $73, $73, $73, $73, $73, $73, $73, $70, $71, $72, $73, $73, $73, $73, $73, $73, $73, $FF
+.byte $01, $C0, $23, $FF
+.byte $FF, $10, $01, $00, $FF
+.byte $01, $D0, $23, $F0, $F0, $F0, $F8, $F2, $FA, $F2, $F0, $FF
+.byte $FF, $28, $01, $FF
+.byte $FF, $00
+@RomGraphicsBonusScreenHitsLabel:
+.byte $6F, $2B, $48, $49, $54, $53, $FF
+.byte $01, $91, $2B, $30, $30, $FF
+.byte $00
 @RomGraphics6:
-.byte $00, $20, $FF, $FF, $20, $0A, $02, $FF, $FF, $20, $14, $3C, $FF, $01, $40, $20, $0E, $0F, $FF, $04, $0A, $0B, $0C, $0D, $0E, $0F, $FF, $10, $0A, $0B, $0C, $0D, $1E, $1F, $FF, $04, $1A, $1B, $1C, $1D, $1E, $1F, $02, $24, $25, $26, $27, $02, $0A, $0B, $0C, $0D, $0E, $0F, $25, $26, $27, $02, $1A, $1B, $1C, $1D, $74, $02, $24, $25, $26, $27, $FF, $05, $74, $02, $34, $35, $36, $37, $02, $1A, $1B, $1C, $1D, $1E, $1F, $35, $36, $37, $FF, $04, $74, $02, $02, $34, $35, $36, $37, $74, $75, $02, $17, $18, $19, $FF, $03, $17, $18, $19, $FF, $03, $74, $02, $02, $74, $75, $02, $17, $18, $19, $02, $02, $74, $75, $02, $02, $74, $75, $FF, $05, $74, $74, $75, $FF, $04, $74, $75, $02, $02, $17, $18, $19, $FF, $03, $74, $75, $FF, $22, $47, $48, $49, $4A, $4B, $4C, $FF, $1A, $3C, $3C, $3C, $3C, $3C, $4D, $2E, $2F, $28, $29, $2A, $2B, $FF, $19, $3D, $3E, $3F, $38, $39, $3A, $3B, $10, $11, $12, $13, $10, $11, $12, $13, $10, $11, $12, $13, $10, $11, $12, $13, $10, $11, $12, $13, $3C, $56, $57, $58, $59, $21, $22, $23, $20, $21, $22, $23, $20, $21, $22, $23, $20, $21, $22, $23, $20, $21, $22, $23, $20, $21, $22, $23, $20, $21, $22, $23, $3C, $66, $67, $33, $30, $31, $32, $33, $30, $31, $32, $33, $30, $31, $32, $33, $30, $31, $32, $33, $30, $31, $32, $33, $30, $31, $32, $33, $30, $31, $32, $33, $3C, $76, $42, $43, $44, $44, $40, $41, $42, $43, $44, $44, $40, $41, $42, $43, $44, $44, $40, $41, $42, $43, $44, $44, $40, $41, $42, $43, $44, $44, $40, $41, $3C, $3C, $77, $54, $45, $46, $54, $54, $54, $54, $45, $46, $54, $54, $54, $54, $45, $46, $54, $54, $54, $54, $45, $46, $54, $54, $54, $54, $45, $46, $54, $54, $3C, $3C, $87, $54, $54, $54, $54, $54, $51, $52, $54, $54, $54, $54, $53, $50, $51, $52, $54, $54, $54, $54, $54, $54, $51, $52, $54, $54, $54, $54, $54, $54, $3C, $3C, $68, $16, $14, $15, $16, $16, $16, $16, $14, $15, $16, $16, $16, $16, $16, $16, $16, $16, $14, $15, $16, $16, $16, $16, $14, $15, $16, $16, $16, $16, $3C, $3C, $78, $79, $55, $55, $60, $61, $62, $63, $55, $55, $55, $55, $55, $55, $55, $55, $55, $55, $55, $55, $55, $60, $61, $62, $63, $55, $55, $55, $55, $55, $FF, $03, $89, $55, $55, $55, $55, $55, $55, $55, $55, $60, $61, $62, $63, $55, $55, $55, $55, $55, $55, $55, $55, $55, $55, $60, $61, $62, $63, $55, $55, $FF, $03, $5A, $16, $16, $64, $65, $16, $16, $16, $16, $16, $16, $16, $16, $16, $16, $64, $65, $16, $16, $16, $16, $16, $16, $64, $65, $16, $16, $16, $16, $FF, $03, $6A, $69, $02, $02, $02, $02, $02, $02, $02, $02, $02, $02, $02, $02, $02, $02, $02, $02, $02, $02, $02, $02, $02, $02, $02, $02, $02, $02, $02, $FF, $05, $7A, $8B, $73, $73, $73, $73, $73, $70, $71, $72, $73, $73, $73, $73, $73, $73, $73, $70, $71, $72, $73, $73, $73, $73, $73, $73, $73, $FF, $07, $5B, $FF, $FF, $18, $02, $02, $7B, $8B, $02, $84, $85, $84, $85, $02, $6C, $6D, $6E, $6F, $80, $55, $55, $55, $55, $55, $55, $55, $55, $55, $55, $55, $FF, $09, $5C, $5D, $92, $93, $94, $95, $02, $7C, $7D, $7E, $7F, $81, $02, $02, $02, $02, $02, $02, $02, $02, $02, $02, $02, $FF, $0E, $7B, $8B, $02, $8D, $8E, $8F, $02, $02, $02, $02, $02, $02, $02, $02, $02, $02, $02, $02, $FF, $0F, $5C, $82, $83, $5F, $02, $6C, $6D, $6E, $6F, $80, $02, $02, $02, $02, $02, $02, $02, $FF, $13, $68, $7C, $7D, $7E, $7F, $81, $16, $16, $16, $16, $16, $16, $16, $FF, $13, $6A, $02, $8D, $8E, $8F, $02, $02, $02, $02, $02, $02, $02, $02, $FF, $01, $E7, $22, $6B, $FF, $01, $C0, $23, $FF, $FF, $10, $01, $00, $FF, $01, $D0, $23, $FF, $FF, $08, $01, $F0, $FF, $01, $D8, $23, $FF, $FF, $28, $01, $FF, $FF, $00
+.byte $00, $20, $FF
+.byte $FF, $20, $0A, $02, $FF
+.byte $FF, $20, $14, $3C, $FF
+.byte $01, $40, $20, $0E, $0F, $FF
+.byte $04, $0A, $0B, $0C, $0D, $0E, $0F, $FF
+.byte $10, $0A, $0B, $0C, $0D, $1E, $1F, $FF
+.byte $04, $1A, $1B, $1C, $1D, $1E, $1F, $02, $24, $25, $26, $27, $02, $0A, $0B, $0C, $0D, $0E, $0F, $25, $26, $27, $02, $1A, $1B, $1C, $1D, $74, $02, $24, $25, $26, $27, $FF
+.byte $05, $74, $02, $34, $35, $36, $37, $02, $1A, $1B, $1C, $1D, $1E, $1F, $35, $36, $37, $FF
+.byte $04, $74, $02, $02, $34, $35, $36, $37, $74, $75, $02, $17, $18, $19, $FF
+.byte $03, $17, $18, $19, $FF
+.byte $03, $74, $02, $02, $74, $75, $02, $17, $18, $19, $02, $02, $74, $75, $02, $02, $74, $75, $FF
+.byte $05, $74, $74, $75, $FF
+.byte $04, $74, $75, $02, $02, $17, $18, $19, $FF
+.byte $03, $74, $75, $FF
+.byte $22, $47, $48, $49, $4A, $4B, $4C, $FF
+.byte $1A, $3C, $3C, $3C, $3C, $3C, $4D, $2E, $2F, $28, $29, $2A, $2B, $FF
+.byte $19, $3D, $3E, $3F, $38, $39, $3A, $3B, $10, $11, $12, $13, $10, $11, $12, $13, $10, $11, $12, $13, $10, $11, $12, $13, $10, $11, $12, $13, $3C, $56, $57, $58, $59, $21, $22, $23, $20, $21, $22, $23, $20, $21, $22, $23, $20, $21, $22, $23, $20, $21, $22, $23, $20, $21, $22, $23, $20, $21, $22, $23, $3C, $66, $67, $33, $30, $31, $32, $33, $30, $31, $32, $33, $30, $31, $32, $33, $30, $31, $32, $33, $30, $31, $32, $33, $30, $31, $32, $33, $30, $31, $32, $33, $3C, $76, $42, $43, $44, $44, $40, $41, $42, $43, $44, $44, $40, $41, $42, $43, $44, $44, $40, $41, $42, $43, $44, $44, $40, $41, $42, $43, $44, $44, $40, $41, $3C, $3C, $77, $54, $45, $46, $54, $54, $54, $54, $45, $46, $54, $54, $54, $54, $45, $46, $54, $54, $54, $54, $45, $46, $54, $54, $54, $54, $45, $46, $54, $54, $3C, $3C, $87, $54, $54, $54, $54, $54, $51, $52, $54, $54, $54, $54, $53, $50, $51, $52, $54, $54, $54, $54, $54, $54, $51, $52, $54, $54, $54, $54, $54, $54, $3C, $3C, $68, $16, $14, $15, $16, $16, $16, $16, $14, $15, $16, $16, $16, $16, $16, $16, $16, $16, $14, $15, $16, $16, $16, $16, $14, $15, $16, $16, $16, $16, $3C, $3C, $78, $79, $55, $55, $60, $61, $62, $63, $55, $55, $55, $55, $55, $55, $55, $55, $55, $55, $55, $55, $55, $60, $61, $62, $63, $55, $55, $55, $55, $55, $FF
+.byte $03, $89, $55, $55, $55, $55, $55, $55, $55, $55, $60, $61, $62, $63, $55, $55, $55, $55, $55, $55, $55, $55, $55, $55, $60, $61, $62, $63, $55, $55, $FF
+.byte $03, $5A, $16, $16, $64, $65, $16, $16, $16, $16, $16, $16, $16, $16, $16, $16, $64, $65, $16, $16, $16, $16, $16, $16, $64, $65, $16, $16, $16, $16, $FF
+.byte $03, $6A, $69, $02, $02, $02, $02, $02, $02, $02, $02, $02, $02, $02, $02, $02, $02, $02, $02, $02, $02, $02, $02, $02, $02, $02, $02, $02, $02, $02, $FF
+.byte $05, $7A, $8B, $73, $73, $73, $73, $73, $70, $71, $72, $73, $73, $73, $73, $73, $73, $73, $70, $71, $72, $73, $73, $73, $73, $73, $73, $73, $FF
+.byte $07, $5B, $FF
+.byte $FF, $18, $02, $02, $7B, $8B, $02, $84, $85, $84, $85, $02, $6C, $6D, $6E, $6F, $80, $55, $55, $55, $55, $55, $55, $55, $55, $55, $55, $55, $FF
+.byte $09, $5C, $5D, $92, $93, $94, $95, $02, $7C, $7D, $7E, $7F, $81, $02, $02, $02, $02, $02, $02, $02, $02, $02, $02, $02, $FF
+.byte $0E, $7B, $8B, $02, $8D, $8E, $8F, $02, $02, $02, $02, $02, $02, $02, $02, $02, $02, $02, $02, $FF
+.byte $0F, $5C, $82, $83, $5F, $02, $6C, $6D, $6E, $6F, $80, $02, $02, $02, $02, $02, $02, $02, $FF
+.byte $13, $68, $7C, $7D, $7E, $7F, $81, $16, $16, $16, $16, $16, $16, $16, $FF
+.byte $13, $6A, $02, $8D, $8E, $8F, $02, $02, $02, $02, $02, $02, $02, $02, $FF
+.byte $01, $E7, $22, $6B, $FF
+.byte $01, $C0, $23, $FF
+.byte $FF, $10, $01, $00, $FF
+.byte $01, $D0, $23, $FF
+.byte $FF, $08, $01, $F0, $FF
+.byte $01, $D8, $23, $FF
+.byte $FF, $28, $01, $FF, $FF
+.byte $00
 @RomGraphics7:
-.byte $8B, $21, $47, $41, $4D, $45, $20, $20, $4F, $56, $45, $52, $FF, $01, $20, $23, $FF, $FF, $20, $01, $01, $FF, $00
-@RomGraphics8:
-.byte $A5, $20, $59, $4F, $55, $20, $43, $41, $4E, $20, $4E, $4F, $57, $20, $54, $52, $41, $43, $4B, $20, $4A, $41, $57, $53, $FF, $2D, $57, $49, $54, $48, $20, $54, $48, $45, $20, $52, $45, $43, $45, $49, $56, $45, $52, $2E, $FF, $6F, $2A, $CE, $CE, $CE, $CE, $CE, $CE, $CE, $CE, $CE, $CE, $CE, $CE, $CF, $FF, $12, $FF, $FF, $01, $09, $3A, $DB, $FF, $01, $8A, $21, $FF, $FF, $0C, $09, $01, $FF, $FF, $0C, $01, $76, $FF, $01, $96, $21, $FF, $FF, $01, $09, $67, $77, $FF, $01, $B1, $21, $C7, $FF, $1A, $F9, $C6, $FF, $03, $D7, $D8, $D9, $DA, $FF, $18, $D6, $C6, $01, $E6, $E7, $E8, $E9, $EA, $EB, $FF, $18, $CC, $CD, $F6, $F7, $F8, $01, $FA, $FB, $FF, $18, $DC, $DD, $C8, $C9, $CA, $01, $DE, $DF, $FF, $18, $AC, $AD, $AE, $AF, $EC, $ED, $EE, $EF, $FF, $18, $BC, $BD, $BE, $BF, $FC, $FD, $FE, $CB, $FF, $01, $20, $23, $FF, $FF, $20, $01, $01, $FF, $01, $C0, $23, $FF, $FF, $10, $01, $00, $FF, $01, $D0, $23, $50, $50, $50, $50, $50, $50, $50, $50, $55, $55, $55, $F5, $55, $55, $55, $55, $55, $55, $55, $59, $FF, $FF, $0C, $01, $55, $FF, $00
-@RomGraphics9:
-.byte $8A, $21, $42, $4F, $4E, $55, $53, $20, $53, $43, $45, $4E, $45, $21, $FF, $01, $20, $23, $FF, $FF, $20, $01, $01, $FF, $00
-@RomGraphicsA:
-.byte $06, $21, $42, $4F, $4E, $55, $53, $20, $53, $43, $45, $4E, $45, $20, $52, $45, $53, $55, $4C, $54, $53, $2E, $FF, $01, $20, $23, $FF, $FF, $20, $01, $01, $FF, $00
+.byte $8B, $21, $47, $41, $4D, $45, $20, $20, $4F, $56, $45, $52, $FF
+.byte $01, $20, $23, $FF
+.byte $FF, $20, $01, $01, $FF
+.byte $00
+@RomGraphicsGotTrackerScreen:
+.byte $A5, $20, $59, $4F, $55, $20, $43, $41, $4E, $20, $4E, $4F, $57, $20, $54, $52, $41, $43, $4B, $20, $4A, $41, $57, $53, $FF
+.byte $2D, $57, $49, $54, $48, $20, $54, $48, $45, $20, $52, $45, $43, $45, $49, $56, $45, $52, $2E, $FF
+.byte $6F, $2A, $CE, $CE, $CE, $CE, $CE, $CE, $CE, $CE, $CE, $CE, $CE, $CE, $CF, $FF
+.byte $12, $FF
+.byte $FF, $01, $09, $3A, $DB, $FF
+.byte $01, $8A, $21, $FF
+.byte $FF, $0C, $09, $01, $FF
+.byte $FF, $0C, $01, $76, $FF
+.byte $01, $96, $21, $FF
+.byte $FF, $01, $09, $67, $77, $FF
+.byte $01, $B1, $21, $C7, $FF
+.byte $1A, $F9, $C6, $FF
+.byte $03, $D7, $D8, $D9, $DA, $FF
+.byte $18, $D6, $C6, $01, $E6, $E7, $E8, $E9, $EA, $EB, $FF
+.byte $18, $CC, $CD, $F6, $F7, $F8, $01, $FA, $FB, $FF
+.byte $18, $DC, $DD, $C8, $C9, $CA, $01, $DE, $DF, $FF
+.byte $18, $AC, $AD, $AE, $AF, $EC, $ED, $EE, $EF, $FF
+.byte $18, $BC, $BD, $BE, $BF, $FC, $FD, $FE, $CB, $FF
+.byte $01, $20, $23, $FF
+.byte $FF, $20, $01, $01, $FF
+.byte $01, $C0, $23, $FF
+.byte $FF, $10, $01, $00, $FF
+.byte $01, $D0, $23, $50, $50, $50, $50, $50, $50, $50, $50, $55, $55, $55, $F5, $55, $55, $55, $55, $55, $55, $55, $59, $FF
+.byte $FF, $0C, $01, $55, $FF
+.byte $00
+@RomGraphicsBonusStartScreen:
+.byte $8A, $21, $42, $4F, $4E, $55, $53, $20, $53, $43, $45, $4E, $45, $21, $FF
+.byte $01, $20, $23, $FF
+.byte $FF, $20, $01, $01, $FF
+.byte $00
+@RomGraphicsBonusEndScreen:
+.byte $06, $21, $42, $4F, $4E, $55, $53, $20, $53, $43, $45, $4E, $45, $20, $52, $45, $53, $55, $4C, $54, $53, $2E, $FF
+.byte $01, $20, $23, $FF
+.byte $FF, $20, $01, $01, $FF
+.byte $00
 @RomGraphicsStatusPowerLabel:
-.byte $6F, $2B, $18, $19, $1A, $FF, $00
-@RomGraphicsC:
-.byte $6F, $2B, $0B, $0C, $FF, $1E, $1B, $1C, $FF, $00
+.byte $6F, $2B, $18, $19, $1A, $FF
+.byte $00
+@RomGraphicsTrackerIcon:
+.byte $6F, $2B, $0B, $0C, $FF
+.byte $1E, $1B, $1C, $FF
+.byte $00
 @RomGraphicsD:
-.byte $20, $20, $FF, $FF, $20, $1D, $07, $FF, $01, $5D, $20, $09, $0A, $0B, $FF, $0A, $09, $0F, $07, $36, $38, $39, $3A, $3B, $FF, $13, $09, $0A, $0F, $FF, $04, $36, $37, $38, $39, $39, $3A, $3B, $0F, $FF, $10, $36, $38, $39, $3A, $3B, $FF, $07, $09, $0A, $0B, $0C, $0D, $0E, $0F, $FF, $17, $36, $37, $38, $39, $3A, $3B, $FF, $06, $36, $37, $3B, $FF, $05, $09, $0F, $FF, $06, $36, $37, $3B, $FF, $05, $36, $37, $38, $39, $3A, $3B, $0F, $FF, $1C, $36, $37, $3B, $FF, $0E, $36, $37, $37, $3B, $FF, $06, $09, $0A, $0E, $0F, $FF, $09, $46, $47, $49, $47, $47, $48, $49, $4A, $4A, $FF, $03, $46, $47, $49, $4A, $FF, $0B, $46, $47, $49, $4A, $FF, $08, $46, $47, $49, $4A, $FF, $04, $46, $47, $48, $49, $4A, $FF, $2F, $6E, $6F, $9D, $6E, $6F, $9D, $6E, $6F, $07, $9D, $6E, $6F, $FF, $14, $7E, $7F, $9E, $7E, $7F, $9E, $7E, $7F, $07, $9E, $7E, $7F, $FF, $03, $19, $1A, $1B, $1C, $1D, $1E, $1F, $1C, $1D, $1D, $1F, $1C, $1D, $1D, $1C, $1D, $1D, $8E, $8F, $9F, $8E, $8F, $9F, $8E, $8F, $07, $9F, $8E, $8F, $FF, $03, $29, $2A, $2B, $2C, $2D, $2E, $2F, $2C, $2D, $2E, $2F, $2C, $2D, $2E, $2C, $2D, $2E, $FF, $FF, $0C, $01, $3D, $FF, $FF, $0C, $01, $4D, $AC, $07, $AC, $AD, $AC, $07, $AC, $AC, $07, $AD, $AC, $AD, $5E, $FF, $01, $0C, $22, $3E, $FF, $FF, $13, $01, $3F, $FF, $01, $2C, $22, $4E, $FF, $FF, $13, $01, $4F, $FF, $FF, $13, $01, $5F, $FF, $01, $64, $22, $AC, $07, $AD, $FF, $03, $AC, $07, $AD, $07, $07, $AC, $AD, $AC, $07, $AC, $07, $07, $AC, $07, $07, $AC, $AD, $07, $07, $AC, $AD, $AD, $07, $07, $AC, $07, $BE, $07, $07, $AC, $FF, $03, $AC, $07, $07, $AD, $07, $07, $AD, $AC, $07, $07, $AC, $07, $AD, $07, $AC, $07, $BE, $07, $AD, $AC, $07, $07, $BC, $BD, $07, $07, $BC, $BD, $07, $BF, $BE, $07, $07, $BC, $BD, $07, $07, $BE, $07, $BC, $BD, $07, $BE, $07, $BC, $BD, $07, $07, $BE, $BF, $07, $07, $BC, $BD, $FF, $09, $BF, $FF, $06, $BC, $BD, $FF, $10, $AE, $AF, $07, $07, $BC, $BD, $FF, $03, $AE, $AF, $FF, $08, $AE, $AF, $07, $07, $BC, $BD, $FF, $0D, $AE, $AF, $FF, $07, $AE, $AF, $FF, $04, $AE, $AF, $07, $07, $AE, $AF, $FF, $01, $C0, $23, $FF, $FF, $18, $01, $FF, $FF, $01, $D8, $23, $FF, $FF, $08, $01, $55, $FF, $01, $E0, $23, $FF, $FF, $20, $01, $AA, $FF, $00
+.byte $20, $20, $FF
+.byte $FF, $20, $1D, $07, $FF
+.byte $01, $5D, $20, $09, $0A, $0B, $FF
+.byte $0A, $09, $0F, $07, $36, $38, $39, $3A, $3B, $FF
+.byte $13, $09, $0A, $0F, $FF
+.byte $04, $36, $37, $38, $39, $39, $3A, $3B, $0F, $FF
+.byte $10, $36, $38, $39, $3A, $3B, $FF
+.byte $07, $09, $0A, $0B, $0C, $0D, $0E, $0F, $FF
+.byte $17, $36, $37, $38, $39, $3A, $3B, $FF
+.byte $06, $36, $37, $3B, $FF
+.byte $05, $09, $0F, $FF
+.byte $06, $36, $37, $3B, $FF
+.byte $05, $36, $37, $38, $39, $3A, $3B, $0F, $FF
+.byte $1C, $36, $37, $3B, $FF
+.byte $0E, $36, $37, $37, $3B, $FF
+.byte $06, $09, $0A, $0E, $0F, $FF
+.byte $09, $46, $47, $49, $47, $47, $48, $49, $4A, $4A, $FF
+.byte $03, $46, $47, $49, $4A, $FF
+.byte $0B, $46, $47, $49, $4A, $FF
+.byte $08, $46, $47, $49, $4A, $FF
+.byte $04, $46, $47, $48, $49, $4A, $FF
+.byte $2F, $6E, $6F, $9D, $6E, $6F, $9D, $6E, $6F, $07, $9D, $6E, $6F, $FF
+.byte $14, $7E, $7F, $9E, $7E, $7F, $9E, $7E, $7F, $07, $9E, $7E, $7F, $FF
+.byte $03, $19, $1A, $1B, $1C, $1D, $1E, $1F, $1C, $1D, $1D, $1F, $1C, $1D, $1D, $1C, $1D, $1D, $8E, $8F, $9F, $8E, $8F, $9F, $8E, $8F, $07, $9F, $8E, $8F, $FF
+.byte $03, $29, $2A, $2B, $2C, $2D, $2E, $2F, $2C, $2D, $2E, $2F, $2C, $2D, $2E, $2C, $2D, $2E, $FF
+.byte $FF, $0C, $01, $3D, $FF
+.byte $FF, $0C, $01, $4D, $AC, $07, $AC, $AD, $AC, $07, $AC, $AC, $07, $AD, $AC, $AD, $5E, $FF
+.byte $01, $0C, $22, $3E, $FF
+.byte $FF, $13, $01, $3F, $FF
+.byte $01, $2C, $22, $4E, $FF
+.byte $FF, $13, $01, $4F, $FF
+.byte $FF, $13, $01, $5F, $FF
+.byte $01, $64, $22, $AC, $07, $AD, $FF
+.byte $03, $AC, $07, $AD, $07, $07, $AC, $AD, $AC, $07, $AC, $07, $07, $AC, $07, $07, $AC, $AD, $07, $07, $AC, $AD, $AD, $07, $07, $AC, $07, $BE, $07, $07, $AC, $FF
+.byte $03, $AC, $07, $07, $AD, $07, $07, $AD, $AC, $07, $07, $AC, $07, $AD, $07, $AC, $07, $BE, $07, $AD, $AC, $07, $07, $BC, $BD, $07, $07, $BC, $BD, $07, $BF, $BE, $07, $07, $BC, $BD, $07, $07, $BE, $07, $BC, $BD, $07, $BE, $07, $BC, $BD, $07, $07, $BE, $BF, $07, $07, $BC, $BD, $FF
+.byte $09, $BF, $FF
+.byte $06, $BC, $BD, $FF
+.byte $10, $AE, $AF, $07, $07, $BC, $BD, $FF
+.byte $03, $AE, $AF, $FF
+.byte $08, $AE, $AF, $07, $07, $BC, $BD, $FF
+.byte $0D, $AE, $AF, $FF
+.byte $07, $AE, $AF, $FF
+.byte $04, $AE, $AF, $07, $07, $AE, $AF, $FF
+.byte $01, $C0, $23, $FF
+.byte $FF, $18, $01, $FF
+.byte $FF, $01, $D8, $23, $FF
+.byte $FF, $08, $01, $55, $FF
+.byte $01, $E0, $23, $FF
+.byte $FF, $20, $01, $AA, $FF
+.byte $00
 @RomGraphicsGetReadyScreen:
-.byte $AB, $20, $76, $74, $15, $00, $13, $74, $70, $73, $0F, $6A, $FF, $53, $89, $8A, $8B, $03, $03, $80, $81, $90, $91, $02, $03, $03, $03, $03, $03, $03, $FF, $10, $03, $03, $03, $03, $82, $83, $84, $85, $86, $87, $03, $88, $89, $8A, $8B, $03, $FF, $10, $03, $03, $98, $99, $92, $03, $94, $95, $96, $97, $03, $98, $99, $9A, $9B, $03, $FF, $10, $03, $03, $03, $03, $A2, $A3, $A4, $A5, $A6, $A7, $A8, $03, $03, $03, $03, $03, $FF, $10, $03, $03, $B0, $B1, $B2, $B3, $B4, $B5, $B6, $B7, $B8, $B9, $03, $03, $98, $99, $FF, $10, $03, $03, $C0, $C1, $C2, $C3, $C4, $C5, $C6, $C7, $C8, $C9, $03, $03, $03, $03, $FF, $10, $DA, $DB, $D0, $D1, $D2, $D3, $D4, $D5, $D6, $D7, $D8, $D9, $DA, $DB, $DA, $DB, $FF, $10, $03, $03, $E0, $E1, $E2, $E3, $E4, $E5, $E6, $E7, $E8, $E9, $EA, $03, $03, $03, $FF, $10, $03, $03, $03, $F1, $F2, $F3, $F4, $F5, $F6, $F7, $03, $03, $03, $03, $03, $03, $FF, $53, $7B, $78, $17, $74, $14, $6B, $FF, $37, $77, $78, $3B, $14, $72, $06, $13, $74, $6B, $FF, $01, $20, $23, $FF, $FF, $20, $01, $01, $FF, $01, $D2, $23, $AA, $22, $88, $AA, $FF, $04, $5A, $DA, $FA, $5A, $FF, $04, $05, $0D, $0F, $05, $FF, $00
+.byte $AB, $20, $76, $74, $15, $00, $13, $74, $70, $73, $0F, $6A, $FF
+.byte $53, $89, $8A, $8B, $03, $03, $80, $81, $90, $91, $02, $03, $03, $03, $03, $03, $03, $FF
+.byte $10, $03, $03, $03, $03, $82, $83, $84, $85, $86, $87, $03, $88, $89, $8A, $8B, $03, $FF
+.byte $10, $03, $03, $98, $99, $92, $03, $94, $95, $96, $97, $03, $98, $99, $9A, $9B, $03, $FF
+.byte $10, $03, $03, $03, $03, $A2, $A3, $A4, $A5, $A6, $A7, $A8, $03, $03, $03, $03, $03, $FF
+.byte $10, $03, $03, $B0, $B1, $B2, $B3, $B4, $B5, $B6, $B7, $B8, $B9, $03, $03, $98, $99, $FF
+.byte $10, $03, $03, $C0, $C1, $C2, $C3, $C4, $C5, $C6, $C7, $C8, $C9, $03, $03, $03, $03, $FF
+.byte $10, $DA, $DB, $D0, $D1, $D2, $D3, $D4, $D5, $D6, $D7, $D8, $D9, $DA, $DB, $DA, $DB, $FF
+.byte $10, $03, $03, $E0, $E1, $E2, $E3, $E4, $E5, $E6, $E7, $E8, $E9, $EA, $03, $03, $03, $FF
+.byte $10, $03, $03, $03, $F1, $F2, $F3, $F4, $F5, $F6, $F7, $03, $03, $03, $03, $03, $03, $FF
+.byte $53, $7B, $78, $17, $74, $14, $6B, $FF
+.byte $37, $77, $78, $3B, $14, $72, $06, $13, $74, $6B, $FF
+.byte $01, $20, $23, $FF
+.byte $FF, $20, $01, $01, $FF
+.byte $01, $D2, $23, $AA, $22, $88, $AA, $FF
+.byte $04, $5A, $DA, $FA, $5A, $FF
+.byte $04, $05, $0D, $0F, $05, $FF
+.byte $00
+
 
 
 
@@ -6853,7 +7083,7 @@ LCF0E:
         jsr     DrawStatusLine                           ; CF1C 20 8F A7                  ..
         lda     #$07                            ; CF1F A9 07                    ..
         jsr     L8EBD                           ; CF21 20 BD 8E                  ..
-        lda     #RomGraphics9                            ; CF24 A9 09                    ..
+        lda     #RomGraphicsBonusStartScreen                            ; CF24 A9 09                    ..
         jsr     DrawROMGraphics                           ; CF26 20 69 8D                  i.
         lda     #$00                            ; CF29 A9 00                    ..
         sta     SCROLL_X                           ; CF2B 8D 20 03                 . .
@@ -6866,7 +7096,7 @@ LCF0E:
         lda     #MusicBonusScreenStart                            ; CF3F A9 03                    ..
         jsr     SoundPlay                           ; CF41 20 CD E2                  ..
         jsr     PPUEnableNMI                           ; CF44 20 DE 8B                  ..
-        jsr     L8BC2                           ; CF47 20 C2 8B                  ..
+        jsr     PPUEnableAndWaitFor1Frame                           ; CF47 20 C2 8B                  ..
         lda     #$B4                            ; CF4A A9 B4                    ..
         sta     $12                             ; CF4C 85 12                    ..
 LCF4E:
@@ -6879,11 +7109,11 @@ LCF4E:
         jsr     PPUDisableNMI                           ; CF5D 20 EA 8B                  ..
         jsr     ClearScreenAndSprites                           ; CF60 20 12 8E                  ..
         jsr     DrawStatusLine                           ; CF63 20 8F A7                  ..
-        lda     #RomGraphics5                            ; CF66 A9 05                    ..
+        lda     #RomGraphicsBonusScreenHitsLabel                            ; CF66 A9 05                    ..
         jsr     DrawROMGraphics                           ; CF68 20 69 8D                  i.
         lda     #$01                            ; CF6B A9 01                    ..
         jsr     LACE6                           ; CF6D 20 E6 AC                  ..
-        lda     #RomGraphics3                            ; CF70 A9 03                    ..
+        lda     #RomGraphicsEncounterDeep                            ; CF70 A9 03                    ..
         jsr     DrawROMGraphics                           ; CF72 20 69 8D                  i.
         lda     #$03                            ; CF75 A9 03                    ..
         jsr     L8EBD                           ; CF77 20 BD 8E                  ..
@@ -6924,7 +7154,7 @@ LCF4E:
         sta     $53                             ; CFCC 85 53                    .S
         sta     $54                             ; CFCE 85 54                    .T
         jsr     PPUEnableNMI                           ; CFD0 20 DE 8B                  ..
-        jsr     L8BC2                           ; CFD3 20 C2 8B                  ..
+        jsr     PPUEnableAndWaitFor1Frame                           ; CFD3 20 C2 8B                  ..
 LCFD6:
         jsr     WaitFor1Frame                           ; CFD6 20 40 8C                  @.
         jsr     ReadJoypads                           ; CFD9 20 87 8C                  ..
@@ -6949,9 +7179,9 @@ LD002:
         dec     $52                             ; D002 C6 52                    .R
         bne     LCFD6                           ; D004 D0 D0                    ..
         jsr     PPUDisableNMI                           ; D006 20 EA 8B                  ..
-        jsr     L8BC2                           ; D009 20 C2 8B                  ..
-        jsr     L8E2D                           ; D00C 20 2D 8E                  -.
-        lda     #RomGraphicsA                            ; D00F A9 0A                    ..
+        jsr     PPUEnableAndWaitFor1Frame                           ; D009 20 C2 8B                  ..
+        jsr     PPUClear                           ; D00C 20 2D 8E                  -.
+        lda     #RomGraphicsBonusEndScreen                            ; D00F A9 0A                    ..
         jsr     DrawROMGraphics                           ; D011 20 69 8D                  i.
         lda     #$00                            ; D014 A9 00                    ..
         sta     SCROLL_X                           ; D016 8D 20 03                 . .
@@ -6962,13 +7192,13 @@ LD002:
         sta     $0302                           ; D024 8D 02 03                 ...
         sta     $0305                           ; D027 8D 05 03                 ...
         jsr     PPUEnableNMI                           ; D02A 20 DE 8B                  ..
-        jsr     L8BC2                           ; D02D 20 C2 8B                  ..
+        jsr     PPUEnableAndWaitFor1Frame                           ; D02D 20 C2 8B                  ..
         lda     #MusicBonusScreenEnd                            ; D030 A9 1A                    ..
         jsr     SoundPlay                           ; D032 20 CD E2                  ..
         lda     #$78                            ; D035 A9 78                    .x
         jsr     LD11F                           ; D037 20 1F D1                  ..
-        jsr     LA8A1                           ; D03A 20 A1 A8                  ..
-        .byte   $50,$D1                         ; D03D 50 D1                    P.
+        jsr     CopyFromNextPtr                           ; D03A 20 A1 A8                  ..
+        .addr   CopyTextBonusNumberOfHits                         ; D03D 50 D1                    P.
 ; ----------------------------------------------------------------------------
         lda     #$00                            ; D03F A9 00                    ..
         sta     $0100                           ; D041 8D 00 01                 ...
@@ -6998,8 +7228,8 @@ LD002:
         sta     $0304                           ; D077 8D 04 03                 ...
         lda     #$78                            ; D07A A9 78                    .x
         jsr     LD11F                           ; D07C 20 1F D1                  ..
-        jsr     LA8A1                           ; D07F 20 A1 A8                  ..
-        .byte   $67,$D1                         ; D082 67 D1                    g.
+        jsr     CopyFromNextPtr                           ; D07F 20 A1 A8                  ..
+        .addr   CopyTextBonusShellsCollected                         ; D082 67 D1                    g.
 ; ----------------------------------------------------------------------------
         lda     #$00                            ; D084 A9 00                    ..
         sta     $0100                           ; D086 8D 00 01                 ...
@@ -7056,19 +7286,22 @@ LD0DF:
         lda     $54                             ; D0EA A5 54                    .T
         cmp     #$1E                            ; D0EC C9 1E                    ..
         bcs     LD0FB                           ; D0EE B0 0B                    ..
-        .byte   $A9,$0C,$20,$CD,$E2,$A9,$78,$20 ; D0F0 A9 0C 20 CD E2 A9 78 20  .. ...x 
-        .byte   $1F,$D1,$60                     ; D0F8 1F D1 60                 ..`
+        lda     #SFXEncounterJawsHit
+        jsr     SoundPlay
+        lda     #$78
+        jsr     LD11F
+        rts
 ; ----------------------------------------------------------------------------
 LD0FB:
         lda     #$3C                            ; D0FB A9 3C                    .<
         jsr     LD11F                           ; D0FD 20 1F D1                  ..
-        jsr     LA8A1                           ; D100 20 A1 A8                  ..
-        .byte   $82,$D1                         ; D103 82 D1                    ..
+        jsr     CopyFromNextPtr                           ; D100 20 A1 A8                  ..
+        .addr   CopyTextBonusGotThemAll                        ; D103 82 D1                    ..
 ; ----------------------------------------------------------------------------
         lda     #$3C                            ; D105 A9 3C                    .<
         jsr     LD11F                           ; D107 20 1F D1                  ..
-        jsr     LA8A1                           ; D10A 20 A1 A8                  ..
-        .byte   $97,$D1                         ; D10D 97 D1                    ..
+        jsr     CopyFromNextPtr                           ; D10A 20 A1 A8                  ..
+        .addr   CopyTextBonus10000BonusPoints                         ; D10D 97 D1                    ..
 ; ----------------------------------------------------------------------------
         lda     #$11                            ; D10F A9 11                    ..
         jsr     AwardPoints                           ; D111 20 D0 8C                  ..
@@ -7119,19 +7352,26 @@ LD146:
         rts                                     ; D14F 60                       `
 
 ; ----------------------------------------------------------------------------
-        .byte   $66,$21,$14,$4E,$55,$4D,$42,$45 ; D150 66 21 14 4E 55 4D 42 45  f!.NUMBE
-        .byte   $52,$20,$4F,$46,$20,$48,$49,$54 ; D158 52 20 4F 46 20 48 49 54  R OF HIT
-        .byte   $53,$20,$20,$20,$20,$20,$2B,$C2 ; D160 53 20 20 20 20 20 2B C2  S     +.
-        .byte   $21,$18,$42,$4F,$4E,$55,$53,$20 ; D168 21 18 42 4F 4E 55 53 20  !.BONUS 
-        .byte   $53,$48,$45,$4C,$4C,$53,$20,$43 ; D170 53 48 45 4C 4C 53 20 43  SHELLS C
-        .byte   $4F,$4C,$4C,$45,$43,$54,$45,$44 ; D178 4F 4C 4C 45 43 54 45 44  OLLECTED
-        .byte   $20,$2B,$27,$22,$12,$59,$4F,$55 ; D180 20 2B 27 22 12 59 4F 55   +'".YOU
-        .byte   $20,$47,$4F,$54,$20,$54,$48,$45 ; D188 20 47 4F 54 20 54 48 45   GOT THE
-        .byte   $4D,$20,$41,$4C,$4C,$21,$21,$62 ; D190 4D 20 41 4C 4C 21 21 62  M ALL!!b
-        .byte   $22,$1C,$59,$4F,$55,$20,$47,$45 ; D198 22 1C 59 4F 55 20 47 45  ".YOU GE
-        .byte   $54,$20,$31,$30,$30,$30,$30,$20 ; D1A0 54 20 31 30 30 30 30 20  T 10000 
-        .byte   $42,$4F,$4E,$55,$53,$20,$50,$4F ; D1A8 42 4F 4E 55 53 20 50 4F  BONUS PO
-        .byte   $49,$4E,$54,$53,$21,$21         ; D1B0 49 4E 54 53 21 21        INTS!!
+
+CopyTextBonusNumberOfHits:
+        .byte $66,$21,$14
+        .byte "NUMBER OF HITS     "
+        .byte $2B
+
+CopyTextBonusShellsCollected:
+        .byte $C2,$21,$18
+        .byte "BONUS SHELLS COLLECTED "
+        .byte $2B
+
+CopyTextBonusGotThemAll:
+        .byte $27,$22,$12
+        .byte "YOU GOT THEM ALL!"
+        .byte $21
+
+CopyTextBonus10000BonusPoints:
+        .byte $62,$22,$1C
+        .byte "YOU GET 10000 BONUS POINTS!!"
+
 ; ----------------------------------------------------------------------------
 LD1B6:
         lda     #<PlayerData                            ; D1B6 A9 80                    ..
@@ -7769,7 +8009,7 @@ LD7D6:
         lda     #MusicFinaleScreen                            ; D7E1 A9 02                    ..
         jsr     SoundPlay                           ; D7E3 20 CD E2                  ..
         jsr     PPUEnableNMI                           ; D7E6 20 DE 8B                  ..
-        jsr     L8BC2                           ; D7E9 20 C2 8B                  ..
+        jsr     PPUEnableAndWaitFor1Frame                           ; D7E9 20 C2 8B                  ..
 LD7EC:
         jsr     WaitFor1Frame                           ; D7EC 20 40 8C                  @.
         ldy     #$01                            ; D7EF A0 01                    ..
@@ -8402,11 +8642,11 @@ LDCC1:
         jsr     PPUDisableNMI                           ; DCC1 20 EA 8B                  ..
         jsr     ClearScreenAndSprites                           ; DCC4 20 12 8E                  ..
         jsr     DrawStatusLine                           ; DCC7 20 8F A7                  ..
-        lda     #RomGraphics5                            ; DCCA A9 05                    ..
+        lda     #RomGraphicsBonusScreenHitsLabel                            ; DCCA A9 05                    ..
         jsr     DrawROMGraphics                           ; DCCC 20 69 8D                  i.
         lda     #$01                            ; DCCF A9 01                    ..
         jsr     LACE6                           ; DCD1 20 E6 AC                  ..
-        lda     #RomGraphics3                            ; DCD4 A9 03                    ..
+        lda     #RomGraphicsEncounterDeep                            ; DCD4 A9 03                    ..
         jsr     DrawROMGraphics                           ; DCD6 20 69 8D                  i.
         lda     #$03                            ; DCD9 A9 03                    ..
         jsr     L8EBD                           ; DCDB 20 BD 8E                  ..
@@ -8424,7 +8664,7 @@ LDCC1:
         jsr     L977C                           ; DCFC 20 7C 97                  |.
         sta     $0302                           ; DCFF 8D 02 03                 ...
         jsr     PPUEnableNMI                           ; DD02 20 DE 8B                  ..
-        jsr     L8BC2                           ; DD05 20 C2 8B                  ..
+        jsr     PPUEnableAndWaitFor1Frame                           ; DD05 20 C2 8B                  ..
 LDD08:
         jsr     WaitFor1Frame                           ; DD08 20 40 8C                  @.
         jsr     LDE92                           ; DD0B 20 92 DE                  ..
@@ -8455,7 +8695,7 @@ LDD08:
         lda     #$01                            ; DD50 A9 01                    ..
         sta     $0302                           ; DD52 8D 02 03                 ...
         jsr     PPUEnableNMI                           ; DD55 20 DE 8B                  ..
-        jsr     L8BC2                           ; DD58 20 C2 8B                  ..
+        jsr     PPUEnableAndWaitFor1Frame                           ; DD58 20 C2 8B                  ..
         lda     #$00                            ; DD5B A9 00                    ..
         sta     $0301                           ; DD5D 8D 01 03                 ...
 LDD60:
@@ -8466,14 +8706,14 @@ LDD60:
         bne     LDD60                           ; DD6C D0 F2                    ..
         ldy     #$3C                            ; DD6E A0 3C                    .<
         jsr     WaitForYFrames                           ; DD70 20 50 8C                  P.
-        jsr     LA8A1                           ; DD73 20 A1 A8                  ..
-        .byte   $A9,$DD                         ; DD76 A9 DD                    ..
+        jsr     CopyFromNextPtr                           ; DD73 20 A1 A8                  ..
+        .addr   LDDA9
 ; ----------------------------------------------------------------------------
-        jsr     LA8A1                           ; DD78 20 A1 A8                  ..
-        .byte   $B4,$DD                         ; DD7B B4 DD                    ..
+        jsr     CopyFromNextPtr                           ; DD78 20 A1 A8                  ..
+        .addr   LDDB4                         ; DD7B B4 DD                    ..
 ; ----------------------------------------------------------------------------
-        jsr     LA8A1                           ; DD7D 20 A1 A8                  ..
-        .byte   $BF,$DD                         ; DD80 BF DD                    ..
+        jsr     CopyFromNextPtr                           ; DD7D 20 A1 A8                  ..
+        .addr   LDDBF                        ; DD80 BF DD                    ..
 ; ----------------------------------------------------------------------------
         jsr     L8B5F                           ; DD82 20 5F 8B                  _.
         lda     #MusicTheEndScreen                            ; DD85 A9 04                    ..
@@ -8487,10 +8727,15 @@ LDD8A:
         bit     Joy1Pressed                           ; DD97 2C 32 03                 ,2.
         beq     LDD8A                           ; DD9A F0 EE                    ..
         .byte   $AD,$0E,$03,$29,$E7,$09,$08,$8D ; DD9C AD 0E 03 29 E7 09 08 8D  ...)....
-        .byte   $0E,$03,$4C,$48,$81,$56,$23,$08 ; DDA4 0E 03 4C 48 81 56 23 08  ..LH.V#.
+        .byte   $0E,$03,$4C,$48,$81
+LDDA9:
+        .byte   $56,$23,$08 ; DDA4 0E 03 4C 48 81 56 23 08  ..LH.V#.
         .byte   $E8,$E9,$EA,$EB,$EC,$ED,$EE,$EF ; DDAC E8 E9 EA EB EC ED EE EF  ........
+LDDB4:
         .byte   $76,$23,$08,$F8,$F9,$FA,$FB,$FC ; DDB4 76 23 08 F8 F9 FA FB FC  v#......
-        .byte   $FD,$FE,$FF,$F5,$23,$03,$7F,$5F ; DDBC FD FE FF F5 23 03 7F 5F  ....#.._
+        .byte   $FD,$FE,$FF
+LDDBF:
+        .byte $F5,$23,$03,$7F,$5F ; DDBC FD FE FF F5 23 03 7F 5F  ....#.._
         .byte   $DF                             ; DDC4 DF                       .
 ; ----------------------------------------------------------------------------
 LDDC5:
