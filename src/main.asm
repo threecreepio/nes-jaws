@@ -5946,8 +5946,8 @@ DrawStatusLine_Shells:
         lda     #$8C                            ; A99A A9 8C                    ..
         sta     PPUADDR                           ; A99C 8D 06 20                 .. 
         lda     $0390                           ; A99F AD 90 03                 ...
-        jsr     LD139                           ; A9A2 20 39 D1                  9.
-        jsr     LD146                           ; A9A5 20 46 D1                  F.
+        jsr     ConvertAToBCD                           ; A9A2 20 39 D1                  9.
+        jsr     MoveAAndYToAsciiTable                           ; A9A5 20 46 D1                  F.
         pha                                     ; A9A8 48                       H
         tya                                     ; A9A9 98                       .
         ora     #$30                            ; A9AA 09 30                    .0
@@ -9326,8 +9326,8 @@ RunBonusScreenEnding:
         sta     VRAMBuffer,x                         ; D055 9D 02 01                 ...
         inx                                     ; D058 E8                       .
         lda     $54                             ; D059 A5 54                    .T
-        jsr     LD139                           ; D05B 20 39 D1                  9.
-        jsr     LD146                           ; D05E 20 46 D1                  F.
+        jsr     ConvertAToBCD                           ; D05B 20 39 D1                  9.
+        jsr     MoveAAndYToAsciiTable                           ; D05E 20 46 D1                  F.
         sta     VRAMBuffer+1,x                         ; D061 9D 03 01                 ...
         tya                                     ; D064 98                       .
         sta     VRAMBuffer,x                         ; D065 9D 02 01                 ...
@@ -9369,8 +9369,8 @@ LD0A2:
 LD0AC:
         tya                                     ; D0AC 98                       .
         sta     $00                             ; D0AD 85 00                    ..
-        jsr     LD139                           ; D0AF 20 39 D1                  9.
-        jsr     LD146                           ; D0B2 20 46 D1                  F.
+        jsr     ConvertAToBCD                           ; D0AF 20 39 D1                  9.
+        jsr     MoveAAndYToAsciiTable                           ; D0B2 20 46 D1                  F.
         sta     VRAMBuffer+1,x                         ; D0B5 9D 03 01                 ...
         tya                                     ; D0B8 98                       .
         sta     VRAMBuffer,x                         ; D0B9 9D 02 01                 ...
@@ -9440,29 +9440,36 @@ WaitForAFramesAndRefreshPPU:
         rts
 
 ; ----------------------------------------------------------------------------
-LD139:
-        ldy     #$00                            ; D139 A0 00                    ..
-LD13B:
-        cmp     #$0A                            ; D13B C9 0A                    ..
-        bcc     LD145                           ; D13D 90 06                    ..
-        sbc     #$0A                            ; D13F E9 0A                    ..
-        iny                                     ; D141 C8                       .
-        jmp     LD13B                           ; D142 4C 3B D1                 L;.
+; Converts the value in the A register to Binary Coded Decimal.
+; Stores the low byte in A and the high byte in Y.
+;
+; Example:
+;   lda #$23           ; load decimal 35 into A
+;   jsr ConvertAToBCD  ; convert to BCD
+;   sty $0             ; Stores #$03 into $0
+;   sta $1             ; Stores #$05 into $1
+;
+ConvertAToBCD:
+        ldy     #$00
+@IncrementYUntilALowerThan10:
+        cmp     #$0A
+        bcc     @Done
+        sbc     #$0A
+        iny
+        jmp     @IncrementYUntilALowerThan10
+@Done:
+        rts
 
 ; ----------------------------------------------------------------------------
-LD145:
-        rts                                     ; D145 60                       `
-
-; ----------------------------------------------------------------------------
-LD146:
-        clc                                     ; D146 18                       .
-        adc     #$30                            ; D147 69 30                    i0
-        pha                                     ; D149 48                       H
-        tya                                     ; D14A 98                       .
-        adc     #$30                            ; D14B 69 30                    i0
-        tay                                     ; D14D A8                       .
-        pla                                     ; D14E 68                       h
-        rts                                     ; D14F 60                       `
+MoveAAndYToAsciiTable:
+        clc
+        adc #$30
+        pha
+        tya
+        adc #$30
+        tay
+        pla
+        rts
 
 ; ----------------------------------------------------------------------------
 
@@ -9829,8 +9836,8 @@ LD3C2:
         sta     VRAMBuffer,x                         ; D403 9D 02 01                 ...
         inx                                     ; D406 E8                       .
         lda     $54                             ; D407 A5 54                    .T
-        jsr     LD139                           ; D409 20 39 D1                  9.
-        jsr     LD146                           ; D40C 20 46 D1                  F.
+        jsr     ConvertAToBCD                           ; D409 20 39 D1                  9.
+        jsr     MoveAAndYToAsciiTable                           ; D40C 20 46 D1                  F.
         sta     VRAMBuffer+1,x                         ; D40F 9D 03 01                 ...
         tya                                     ; D412 98                       .
         sta     VRAMBuffer,x                         ; D413 9D 02 01                 ...
