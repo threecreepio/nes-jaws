@@ -60,6 +60,10 @@ MapSubmarineY         = $034F
 
 ActivePalette         = $046F
 
+VRAMBufferActive      = $0100
+VRAMBufferOffset      = $0101
+VRAMBuffer            = $0102
+
 
 EntityData            = $0680 ; 680 - 880
 PlayerData            = EntityData
@@ -340,14 +344,14 @@ Soundtest:
 SoundtestDrawSelection:
         ; clear vram buffer
         lda #$00
-        sta $0100
-        ldx $0101
+        sta VRAMBufferActive
+        ldx VRAMBufferOffset
         ; set ppu address to $224F for 1st character
         lda #$22
-        sta $0102,X
+        sta VRAMBuffer,X
         inx
         lda #$4F
-        sta $0102,X
+        sta VRAMBuffer,X
         inx
         ; get high nybble of selected sound
         lda SoundtestSelected
@@ -364,14 +368,14 @@ SoundtestDrawSelection:
         ; so add 6 onto our value if we're above 9
         adc #$06
 @DrawHighNybbleHex:
-        sta $0102,X
+        sta VRAMBuffer,X
         ; set ppu address to $2250 for 2nd character
         inx
         lda #$22
-        sta $0102,X
+        sta VRAMBuffer,X
         inx
         lda #$50
-        sta $0102,X
+        sta VRAMBuffer,X
         inx
         ; get low nybble of selected sound
         lda SoundtestSelected
@@ -385,12 +389,12 @@ SoundtestDrawSelection:
         bcc @DrawLowNybbleHex
         adc #$06
 @DrawLowNybbleHex:                   
-        sta $0102,X
+        sta VRAMBuffer,X
         ; update vram position
         inx
-        stx $0101
+        stx VRAMBufferOffset
         lda #$80
-        sta $0100
+        sta VRAMBufferActive
         lda $0304
         ora #$10
         sta $0304
@@ -1146,22 +1150,22 @@ RunPortPowerUp:
         jsr     WaitForAFramesAndRefreshPPU
         inc     PlayerPowerLevel
         lda     #$00
-        sta     $0100
-        ldx     $0101
+        sta     VRAMBufferActive
+        ldx     VRAMBufferOffset
         lda     #$2B
-        sta     $0102,x
+        sta     VRAMBuffer,x
         inx
         lda     #$91
-        sta     $0102,x
+        sta     VRAMBuffer,x
         inx
         lda     PlayerPowerLevel
         clc
         adc     #$31
-        sta     $0102,x
+        sta     VRAMBuffer,x
         inx
-        stx     $0101
+        stx     VRAMBufferOffset
         lda     #$80
-        sta     $0100
+        sta     VRAMBufferActive
         lda     $0304
         ora     #$10
         sta     $0304
@@ -5811,34 +5815,34 @@ CopyToVRAMBuffer:
         stx @TempPointer
         sty @TempPointer+1
         ldy #0
-        sty $0100
+        sty VRAMBufferActive
         ; use $101 as a copy offset
-        ldx $0101
+        ldx VRAMBufferOffset
         lda (@TempPointer),y
-        sta $0103,x
+        sta VRAMBuffer+1,x
         inx
         iny
         lda (@TempPointer),y
         ora #$80
-        sta $0101,x
+        sta VRAMBufferOffset,x
         inx
         iny
         lda (@TempPointer),y
-        sta $0102,x
+        sta VRAMBuffer,x
         sta @TempCopyLength
         inx
         iny
 @KeepCopying:
         lda (@TempPointer),y
-        sta $0102,x
+        sta VRAMBuffer,x
         inx
         iny
         dec @TempCopyLength
         bne @KeepCopying
         ; store new offset at $101
-        stx $0101
+        stx VRAMBufferOffset
         lda #$80
-        sta $0100
+        sta VRAMBufferActive
         lda $0304
         ora #$10
         sta $0304
@@ -5851,47 +5855,50 @@ CopyToVRAMBuffer:
         rts
 
 ; ----------------------------------------------------------------------------
+VRAMFlagMultipleBytes = %10000000
+
 DrawVRAMBuffer:
-        lda $0100
+        lda VRAMBufferActive
         bpl @Done
-        lda $0101
+        lda VRAMBufferOffset
         beq @Done
         lda PPUCTRL_MIRROR
         and #%11111011                   ; clear vertical rendering flag
         sta PPUCTRL
         ldx #$00
 @CopyNextBuffer:
-        lda $0102,x
+        lda VRAMBuffer,x
         bmi @DrawMultipleBytes           ; check if negative flag is set, otherwise draw single byte
         sta PPUADDR
         inx
-        lda $0102,x
+        lda VRAMBuffer,x
         sta PPUADDR
         inx
-        lda $0102,x
+        lda VRAMBuffer,x
         sta PPUDATA
         inx
         jmp @NextBuffer
 @DrawMultipleBytes:
-        and #$7F
+        ; remove multiple bytes flag to get real ppu address
+        and #($FF ^ VRAMFlagMultipleBytes)
         sta PPUADDR
         inx
-        lda $0102,x
+        lda VRAMBuffer,x
         sta PPUADDR
         inx
-        ldy $0102,x
+        ldy VRAMBuffer,x
         inx
 @KeepDrawing:
-        lda $0102,x
+        lda VRAMBuffer,x
         sta PPUDATA
         inx
         dey
         bne @KeepDrawing
 @NextBuffer:
-        cpx $0101
+        cpx VRAMBufferOffset
         bcc @CopyNextBuffer
         lda #$00
-        sta $0101
+        sta VRAMBufferOffset
 @Done:
         lda #$00
         sta $0303
@@ -9307,28 +9314,28 @@ RunBonusScreenEnding:
         .addr   CopyTextBonusNumberOfHits                         ; D03D 50 D1                    P.
 ; ----------------------------------------------------------------------------
         lda     #$00                            ; D03F A9 00                    ..
-        sta     $0100                           ; D041 8D 00 01                 ...
-        ldx     $0101                           ; D044 AE 01 01                 ...
+        sta     VRAMBufferActive                           ; D041 8D 00 01                 ...
+        ldx     VRAMBufferOffset                           ; D044 AE 01 01                 ...
         lda     #$A1                            ; D047 A9 A1                    ..
-        sta     $0102,x                         ; D049 9D 02 01                 ...
+        sta     VRAMBuffer,x                         ; D049 9D 02 01                 ...
         inx                                     ; D04C E8                       .
         lda     #$7B                            ; D04D A9 7B                    .{
-        sta     $0102,x                         ; D04F 9D 02 01                 ...
+        sta     VRAMBuffer,x                         ; D04F 9D 02 01                 ...
         inx                                     ; D052 E8                       .
         lda     #$02                            ; D053 A9 02                    ..
-        sta     $0102,x                         ; D055 9D 02 01                 ...
+        sta     VRAMBuffer,x                         ; D055 9D 02 01                 ...
         inx                                     ; D058 E8                       .
         lda     $54                             ; D059 A5 54                    .T
         jsr     LD139                           ; D05B 20 39 D1                  9.
         jsr     LD146                           ; D05E 20 46 D1                  F.
-        sta     $0103,x                         ; D061 9D 03 01                 ...
+        sta     VRAMBuffer+1,x                         ; D061 9D 03 01                 ...
         tya                                     ; D064 98                       .
-        sta     $0102,x                         ; D065 9D 02 01                 ...
+        sta     VRAMBuffer,x                         ; D065 9D 02 01                 ...
         inx                                     ; D068 E8                       .
         inx                                     ; D069 E8                       .
-        stx     $0101                           ; D06A 8E 01 01                 ...
+        stx     VRAMBufferOffset                           ; D06A 8E 01 01                 ...
         lda     #$80                            ; D06D A9 80                    ..
-        sta     $0100                           ; D06F 8D 00 01                 ...
+        sta     VRAMBufferActive                           ; D06F 8D 00 01                 ...
         lda     $0304                           ; D072 AD 04 03                 ...
         ora     #$10                            ; D075 09 10                    ..
         sta     $0304                           ; D077 8D 04 03                 ...
@@ -9338,16 +9345,16 @@ RunBonusScreenEnding:
         .addr   CopyTextBonusShellsCollected                         ; D082 67 D1                    g.
 ; ----------------------------------------------------------------------------
         lda     #$00                            ; D084 A9 00                    ..
-        sta     $0100                           ; D086 8D 00 01                 ...
-        ldx     $0101                           ; D089 AE 01 01                 ...
+        sta     VRAMBufferActive                           ; D086 8D 00 01                 ...
+        ldx     VRAMBufferOffset                           ; D089 AE 01 01                 ...
         lda     #$A1                            ; D08C A9 A1                    ..
-        sta     $0102,x                         ; D08E 9D 02 01                 ...
+        sta     VRAMBuffer,x                         ; D08E 9D 02 01                 ...
         inx                                     ; D091 E8                       .
         lda     #$DB                            ; D092 A9 DB                    ..
-        sta     $0102,x                         ; D094 9D 02 01                 ...
+        sta     VRAMBuffer,x                         ; D094 9D 02 01                 ...
         inx                                     ; D097 E8                       .
         lda     #$02                            ; D098 A9 02                    ..
-        sta     $0102,x                         ; D09A 9D 02 01                 ...
+        sta     VRAMBuffer,x                         ; D09A 9D 02 01                 ...
         inx                                     ; D09D E8                       .
         lda     $54                             ; D09E A5 54                    .T
         ldy     #$00                            ; D0A0 A0 00                    ..
@@ -9364,14 +9371,14 @@ LD0AC:
         sta     $00                             ; D0AD 85 00                    ..
         jsr     LD139                           ; D0AF 20 39 D1                  9.
         jsr     LD146                           ; D0B2 20 46 D1                  F.
-        sta     $0103,x                         ; D0B5 9D 03 01                 ...
+        sta     VRAMBuffer+1,x                         ; D0B5 9D 03 01                 ...
         tya                                     ; D0B8 98                       .
-        sta     $0102,x                         ; D0B9 9D 02 01                 ...
+        sta     VRAMBuffer,x                         ; D0B9 9D 02 01                 ...
         inx                                     ; D0BC E8                       .
         inx                                     ; D0BD E8                       .
-        stx     $0101                           ; D0BE 8E 01 01                 ...
+        stx     VRAMBufferOffset                           ; D0BE 8E 01 01                 ...
         lda     #$80                            ; D0C1 A9 80                    ..
-        sta     $0100                           ; D0C3 8D 00 01                 ...
+        sta     VRAMBufferActive                           ; D0C3 8D 00 01                 ...
         lda     $0304                           ; D0C6 AD 04 03                 ...
         ora     #$10                            ; D0C9 09 10                    ..
         sta     $0304                           ; D0CB 8D 04 03                 ...
@@ -9810,28 +9817,28 @@ LD3C2:
         lda     #$FF                            ; D3E9 A9 FF                    ..
         sta     Workset + EntityYSpeed                             ; D3EB 85 33                    .3
         lda     #$00                            ; D3ED A9 00                    ..
-        sta     $0100                           ; D3EF 8D 00 01                 ...
-        ldx     $0101                           ; D3F2 AE 01 01                 ...
+        sta     VRAMBufferActive                           ; D3EF 8D 00 01                 ...
+        ldx     VRAMBufferOffset                           ; D3F2 AE 01 01                 ...
         lda     #$AB                            ; D3F5 A9 AB                    ..
-        sta     $0102,x                         ; D3F7 9D 02 01                 ...
+        sta     VRAMBuffer,x                         ; D3F7 9D 02 01                 ...
         inx                                     ; D3FA E8                       .
         lda     #$91                            ; D3FB A9 91                    ..
-        sta     $0102,x                         ; D3FD 9D 02 01                 ...
+        sta     VRAMBuffer,x                         ; D3FD 9D 02 01                 ...
         inx                                     ; D400 E8                       .
         lda     #$02                            ; D401 A9 02                    ..
-        sta     $0102,x                         ; D403 9D 02 01                 ...
+        sta     VRAMBuffer,x                         ; D403 9D 02 01                 ...
         inx                                     ; D406 E8                       .
         lda     $54                             ; D407 A5 54                    .T
         jsr     LD139                           ; D409 20 39 D1                  9.
         jsr     LD146                           ; D40C 20 46 D1                  F.
-        sta     $0103,x                         ; D40F 9D 03 01                 ...
+        sta     VRAMBuffer+1,x                         ; D40F 9D 03 01                 ...
         tya                                     ; D412 98                       .
-        sta     $0102,x                         ; D413 9D 02 01                 ...
+        sta     VRAMBuffer,x                         ; D413 9D 02 01                 ...
         inx                                     ; D416 E8                       .
         inx                                     ; D417 E8                       .
-        stx     $0101                           ; D418 8E 01 01                 ...
+        stx     VRAMBufferOffset                           ; D418 8E 01 01                 ...
         lda     #$80                            ; D41B A9 80                    ..
-        sta     $0100                           ; D41D 8D 00 01                 ...
+        sta     VRAMBufferActive                           ; D41D 8D 00 01                 ...
         lda     $0304                           ; D420 AD 04 03                 ...
         ora     #$10                            ; D423 09 10                    ..
         sta     $0304                           ; D425 8D 04 03                 ...
