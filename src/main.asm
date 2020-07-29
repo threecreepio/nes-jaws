@@ -101,7 +101,7 @@ PlayerY               = PlayerData + EntityY ; 16 bit
 PaletteLoadPending        = $0300
 NMISpriteHandlingDisabled = $0302
 
-InJawsEncounter       = $034B
+EncounterJawsActive       = $034B
 EncounterType         = $038A ; 0=normal, 1=jaws, 2=bonus stage, 3=?
 
 TrackerTimer          = $0345
@@ -112,6 +112,7 @@ TrackerDistanceNext   = $0346
 
 PlayerNumberOfLives   = $0387
 PlayerHasTracker      = $0341
+PlayerFlag34D    = $034D
 PlayerShellCount      = $0390
 PlayerPowerLevel      = $0391
 PlayerCrabLevel       = $0392
@@ -451,7 +452,7 @@ InitializeGame:
         jsr InitJawsStashedLocation
 StartGameAfterDeath:
         lda #$00
-        sta $034D
+        sta PlayerFlag34D
         sta PlayerHasTracker
         sta MapSubmarineVisible
         sta EncounterType
@@ -462,6 +463,7 @@ StartGameAfterDeath:
         sta JawsHP
         lda #>JawsMaxHP
         sta JawsHP+1
+        ; place player at starting port
         lda #$04
         sta PlayerStashedX
         lda #$04
@@ -504,7 +506,7 @@ RunMapScreen:
         lda     #MusicMapScreen
         jsr     SoundPlay
         jsr     WaitFor1Frame
-@MapScreenMainLoop:
+MapScreenMainLoop:
         jsr     ReadJoypads
         jsr     MapRunJaws
         jsr     MapRunPlayer
@@ -513,28 +515,28 @@ RunMapScreen:
         jsr     LAA4E
         jsr     UpdateEntitySprites
         lda     #$00
-        sta     InJawsEncounter
+        sta     EncounterJawsActive
         lda     $0306
         lsr     a
-        bcc     @L836B
-        jmp     StartEncounter
-@L836B:
+        bcc     @CheckEnterPort
+        jmp     RunEncounterScreen
+@CheckEnterPort:
         lsr     a
-        bcc     @L8371
+        bcc     @CheckEnterEncounter
         jmp     RunPortScreen
-@L8371:
+@CheckEnterEncounter:
         lsr     a
-        bcc     @L8384
-        inc     InJawsEncounter
-        lda     $0700
+        bcc     @CheckNeedMoreConchShells
+        inc     EncounterJawsActive
+        lda     JawsData + EntityActive
         and     #$01
-        beq     StartEncounter
-        inc     InJawsEncounter
-        jmp     StartEncounter
-@L8384:
+        beq     RunEncounterScreen
+        inc     EncounterJawsActive
+        jmp     RunEncounterScreen
+@CheckNeedMoreConchShells:
         lsr     a
         bcc     @L838A
-        jmp     L877B
+        jmp     MapShowConchShellsMessage
 @L838A:
         lda     #(JOY_START)
         bit     Joy1Pressed
@@ -543,7 +545,7 @@ RunMapScreen:
         jsr     L8B5F
         jsr     RefreshPPUState
         jsr     WaitFor1Frame
-        jmp     @MapScreenMainLoop
+        jmp     MapScreenMainLoop
 @PauseGameInMap:
         lda #$81
         sta ShowStatusBarTextLine         
@@ -560,7 +562,7 @@ RunMapScreen:
         jsr L8B5F
         jsr ReadJoypads
         lda #$08
-        bit $0332
+        bit Joy1Pressed
         bne @L84D6
         LDY #$02
         jsr WaitForYSpins
@@ -571,12 +573,12 @@ RunMapScreen:
         lda #$01
         sta ShowStatusBarTextLine         
         bit $0308
-        BPL @L83E6
-        lda $0331
-        AND #$03
+        bpl @L83E6
+        lda Joy2Inputs
+        and #(JOY_A | JOY_B)
         bne @L83E9
 @L83E6:
-        jmp @MapScreenMainLoop
+        jmp MapScreenMainLoop
 @L83E9:
         tax
         dex
@@ -588,10 +590,10 @@ RunMapScreen:
         stx TrackerDistancePrev
 
 ; ----------------------------------------------------------------------------
-StartEncounter:
+RunEncounterScreen:
         lda #MusicStartEncounter
         jsr SoundPlay
-        lda InJawsEncounter
+        lda EncounterJawsActive
         beq @StartingJawsEncounter
         jsr CopyToVRAMBuffer
         .addr CopyTextYouveHitSomething
@@ -604,14 +606,15 @@ StartEncounter:
         sta     ShowStatusBarTextLine
         lda     #$01
         sta     NMISpriteHandlingDisabled
-@L8419:
+@DelayUntilSoundStops:
         jsr     RefreshPPUState
         jsr     WaitFor1Frame
         jsr     L8B5F
         ldy     #$02
         jsr     WaitForYSpins
         lda     $0574
-        bmi     @L8419
+        bmi     @DelayUntilSoundStops
+        ; run encounter
         lda     #$01
         sta     ShowStatusBarTextLine
         jsr     PPUDisableNMI
@@ -643,7 +646,7 @@ StartEncounter:
         jsr     ReadJoypads
         jsr     EncounterRunPlayer
         jsr     EncounterRunProjectiles
-        jsr     L9F82
+        jsr     EncounterRunJaws
         jsr     LA136
         jsr     L96F1
         jsr     UpdateEntitySprites
@@ -673,7 +676,7 @@ StartEncounter:
         jsr WaitFor1Frame
         jsr ReadJoypads
         lda #$08
-        bit $0332
+        bit Joy1Pressed
         bne @L84D6
         ldy #$02
         jsr WaitForYSpins
@@ -685,8 +688,8 @@ StartEncounter:
         sta ShowStatusBarTextLine
         bit $0308
         bpl @L8476
-        lda $0331
-        and #$03
+        lda Joy2Inputs
+        and #(JOY_A | JOY_B)
         beq @L8476
         tax
         dex
@@ -983,15 +986,31 @@ L8768:
         rts                                     ; 877A 60                       `
 
 ; ----------------------------------------------------------------------------
-L877B:
-        .byte   $A9,$1E,$20,$CD,$E2,$A9,$81,$8D ; 877B A9 1E 20 CD E2 A9 81 8D  .. .....
-        .byte   $05,$03,$20,$A1,$A8,$B0,$87,$A9 ; 8783 05 03 20 A1 A8 B0 87 A9  .. .....
-        .byte   $78,$85,$12,$20,$83,$8B,$20,$40 ; 878B 78 85 12 20 83 8B 20 40  x.. .. @
-        .byte   $8C,$20,$5F,$8B,$A0,$02,$20,$60 ; 8793 8C 20 5F 8B A0 02 20 60  . _... `
-        .byte   $8C,$C6,$12,$D0,$EE,$A9,$01,$8D ; 879B 8C C6 12 D0 EE A9 01 8D  ........
-        .byte   $05,$03,$A9,$00,$8D,$06,$03,$20 ; 87A3 05 03 A9 00 8D 06 03 20  ....... 
-        .byte   $CD,$E2,$4C,$48,$83
-        
+MapShowConchShellsMessage:
+        lda #SFXPortNeedMoreConchShells
+        jsr SoundPlay
+        lda #$81
+        sta $0305
+        jsr CopyToVRAMBuffer
+        .addr CopyTextYouNeedMoreConchShells
+        lda #$78
+        sta $12
+@Wait:
+        jsr RefreshPPUState
+        jsr WaitFor1Frame
+        jsr L8B5F
+        ldy #$02
+        jsr WaitForYSpins
+        dec $12
+        bne @Wait
+        lda #$01
+        sta $0305
+        lda #$00
+        sta $0306
+        jsr SoundPlay
+        jmp MapScreenMainLoop
+
+CopyTextYouNeedMoreConchShells:
         .byte $20, $2B ; space + ascii file separator
         .byte "    YOU NEED MORE CONCH SHELLS.  "
 
@@ -2034,7 +2053,7 @@ JumpEngine:
 MapRunPlayer:
         jsr     LoadPlayerWorkset                           ; 8F54 20 4C 97                  L.
         bit     Workset + EntityActive                             ; 8F57 24 20                    $ 
-        bvs     L8F70                           ; 8F59 70 15                    p.
+        bvs     @PlayerIsActive                           ; 8F59 70 15                    p.
         lda     #$C0                            ; 8F5B A9 C0                    ..
         sta     Workset + EntityActive                             ; 8F5D 85 20                    . 
         lda     #$08                            ; 8F5F A9 08                    ..
@@ -2044,9 +2063,7 @@ MapRunPlayer:
         jsr     L90A7                           ; 8F67 20 A7 90                  ..
         jsr     L98ED                           ; 8F6A 20 ED 98                  ..
         jmp     L909C                           ; 8F6D 4C 9C 90                 L..
-
-; ----------------------------------------------------------------------------
-L8F70:
+@PlayerIsActive:
         lda     #$08                            ; 8F70 A9 08                    ..
         bit     Workset + EntityV14                             ; 8F72 24 34                    $4
         beq     L8F9F                           ; 8F74 F0 29                    .)
@@ -2119,7 +2136,7 @@ L8FD6:
         cmp     #$02                            ; 8FEA C9 02                    ..
         bcs     L9045                           ; 8FEC B0 57                    .W
         sta     $12                             ; 8FEE 85 12                    ..
-        eor     $034D                           ; 8FF0 4D 4D 03                 MM.
+        eor     PlayerFlag34D                           ; 8FF0 4D 4D 03                 MM.
         bne     L9045                           ; 8FF3 D0 50                    .P
         bit     PlayerHasTracker                           ; 8FF5 2C 41 03                 ,A.
         bmi     L9006                           ; 8FF8 30 0C                    0.
@@ -2153,9 +2170,9 @@ L9024:
         lda     $0306                           ; 9027 AD 06 03                 ...
         ora     #$02                            ; 902A 09 02                    ..
         sta     $0306                           ; 902C 8D 06 03                 ...
-        lda     $034D                           ; 902F AD 4D 03                 .M.
+        lda     PlayerFlag34D                           ; 902F AD 4D 03                 .M.
         eor     #$01                            ; 9032 49 01                    I.
-        sta     $034D                           ; 9034 8D 4D 03                 .M.
+        sta     PlayerFlag34D                           ; 9034 8D 4D 03                 .M.
         jmp     L909C                           ; 9037 4C 9C 90                 L..
 
 ; ----------------------------------------------------------------------------
@@ -2215,41 +2232,52 @@ L909F:
         .byte   $03,$05,$07,$0A,$0F,$14,$19,$1E ; 909F 03 05 07 0A 0F 14 19 1E  ........
 ; ----------------------------------------------------------------------------
 L90A7:
-        lda     Workset + EntityV14                             ; 90A7 A5 34                    .4
-        cmp     Workset + EntityV15                             ; 90A9 C5 35                    .5
-        beq     @Done                           ; 90AB F0 20                    . 
-        sta     Workset + EntityV15                             ; 90AD 85 35                    .5
-        asl     a                               ; 90AF 0A                       .
-        tay                                     ; 90B0 A8                       .
-        lda     Workset + EntityType                             ; 90B1 A5 21                    .!
-        asl     a                               ; 90B3 0A                       .
-        tax                                     ; 90B4 AA                       .
-        lda     L90CE,x                         ; 90B5 BD CE 90                 ...
-        sta     $44                             ; 90B8 85 44                    .D
-        lda     L90CE+1,x                         ; 90BA BD CF 90                 ...
-        sta     $45                             ; 90BD 85 45                    .E
-        lda     Workset + EntityActive                             ; 90BF A5 20                    . 
-        and     #$CF                            ; 90C1 29 CF                    ).
-        ora     ($44),y                         ; 90C3 11 44                    .D
-        sta     Workset + EntityActive                             ; 90C5 85 20                    . 
-        iny                                     ; 90C7 C8                       .
-        lda     ($44),y                         ; 90C8 B1 44                    .D
-        jsr     WorksetAnimationPlay                           ; 90CA 20 AD 97                  ..
+        @TempPointer = $44
+        lda     Workset + EntityV14
+        cmp     Workset + EntityV15
+        beq     @Done
+        sta     Workset + EntityV15
+        asl     a
+        tay
+        lda     Workset + EntityType
+        asl     a
+        tax
+        lda     @Animations,x
+        sta     @TempPointer
+        lda     @Animations+1,x
+        sta     @TempPointer+1
+        lda     Workset + EntityActive
+        and     #$CF
+        ora     (@TempPointer),y
+        sta     Workset + EntityActive
+        iny
+        lda     (@TempPointer),y
+        jsr     WorksetAnimationPlay
 @Done:
-        rts                                     ; 90CD 60                       `
+        rts
+@Animations:
+        .addr @BoatAnimations
+        .addr @BoatAnimations
+        .addr @BoatAnimations
 
-; ----------------------------------------------------------------------------
-L90CE:
-        .addr $90D4
-        .addr $90D4
-        .addr $90D4
-        
-        
-        .byte   $00,$00,$00 ; 90CF 90 D4 90 D4 90 00 00 00  ........
-        .byte   $00,$00,$02,$00,$02,$10,$00,$10 ; 90D7 00 00 02 00 02 10 00 10  ........
-        .byte   $00,$00,$01,$00,$01,$00,$04,$00 ; 90DF 00 00 01 00 01 00 04 00  ........
-        .byte   $04,$00,$06,$00,$06,$10,$04,$10 ; 90E7 04 00 06 00 06 10 04 10  ........
-        .byte   $04,$00,$05,$00,$05             ; 90EF 04 00 05 00 05           .....
+@BoatAnimations:
+.byte $00,AnimationMapBoatEW
+.byte $00,AnimationMapBoatEW
+.byte $00,AnimationMapBoatS
+.byte $00,AnimationMapBoatS
+.byte $10,AnimationMapBoatEW
+.byte $10,AnimationMapBoatEW
+.byte $00,AnimationMapBoatN
+.byte $00,AnimationMapBoatN
+.byte $00,AnimationMapBoatStillEW
+.byte $00,AnimationMapBoatStillEW
+.byte $00,AnimationMapBoatStillS
+.byte $00,AnimationMapBoatStillS
+.byte $10,AnimationMapBoatStillEW
+.byte $10,AnimationMapBoatStillEW
+.byte $00,AnimationMapBoatStillN
+.byte $00,AnimationMapBoatStillN
+
 ; ----------------------------------------------------------------------------
 L90F4:
         lda     Workset + EntityType                             ; 90F4 A5 21                    .!
@@ -2431,7 +2459,7 @@ EncounterRunPlayerBoat:
         sta     Workset + EntityActive
         jmp     WorksetSave
 L9231:
-        lda     InJawsEncounter                           ; 9231 AD 4B 03                 .K.
+        lda     EncounterJawsActive                           ; 9231 AD 4B 03                 .K.
         beq     L923D                           ; 9234 F0 07                    ..
         dec     Workset + EntityV1D                             ; 9236 C6 3D                    .=
         beq     L9241                           ; 9238 F0 07                    ..
@@ -4480,8 +4508,8 @@ L9F72:
         .byte   $02,$02,$06,$06,$00,$04,$00,$04 ; 9F72 02 02 06 06 00 04 00 04  ........
         .byte   $01,$03,$07,$05,$01,$03,$07,$05 ; 9F7A 01 03 07 05 01 03 07 05  ........
 ; ----------------------------------------------------------------------------
-L9F82:
-        lda     InJawsEncounter                           ; 9F82 AD 4B 03                 .K.
+EncounterRunJaws:
+        lda     EncounterJawsActive                           ; 9F82 AD 4B 03                 .K.
         cmp     #$02                            ; 9F85 C9 02                    ..
         bne     L9F8A                           ; 9F87 D0 01                    ..
         rts                                     ; 9F89 60                       `
@@ -4530,7 +4558,7 @@ L9FCB:
         lda     WaterHeight+1                           ; 9FD3 AD 3D 03                 .=.
         adc     #$00                            ; 9FD6 69 00                    i.
         sta     Workset + EntityY + 1                             ; 9FD8 85 25                    .%
-        lda     InJawsEncounter                           ; 9FDA AD 4B 03                 .K.
+        lda     EncounterJawsActive                           ; 9FDA AD 4B 03                 .K.
         sta     Workset + EntityV14                             ; 9FDD 85 34                    .4
         sta     Workset + EntityV15                             ; 9FDF 85 35                    .5
         beq     L9FED                           ; 9FE1 F0 0A                    ..
@@ -5638,7 +5666,7 @@ LA749:
         iny
         cmp     #$03
         bcc     @LA76A
-        ldx     InJawsEncounter
+        ldx     EncounterJawsActive
         cpx     #$02
         bcs     @LA76A
         lda     #$03
@@ -9719,7 +9747,7 @@ LD2B8:
         sta     $46                             ; D2E2 85 46                    .F
 LD2E4:
         lda     #$80                            ; D2E4 A9 80                    ..
-        sta     $0700,x                         ; D2E6 9D 00 07                 ...
+        sta     JawsData,x                         ; D2E6 9D 00 07                 ...
         lda     ($44),y                         ; D2E9 B1 44                    .D
         sta     $0714,x                         ; D2EB 9D 14 07                 ...
         iny                                     ; D2EE C8                       .
@@ -12062,7 +12090,7 @@ MusicBonusScreenEnd            = $1A
 MusicIntroScreen               = $1B
 MusicMapScreenDupe             = $1C
 MusicPortPowerup               = $1D
-SFXUnknown3                    = $1E
+SFXPortNeedMoreConchShells     = $1E
 SFXSTOP                        = $FF
 
 SoundPointers:
@@ -12096,7 +12124,7 @@ SoundPointers:
         .addr MusicIntroScreenData
         .addr MusicMapScreenData
         .addr MusicPortPowerupData
-        .addr SFXUnknown3Data                          ; unused error beep?
+        .addr SFXPortNeedMoreConchShellsData
 
 SFXSilentData:
         .byte $FF
@@ -12245,7 +12273,7 @@ MusicPortPowerupData:
 .byte   $1A,$19,$18,$17,$16,$15,$14,$13
 .byte   $12,$11,$10,$FF
 
-SFXUnknown3Data:
+SFXPortNeedMoreConchShellsData:
 .byte $00,$0D,$EC,$01
 .byte   $0B,$EC,$FF,$F0,$01,$EC,$04,$ED
 .byte   $00,$C3,$82,$15,$80,$3F,$F9,$EE
