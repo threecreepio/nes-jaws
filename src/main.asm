@@ -91,13 +91,14 @@ PlayerY               = PlayerData + EntityY ; 16 bit
 
 PaletteLoadPending    = $0300
 
-InJawsEncounter    = $034B
+InJawsEncounter       = $034B
 EncounterType         = $038A ; 0=normal, 1=jaws, 2=bonus stage, 3=?
 
 TrackerTimer          = $0345
 TrackerAnimationIndex = $0342
 TrackerAnimationTimer = $0343
-TrackerJawsDistance   = $0346
+TrackerDistancePrev   = $0344
+TrackerDistanceNext   = $0346
 
 PlayerNumberOfLives   = $0387
 PlayerHasTracker      = $0341
@@ -469,7 +470,7 @@ RunMapScreen:
         lda     #$80
         sta     PlayerHasTracker
         sta     $0344
-        sta     TrackerJawsDistance
+        sta     TrackerDistanceNext
         lda     #RomGraphicsTrackerIcon
         jsr     DrawRomGraphics
 @RunMapScreenContinue:
@@ -569,11 +570,11 @@ RunMapScreen:
         tax
         dex
         stx $034B
-        lda $0344
+        lda TrackerDistancePrev
         and #$0F
         tax
         dex
-        stx $0344
+        stx TrackerDistancePrev
 
 ; ----------------------------------------------------------------------------
 StartEncounter:
@@ -4269,7 +4270,7 @@ L9DEF:
         bcs     L9E02                           ; 9DFE B0 02                    ..
         lda     $18                             ; 9E00 A5 18                    ..
 L9E02:
-        sta     $0344                           ; 9E02 8D 44 03                 .D.
+        sta     TrackerDistancePrev                           ; 9E02 8D 44 03                 .D.
 L9E05:
         dec     Workset + EntityV16                            ; 9E05 C6 36                    .6
         bne     L9E4A                           ; 9E07 D0 41                    .A
@@ -4281,7 +4282,7 @@ L9E05:
         sta     Workset + EntityV17                            ; 9E13 85 37                    .7
 L9E15:
         jsr     L9EFA                           ; 9E15 20 FA 9E                  ..
-        lda     $0344                           ; 9E18 AD 44 03                 .D.
+        lda     TrackerDistancePrev                           ; 9E18 AD 44 03                 .D.
         cmp     #$03                            ; 9E1B C9 03                    ..
         lda     #$01                            ; 9E1D A9 01                    ..
         bit     Workset + EntityActive                             ; 9E1F 24 20                    $ 
@@ -5682,98 +5683,123 @@ DrawStatusLine_Score: ; A79E
 
 ; ----------------------------------------------------------------------------
 MapRunJawsTracker:
+        @Temp = $12
         ; exit if the player does not have the tracker
-        lda     PlayerHasTracker
-        bmi     @MapRunJawsTracker
+        lda PlayerHasTracker
+        bmi @MapRunJawsTracker
         rts
 @MapRunJawsTracker:
-        lda     $0344
-        cmp     TrackerJawsDistance
-        bcs     @LA800
-        cmp     #$10
-        bcs     @LA800
-        ldx     TrackerJawsDistance
-        cpx     #$10
-        bcs     @LA800
-        sta     TrackerJawsDistance
-        lda     @TrackerTimers,x
-        ldx     $0344
+        ; skip ahead if jaws is moving farther away
+        lda TrackerDistancePrev
+        cmp TrackerDistanceNext
+        bcs @CheckTimerExpiration
+        ; skip ahead if jaws is >= 16 units away
+        cmp #$10
+        bcs @CheckTimerExpiration
+        ldx TrackerDistanceNext
+        cpx #$10
+        bcs @CheckTimerExpiration
+        ; otherwise store a new pulse timer based on
+        ; the tracker timer for our new distance compared to old
+        sta TrackerDistanceNext
+        lda @TrackerTimers,x
+        ldx TrackerDistancePrev
         sec
-        sbc     @TrackerTimers,x
-        sta     $12
-        lda     TrackerTimer
+        sbc @TrackerTimers,x
+        sta @Temp
+        lda TrackerTimer
         sec
-        sbc     $12
-        bcs     @LA7FD
-        lda     #$00
-@LA7FD:
-        sta     TrackerTimer
-@LA800:
-        lda     TrackerTimer
-        beq     @LA80B
-        dec     TrackerTimer
-        jmp     @LA82B
-@LA80B:
-        lda     $0344
-        cmp     #$10
-        bcs     @LA82B
-        sta     TrackerJawsDistance
+        sbc @Temp
+        bcs @UpdateTimer
+        lda #$00
+@UpdateTimer:
+        sta TrackerTimer
+@CheckTimerExpiration:
+        ; if the timer is 0, we can play the sound!
+        lda TrackerTimer
+        beq @PlaySoundIfNeeded
+        ; otherwise decrement the timer and update ui.
+        dec TrackerTimer
+        jmp @UpdateUIIfNeeded
+@PlaySoundIfNeeded:
+        ; check so that we are close enough to play the sound.
+        lda TrackerDistancePrev
+        cmp #$10
+        bcs @UpdateUIIfNeeded
+        ; update the timer based on distance, play the sound and
+        ; prepare the ui animation
+        sta TrackerDistanceNext
         tax
-        lda     @TrackerTimers,x
-        sta     TrackerTimer
-        lda     #SFXMapTrackerPulse
-        jsr     SoundPlay
-        lda     #$00
-        sta     TrackerAnimationIndex
-        lda     #$01
-        sta     TrackerAnimationTimer
-@LA82B:
-        lda     TrackerAnimationTimer
-        beq     @Done
-        dec     TrackerAnimationTimer
-        bne     @Done
-        lda     TrackerAnimationIndex
-        cmp     #$09
-        bcs     @Done
-        inc     TrackerAnimationIndex
-        ldx     #$04
-        stx     TrackerAnimationTimer
-        asl     a
+        lda @TrackerTimers,x
+        sta TrackerTimer
+        lda #SFXMapTrackerPulse
+        jsr SoundPlay
+        lda #$00
+        sta TrackerAnimationIndex
+        lda #$01
+        sta TrackerAnimationTimer
+@UpdateUIIfNeeded:
+        ; wait for next timer animation update
+        lda TrackerAnimationTimer
+        beq @Done
+        dec TrackerAnimationTimer
+        bne @Done
+        lda TrackerAnimationIndex
+        cmp #$09
+        bcs @Done
+        inc TrackerAnimationIndex
+        ldx #$04
+        stx TrackerAnimationTimer
+        asl a
         tay
-        lda     #$00
-        sta     $0100
-        ldx     $0101
-        lda     #$AB
-        sta     $0102,x
+        ; place new tiles in vram buffer
+        lda #$00
+        sta VRAMBufferActive
+        ldx VRAMBufferOffset
+        ; set ppu address to $2B6F, and mark the buffer as having multiple bytes
+        lda #$2B | VRAMFlagMultipleBytes
+        sta VRAMBuffer,x
         inx
-        lda     #$6F
-        sta     $0102,x
+        lda #$6F
+        sta VRAMBuffer,x
         inx
-        lda     #$02
-        sta     $0102,x
+        ; set bytes to draw
+        lda #$02
+        sta VRAMBuffer,x
         inx
-        lda     @LA88F,y
-        sta     $0102,x
+        ; and load in the next tracker animation tiles
+        lda @TrackerAnimationTiles,y
+        sta VRAMBuffer,x
         inx
-        lda     @LA890,y
-        sta     $0102,x
+        lda @TrackerAnimationTiles+1,y
+        sta VRAMBuffer,x
         inx
-        stx     $0101
-        lda     #$80
-        sta     $0100
-        lda     $0304
-        ora     #$10
-        sta     $0304
+        ; store new vram offset and flag as active
+        stx VRAMBufferOffset
+        lda #$80
+        sta VRAMBufferActive
+        lda $0304
+        ora #$10
+        sta $0304
 @Done:
         rts
+
+; cooldown for the tracker, used to slow the tracker down based
+; on players distance to jaws
 @TrackerTimers:
-        .byte   $18,$20,$30,$40,$50,$60,$70,$80,$90,$A0,$B0,$C0,$D0,$E0,$F0,$FF
-@LA88F:
-        .byte   $0D
-@LA890:
-        .byte   $0C,$1D,$0C,$0E,$0F,$1E,$1F,$24
-        .byte   $25,$0B,$27,$0B,$28,$0B,$29,$0B
-        .byte   $0C
+        .byte $18,$20,$30,$40,$50,$60,$70,$80,$90,$A0,$B0,$C0,$D0,$E0,$F0,$FF
+
+; sets of two tiles showing the trackers pulse in the UI
+@TrackerAnimationTiles:
+        .byte $0D,$0C
+        .byte $1D,$0C
+        .byte $0E,$0F
+        .byte $1E,$1F
+        .byte $24,$25
+        .byte $0B,$27
+        .byte $0B,$28
+        .byte $0B,$29
+        .byte $0B,$0C
 
 
 ; ----------------------------------------------------------------------
@@ -5940,22 +5966,25 @@ DrawStatusLine_JawsPower:
 
 ; ----------------------------------------------------------------------------
 DrawStatusLine_Shells:
-        jsr     PPURenderHorizontal                           ; A992 20 F6 8B                  ..
-        lda     #$2B                            ; A995 A9 2B                    .+
-        sta     PPUADDR                           ; A997 8D 06 20                 .. 
-        lda     #$8C                            ; A99A A9 8C                    ..
-        sta     PPUADDR                           ; A99C 8D 06 20                 .. 
-        lda     $0390                           ; A99F AD 90 03                 ...
-        jsr     ConvertAToBCD                           ; A9A2 20 39 D1                  9.
-        jsr     MoveAAndYToAsciiTable                           ; A9A5 20 46 D1                  F.
-        pha                                     ; A9A8 48                       H
-        tya                                     ; A9A9 98                       .
-        ora     #$30                            ; A9AA 09 30                    .0
-        sta     PPUDATA                           ; A9AC 8D 07 20                 .. 
-        pla                                     ; A9AF 68                       h
-        ora     #$30                            ; A9B0 09 30                    .0
-        sta     PPUDATA                           ; A9B2 8D 07 20                 .. 
-        rts                                     ; A9B5 60                       `
+        jsr     PPURenderHorizontal
+        ; draw at $2B94, where the shell counter is
+        lda     #$2B
+        sta     PPUADDR
+        lda     #$8C
+        sta     PPUADDR
+        lda     PlayerShellCount
+        jsr     ConvertAToBCD
+        jsr     MoveAAndYToAsciiTable
+        pha
+        tya
+        ; make doubly-certain that we're in the ascii table and
+        ; then write the shell counter to ppu
+        ora     #$30
+        sta     PPUDATA
+        pla
+        ora     #$30
+        sta     PPUDATA
+        rts
 
 ; ----------------------------------------------------------------------------
 LA9B6:
