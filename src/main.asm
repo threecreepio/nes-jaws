@@ -132,6 +132,7 @@ SpritePosX            = $0203
 SPR                   = 4
 
 SoundIsPlaying        = $055D
+PPUADDRStatusbarText  = $2B20
 
 ; $20 bytes of working data
 WorksetPtr            = $40
@@ -898,12 +899,14 @@ EncounterTypeMusic:
         .byte MusicEncounterScreen
 
 CopyTextYouveHitSomething:
-        .byte $20, $2B ; string length + ascii file separator
-        .byte "       YOU/VE HIT SOMETHING!     "
+        .addr PPUADDRStatusbarText
+        .byte $20 ; length
+        .byte "      YOU/VE HIT SOMETHING!     "
 
 CopyTextYouveHitJaws:
-        .byte $20, $2B ; string length + ascii file separator
-        .byte "         YOU/VE HIT JAWS!        "
+        .addr PPUADDRStatusbarText
+        .byte $20 ; length
+        .byte "        YOU/VE HIT JAWS!        "
 
 ; ----------------------------------------------------------------------------
 RunIntroScreen:
@@ -1011,8 +1014,9 @@ MapShowConchShellsMessage:
         jmp MapScreenMainLoop
 
 CopyTextYouNeedMoreConchShells:
-        .byte $20, $2B ; space + ascii file separator
-        .byte "    YOU NEED MORE CONCH SHELLS.  "
+        .addr PPUADDRStatusbarText
+        .byte $20 ; length
+        .byte "   YOU NEED MORE CONCH SHELLS.  "
 
 ; ----------------------------------------------------------------------------
 DrawStatusLine_PowerLabel:
@@ -1238,12 +1242,14 @@ RunPortPowerUp:
         jmp RunMapScreen
 
 CopyTextPowerLevelRaised:
-        .byte $20, $2B ; copy length + ascii file separator
-        .byte "        POWER LEVEL RAISED.      "
+        .addr PPUADDRStatusbarText
+        .byte $20 ; length
+        .byte "       POWER LEVEL RAISED.      "
 
 CopyTextCollectOneStrobe:
-        .byte $20, $2B ; copy length + ascii file separator
-        .byte "        COLLECT ONE STROBE.      "
+        .addr PPUADDRStatusbarText
+        .byte $20 ; length
+        .byte "       COLLECT ONE STROBE.      "
         
 ; ----------------------------------------------------------------------------
 UnstashPlayerLocation:
@@ -5893,7 +5899,7 @@ CopyToVRAMBuffer:
         inx
         iny
         lda (@TempPointer),y
-        ora #$80
+        ora #VRAMFlagMultipleBytes
         sta VRAMBufferOffset,x
         inx
         iny
@@ -12793,8 +12799,9 @@ LF697:
         .byte   $F6 ; F69F F6
 
 CopyTextPause:
-.byte $20, $2B ; length + ascii file separator
-.byte "              PAUSE              "
+        .addr PPUADDRStatusbarText
+        .byte $20 ; length
+        .byte "             PAUSE              "
         
         .byte $00,$00,$00,$00 ; F6BF 20 20 20 20 00 00 00 00      ....
         .byte   $00,$FF,$FF,$FF,$FF,$FC,$F8,$F0 ; F6C7 00 FF FF FF FF FC F8 F0  ........
