@@ -36,6 +36,8 @@ SND_MASTERCTRL        = $4015
 JOYPAD_PORT1          = $4016
 JOYPAD_PORT2          = $4017
 
+
+NextStatusbarToDraw   = $0303
 SoundtestEnabled      = $0308
 SoundtestSelected     = $00
 
@@ -46,8 +48,13 @@ Joy1Pressed           = $0332
 Joy2Inputs            = $0331
 Joy2Pressed           = $0333
 
-JawsPreviousX         = $0348 ; 8 bit approximation of jaws last X coord
-JawsPreviousY         = $0349 ; 8 bit approximation of jaws last Y coord
+; these previous x/y positions are used when jaws or the player is unloaded.
+; that way we can restore them to roughly the correct location when needed.
+JawsStashedX          = $0348 ; 8 bit approximation of jaws last X coord
+JawsStashedY          = $0349 ; 8 bit approximation of jaws last Y coord
+PlayerStashedX        = $038C ; 8 bit approximation of jaws last X coord
+PlayerStashedY        = $038D ; 8 bit approximation of jaws last Y coord
+
 ShowStatusBarTextLine = $0305
 HighScore             = $0350
 CurrentScore          = $0380
@@ -91,7 +98,8 @@ PlayerType            = PlayerData + EntityType
 PlayerX               = PlayerData + EntityX ; 16 bit
 PlayerY               = PlayerData + EntityY ; 16 bit
 
-PaletteLoadPending    = $0300
+PaletteLoadPending        = $0300
+NMISpriteHandlingDisabled = $0302
 
 InJawsEncounter       = $034B
 EncounterType         = $038A ; 0=normal, 1=jaws, 2=bonus stage, 3=?
@@ -114,6 +122,7 @@ BGDataPage2           = $0430
 BGDataPage3           = $0460
 BGDataDrawOffset      = $046D
 
+StatusbarPPULocation= $48 ; 16 bit
 
 SpritePosY            = $0200
 SpriteTile            = $0201
@@ -287,7 +296,7 @@ RunTitleScreen:
 @TitleScreenMainLoop:
         jsr WaitFor1Frame
         lda #$01
-        sta $0302
+        sta NMISpriteHandlingDisabled
         jsr ReadJoypads
         jsr Soundtest
         jsr L8B5F
@@ -334,7 +343,7 @@ Soundtest:
         cpy SoundtestSelected
         beq @CheckAInput
         sty $00
-        jsr SoundtestDrawSelection
+        jsr @SoundtestDrawSelection
 @CheckAInput:
         lda #JOY_A
         bit Joy1Pressed
@@ -344,7 +353,7 @@ Soundtest:
 @Done:
         rts
 
-SoundtestDrawSelection:
+@SoundtestDrawSelection:
         ; clear vram buffer
         lda #$00
         sta VRAMBufferActive
@@ -439,7 +448,7 @@ InitializeGame:
         sta $0396
         lda #$03
         sta PlayerStrobeCount
-        jsr InitJawsPreviousLocation
+        jsr InitJawsStashedLocation
 StartGameAfterDeath:
         lda #$00
         sta $034D
@@ -454,9 +463,9 @@ StartGameAfterDeath:
         lda #>JawsMaxHP
         sta JawsHP+1
         lda #$04
-        sta $038C
+        sta PlayerStashedX
         lda #$04
-        sta $038D
+        sta PlayerStashedY
         jsr RunIntroScreen
 
 RunMapScreen:
@@ -479,7 +488,7 @@ RunMapScreen:
         jsr     ClearEntityMemory
         lda     #$00
         sta     $0306
-        jsr     L8A16
+        jsr     UnstashPlayerLocation
         jsr     L9746
         lda     #$01
         jsr     StoreActivePaletteAndWaitFor1Frame
@@ -488,7 +497,7 @@ RunMapScreen:
         jsr     MapRunCamera
         jsr     LAAB3
         lda     #$01
-        sta     $0302
+        sta     NMISpriteHandlingDisabled
         sta     ShowStatusBarTextLine
         jsr     PPUEnableNMI
         jsr     PPUEnableAndWaitFor1Frame
@@ -512,7 +521,7 @@ RunMapScreen:
 @L836B:
         lsr     a
         bcc     @L8371
-        jmp     L87EC
+        jmp     RunPortScreen
 @L8371:
         lsr     a
         bcc     @L8384
@@ -539,7 +548,7 @@ RunMapScreen:
         lda #$81
         sta ShowStatusBarTextLine         
         lda #$01
-        sta $0302
+        sta NMISpriteHandlingDisabled
         sta $4A
         lda #SFXPause
         jsr SoundPlay
@@ -586,73 +595,73 @@ StartEncounter:
         beq @StartingJawsEncounter
         jsr CopyToVRAMBuffer
         .addr CopyTextYouveHitSomething
-        jmp @L840F
+        jmp @UpdateStatusbar
 @StartingJawsEncounter:
         jsr CopyToVRAMBuffer
         .addr CopyTextYouveHitJaws
-@L840F:
-        lda     #$81                            ; 840F A9 81                    ..
-        sta     ShowStatusBarTextLine                           ; 8411 8D 05 03                 ...
-        lda     #$01                            ; 8414 A9 01                    ..
-        sta     $0302                           ; 8416 8D 02 03                 ...
+@UpdateStatusbar:
+        lda     #$81
+        sta     ShowStatusBarTextLine
+        lda     #$01
+        sta     NMISpriteHandlingDisabled
 @L8419:
-        jsr     RefreshPPUState                           ; 8419 20 83 8B                  ..
-        jsr     WaitFor1Frame                           ; 841C 20 40 8C                  @.
-        jsr     L8B5F                           ; 841F 20 5F 8B                  _.
-        ldy     #$02                            ; 8422 A0 02                    ..
-        jsr     WaitForYSpins                           ; 8424 20 60 8C                  `.
-        lda     $0574                           ; 8427 AD 74 05                 .t.
-        bmi     @L8419                           ; 842A 30 ED                    0.
-        lda     #$01                            ; 842C A9 01                    ..
-        sta     ShowStatusBarTextLine                           ; 842E 8D 05 03                 ...
-        jsr     PPUDisableNMI                           ; 8431 20 EA 8B                  ..
-        lda     #SFXSTOP                            ; 8434 A9 FF                    ..
-        jsr     SoundPlay                           ; 8436 20 CD E2                  ..
-        jsr     PPUDisableRendering                           ; 8439 20 B6 8B                  ..
-        jsr     L8A41                           ; 843C 20 41 8A                  A.
-        jsr     L8A5E                           ; 843F 20 5E 8A                  ^.
-        jsr     ClearEntityMemory                           ; 8442 20 7C 97                  |.
-        lda     #$00                            ; 8445 A9 00                    ..
-        sta     $0306                           ; 8447 8D 06 03                 ...
-        jsr     LAC82                           ; 844A 20 82 AC                  ..
-        lda     #$00                            ; 844D A9 00                    ..
-        sta     SCROLL_X                           ; 844F 8D 20 03                 . .
-        lda     #$00                            ; 8452 A9 00                    ..
-        sta     CameraX                           ; 8454 8D 38 03                 .8.
-        lda     #$10                            ; 8457 A9 10                    ..
-        sta     CameraX+1                           ; 8459 8D 39 03                 .9.
-        jsr     LA749                           ; 845C 20 49 A7                  I.
-        jsr     L96F1                           ; 845F 20 F1 96                  ..
-        jsr     PPUEnableNMI                           ; 8462 20 DE 8B                  ..
-        jsr     PPUEnableAndWaitFor1Frame                           ; 8465 20 C2 8B                  ..
-        ldx     EncounterType                           ; 8468 AE 8A 03                 ...
-        lda     EncounterTypeMusic,x                         ; 846B BD 97 86                 ...
-        jsr     SoundPlay                           ; 846E 20 CD E2                  ..
-        lda     #$00                            ; 8471 A9 00                    ..
-        sta     $0301                           ; 8473 8D 01 03                 ...
+        jsr     RefreshPPUState
+        jsr     WaitFor1Frame
+        jsr     L8B5F
+        ldy     #$02
+        jsr     WaitForYSpins
+        lda     $0574
+        bmi     @L8419
+        lda     #$01
+        sta     ShowStatusBarTextLine
+        jsr     PPUDisableNMI
+        lda     #SFXSTOP
+        jsr     SoundPlay
+        jsr     PPUDisableRendering
+        jsr     StashPlayerLocation
+        jsr     StashJawsLocation
+        jsr     ClearEntityMemory
+        lda     #$00
+        sta     $0306
+        jsr     LAC82
+        lda     #$00
+        sta     SCROLL_X
+        lda     #$00
+        sta     CameraX
+        lda     #$10
+        sta     CameraX+1
+        jsr     LA749
+        jsr     L96F1
+        jsr     PPUEnableNMI
+        jsr     PPUEnableAndWaitFor1Frame
+        ldx     EncounterType
+        lda     EncounterTypeMusic,x
+        jsr     SoundPlay
+        lda     #$00
+        sta     $0301
 @L8476:
-        jsr     ReadJoypads                           ; 8476 20 87 8C                  ..
-        jsr     EncounterRunPlayer                           ; 8479 20 F8 91                  ..
-        jsr     EncounterRunProjectiles                           ; 847C 20 5A 9B                  Z.
-        jsr     L9F82                           ; 847F 20 82 9F                  ..
-        jsr     LA136                           ; 8482 20 36 A1                  6.
-        jsr     L96F1                           ; 8485 20 F1 96                  ..
-        jsr     UpdateEntitySprites                           ; 8488 20 37 9A                  7.
-        lda     $0306                           ; 848B AD 06 03                 ...
-        and     #$E0                            ; 848E 29 E0                    ).
-        bne     L850A                           ; 8490 D0 78                    .x
-        lda     #(JOY_START)                            ; 8492 A9 08                    ..
-        bit     Joy1Pressed                           ; 8494 2C 32 03                 ,2.
-        bne     @PauseGameInEncounter                           ; 8497 D0 0C                    ..
-        jsr     RefreshPPUState                           ; 8499 20 83 8B                  ..
-        jsr     LA9B6                           ; 849C 20 B6 A9                  ..
-        jsr     L8B5F                           ; 849F 20 5F 8B                  _.
-        jmp     @L8476                           ; 84A2 4C 76 84                 Lv.
+        jsr     ReadJoypads
+        jsr     EncounterRunPlayer
+        jsr     EncounterRunProjectiles
+        jsr     L9F82
+        jsr     LA136
+        jsr     L96F1
+        jsr     UpdateEntitySprites
+        lda     $0306
+        and     #$E0
+        bne     L850A
+        lda     #(JOY_START)
+        bit     Joy1Pressed
+        bne     @PauseGameInEncounter
+        jsr     RefreshPPUState
+        jsr     LA9B6
+        jsr     L8B5F
+        jmp     @L8476
 @PauseGameInEncounter:                   
         lda #$81
         sta ShowStatusBarTextLine
         lda #$01
-        sta $0302
+        sta NMISpriteHandlingDisabled
         sta $4A
         lda #SFXPause
         jsr SoundPlay
@@ -912,7 +921,7 @@ RunIntroScreen:
         ; disable status bar text
         lda     #$01
         sta     ShowStatusBarTextLine
-        sta     $0302
+        sta     NMISpriteHandlingDisabled
         lda     #$02
         sta     ActiveCHR
         ; set ppu to $2272 and draw lives counter
@@ -1001,74 +1010,75 @@ DrawStatusLine_PowerLabel:
         rts                                     ; 87EB 60                       `
 
 ; ----------------------------------------------------------------------------
-L87EC:
-        lda     #MusicPortPowerup                            ; 87EC A9 1D                    ..
-        jsr     SoundPlay                           ; 87EE 20 CD E2                  ..
-        bit     PlayerHasTracker                           ; 87F1 2C 41 03                 ,A.
-        bpl     RunPortTracker                           ; 87F4 10 03                    ..
-        jmp     RunPortPowerUp                           ; 87F6 4C 8D 88                 L..
+RunPortScreen:
+        lda     #MusicPortPowerup
+        jsr     SoundPlay
+        bit     PlayerHasTracker
+        bpl     RunPortTracker
+        jmp     RunPortPowerUp
 
-; ----------------------------------------------------------------------------
 RunPortTracker:
-        jsr     PPUDisableNMI                           ; 87F9 20 EA 8B                  ..
-        jsr     PPUDisableRendering                           ; 87FC 20 B6 8B                  ..
-        jsr     L8A41                           ; 87FF 20 41 8A                  A.
-        jsr     L8A5E                           ; 8802 20 5E 8A                  ^.
-        jsr     ClearEntityMemory                           ; 8805 20 7C 97                  |.
-        lda     #$00                            ; 8808 A9 00                    ..
-        sta     $0306                           ; 880A 8D 06 03                 ...
-        sta     ActiveCHR                           ; 880D 8D 07 03                 ...
-        jsr     ClearScreenAndSprites                           ; 8810 20 12 8E                  ..
-        lda     #RomGraphicsGotTrackerScreen                            ; 8813 A9 08                    ..
-        jsr     DrawRomGraphics                           ; 8815 20 69 8D                  i.
-        jsr     DrawStatusLine                           ; 8818 20 8F A7                  ..
-        lda     #PaletteBlackScreen                            ; 881B A9 07                    ..
-        jsr     StoreActivePaletteAndWaitFor1Frame                           ; 881D 20 BD 8E                  ..
-        lda     #$00                            ; 8820 A9 00                    ..
-        sta     SCROLL_X                           ; 8822 8D 20 03                 . .
-        sta     CameraX                           ; 8825 8D 38 03                 .8.
-        sta     CameraX+1                           ; 8828 8D 39 03                 .9.
-        sta     SCROLL_Y                           ; 882B 8D 22 03                 .".
-        sta     $0323                           ; 882E 8D 23 03                 .#.
-        sta     CameraY                           ; 8831 8D 3A 03                 .:.
-        sta     CameraY+1                           ; 8834 8D 3B 03                 .;.
-        lda     #<PlayerData                            ; 8837 A9 80                    ..
-        sta     WorksetPtr                             ; 8839 85 40                    .@
-        lda     #>PlayerData                            ; 883B A9 06                    ..
-        sta     WorksetPtr+1                             ; 883D 85 41                    .A
-        jsr     WorksetLoad                           ; 883F 20 54 97                  T.
-        lda     #$C0                            ; 8842 A9 C0                    ..
-        sta     Workset + EntityActive                             ; 8844 85 20                    . 
-        lda     #AnimationPortTracker                            ; 8846 A9 07                    ..
-        jsr     WorksetAnimationPlay                           ; 8848 20 AD 97                  ..
-        lda     #$68                            ; 884B A9 68                    .h
-        sta     Workset + EntityX                             ; 884D 85 22                    ."
-        lda     #$67                            ; 884F A9 67                    .g
-        sta     Workset + EntityY                             ; 8851 85 24                    .$
-        jsr     WorksetSave                           ; 8853 20 61 97                  a.
-        jsr     UpdateEntitySprites                           ; 8856 20 37 9A                  7.
-        lda     #$01                            ; 8859 A9 01                    ..
-        sta     ShowStatusBarTextLine                           ; 885B 8D 05 03                 ...
-        jsr     PPUEnableNMI                           ; 885E 20 DE 8B                  ..
-        jsr     PPUEnableAndWaitFor1Frame                           ; 8861 20 C2 8B                  ..
-        lda     #$78                            ; 8864 A9 78                    .x
-        jsr     WaitForAFramesAndRefreshPPU                           ; 8866 20 1F D1                  ..
-        jsr     CopyToVRAMBuffer                           ; 8869 20 A1 A8                  ..
-        .byte   $83,$88                         ; 886C 83 88                    ..
-; ----------------------------------------------------------------------------
-        jsr     CopyToVRAMBuffer                           ; 886E 20 A1 A8                  ..
-        .byte   $88,$88                         ; 8871 88 88                    ..
-; ----------------------------------------------------------------------------
-        jsr     L8768                           ; 8873 20 68 87                  h.
-        lda     #$78                            ; 8876 A9 78                    .x
-        jsr     WaitForAFramesAndRefreshPPU                           ; 8878 20 1F D1                  ..
-        lda     #$80                            ; 887B A9 80                    ..
-        sta     PlayerHasTracker                           ; 887D 8D 41 03                 .A.
-        jmp     RunMapScreen                           ; 8880 4C ED 82                 L..
+        jsr     PPUDisableNMI
+        jsr     PPUDisableRendering
+        jsr     StashPlayerLocation
+        jsr     StashJawsLocation
+        jsr     ClearEntityMemory
+        lda     #$00
+        sta     $0306
+        sta     ActiveCHR
+        jsr     ClearScreenAndSprites
+        lda     #RomGraphicsGotTrackerScreen
+        jsr     DrawRomGraphics
+        jsr     DrawStatusLine
+        lda     #PaletteBlackScreen
+        jsr     StoreActivePaletteAndWaitFor1Frame
+        lda     #$00
+        sta     SCROLL_X
+        sta     CameraX
+        sta     CameraX+1
+        sta     SCROLL_Y
+        sta     $0323
+        sta     CameraY
+        sta     CameraY+1
+        lda     #<PlayerData
+        sta     WorksetPtr
+        lda     #>PlayerData
+        sta     WorksetPtr+1
+        jsr     WorksetLoad
+        lda     #$C0
+        sta     Workset + EntityActive
+        lda     #AnimationPortTracker
+        jsr     WorksetAnimationPlay
+        lda     #$68
+        sta     Workset + EntityX
+        lda     #$67
+        sta     Workset + EntityY
+        jsr     WorksetSave
+        jsr     UpdateEntitySprites
+        lda     #$01
+        sta     ShowStatusBarTextLine
+        jsr     PPUEnableNMI
+        jsr     PPUEnableAndWaitFor1Frame
+        lda     #$78
+        jsr     WaitForAFramesAndRefreshPPU
+        jsr     CopyToVRAMBuffer
+        .byte   $83,$88
+; 
+        jsr     CopyToVRAMBuffer
+        .byte   $88,$88
+; 
+        jsr     L8768
+        lda     #$78
+        jsr     WaitForAFramesAndRefreshPPU
+        lda     #$80
+        sta     PlayerHasTracker
+        jmp     RunMapScreen
+@TrackerTiles1:
+        .byte   $6F,$2B,$02,$0B,$0C
+@TrackerTiles2:
+        .byte   $8F,$2B,$02,$1B,$1C
 
-; ----------------------------------------------------------------------------
-        .byte   $6F,$2B,$02,$0B,$0C,$8F,$2B,$02 ; 8883 6F 2B 02 0B 0C 8F 2B 02  o+....+.
-        .byte   $1B,$1C                         ; 888B 1B 1C                    ..
+
 ; ----------------------------------------------------------------------------
 RunPortPowerUp:
         jsr     PPUDisableNMI
@@ -1076,8 +1086,8 @@ RunPortPowerUp:
         lda     PPUCTRL_MIRROR
         and     #%11100111            ; disable sprite+bg rendering flags
         sta     PPUCTRL_MIRROR
-        jsr     L8A41
-        jsr     L8A5E
+        jsr     StashPlayerLocation
+        jsr     StashJawsLocation
         jsr     ClearEntityMemory
         lda     #$00
         sta     $0306
@@ -1217,8 +1227,8 @@ CopyTextCollectOneStrobe:
         .byte "        COLLECT ONE STROBE.      "
         
 ; ----------------------------------------------------------------------------
-L8A16:
-        lda     $038C                           ; 8A16 AD 8C 03                 ...
+UnstashPlayerLocation:
+        lda     PlayerStashedX                           ; 8A16 AD 8C 03                 ...
         jsr     L8C29                           ; 8A19 20 29 8C                  ).
         lda     $16                             ; 8A1C A5 16                    ..
         clc                                     ; 8A1E 18                       .
@@ -1227,7 +1237,7 @@ L8A16:
         lda     $17                             ; 8A24 A5 17                    ..
         adc     #$00                            ; 8A26 69 00                    i.
         sta     PlayerX+1                           ; 8A28 8D 83 06                 ...
-        lda     $038D                           ; 8A2B AD 8D 03                 ...
+        lda     PlayerStashedY                           ; 8A2B AD 8D 03                 ...
         jsr     L8C29                           ; 8A2E 20 29 8C                  ).
         lda     $16                             ; 8A31 A5 16                    ..
         clc                                     ; 8A33 18                       .
@@ -1239,7 +1249,7 @@ L8A16:
         rts                                     ; 8A40 60                       `
 
 ; ----------------------------------------------------------------------------
-L8A41:
+StashPlayerLocation:
         lda     PlayerX+1                           ; 8A41 AD 83 06                 ...
         lsr     a                               ; 8A44 4A                       J
         lda     PlayerX                           ; 8A45 AD 82 06                 ...
@@ -1247,7 +1257,7 @@ L8A41:
         lsr     a                               ; 8A49 4A                       J
         lsr     a                               ; 8A4A 4A                       J
         lsr     a                               ; 8A4B 4A                       J
-        sta     $038C                           ; 8A4C 8D 8C 03                 ...
+        sta     PlayerStashedX                           ; 8A4C 8D 8C 03                 ...
         lda     PlayerY+1                           ; 8A4F AD 85 06                 ...
         lsr     a                               ; 8A52 4A                       J
         lda     PlayerY                           ; 8A53 AD 84 06                 ...
@@ -1255,11 +1265,11 @@ L8A41:
         lsr     a                               ; 8A57 4A                       J
         lsr     a                               ; 8A58 4A                       J
         lsr     a                               ; 8A59 4A                       J
-        sta     $038D                           ; 8A5A 8D 8D 03                 ...
+        sta     PlayerStashedY                           ; 8A5A 8D 8D 03                 ...
         rts                                     ; 8A5D 60                       `
 
 ; ----------------------------------------------------------------------------
-L8A5E:
+StashJawsLocation:
         lda     JawsX+1                           ; 8A5E AD 03 07                 ...
         lsr     a                               ; 8A61 4A                       J
         lda     JawsX                           ; 8A62 AD 02 07                 ...
@@ -1267,7 +1277,7 @@ L8A5E:
         lsr     a                               ; 8A66 4A                       J
         lsr     a                               ; 8A67 4A                       J
         lsr     a                               ; 8A68 4A                       J
-        sta     JawsPreviousX                           ; 8A69 8D 48 03                 .H.
+        sta     JawsStashedX                           ; 8A69 8D 48 03                 .H.
         lda     JawsY+1                           ; 8A6C AD 05 07                 ...
         lsr     a                               ; 8A6F 4A                       J
         lda     JawsY                           ; 8A70 AD 04 07                 ...
@@ -1275,7 +1285,7 @@ L8A5E:
         lsr     a                               ; 8A74 4A                       J
         lsr     a                               ; 8A75 4A                       J
         lsr     a                               ; 8A76 4A                       J
-        sta     JawsPreviousY                           ; 8A77 8D 49 03                 .I.
+        sta     JawsStashedY                           ; 8A77 8D 49 03                 .I.
         rts                                     ; 8A7A 60                       `
 
 ; ----------------------------------------------------------------------------
@@ -1287,25 +1297,28 @@ VNMI:
         pha
         lda #$01
         sta $0301
-        lda $0302
-        beq @DrawUIOrChangePalette
+        lda NMISpriteHandlingDisabled
+        beq @DrawBackgroundOrChangePalette
         lda #$01
         bit ShowStatusBarTextLine
         beq @CopySprites
-        bmi @L8AA0
+        bmi @OffsetStatusbarForTextLine
         lda #$40
-        sta $48
+        sta StatusbarPPULocation
         lda #$2B
-        sta $49
+        sta StatusbarPPULocation+1
+        ; set height of spr0 to the statusbar height
         lda #$C0
         jmp @PositionSprite0
-@L8AA0:
+@OffsetStatusbarForTextLine:
         lda #$00
-        sta $48
+        sta StatusbarPPULocation
         lda #$2B
-        sta $49
+        sta StatusbarPPULocation+1
+        ; set height of spr0 to the statusbar height
         lda #$B0
 @PositionSprite0:
+        ; position SPR0 just above the statusbar
         sta SpritePosY
         lda #$FF
         sta SpriteTile
@@ -1315,15 +1328,15 @@ VNMI:
         sta SpritePosX
 @CopySprites:
         jsr DMACopySprites
-@DrawUIOrChangePalette:
+@DrawBackgroundOrChangePalette:
         lda #$01
         bit PaletteLoadPending
-        beq @DrawUI
-        ; if 300 is set, update the palette and dont redraw the UI
+        beq @DrawBackground
+        ; if palette load is pending, do that instead of statusbar
         jsr WritePalette
         jmp @Continue
-@DrawUI:
-        jsr     DrawUI
+@DrawBackground:
+        jsr DrawBackground
 @Continue:
         lda     PPUCTRL_MIRROR
         and     #%11111101
@@ -1358,65 +1371,65 @@ VNMI:
         rti
 
 ; ----------------------------------------------------------------------------
-DrawUI:
+DrawBackground:
         @TempJumpTarget = $0334
-        ldx $0303
+        ldx NextStatusbarToDraw
         dex 
-        bpl @KeepDrawingUI
+        bpl @KeepDrawingStatusbar
         rts
-@KeepDrawingUI:
+@KeepDrawingStatusbar:
         txa
         asl a
         tax
-        lda UIPointers,x
+        lda StatusbarPointers,x
         sta @TempJumpTarget
-        lda UIPointers+1,x
+        lda StatusbarPointers+1,x
         sta @TempJumpTarget+1
         jmp (@TempJumpTarget)
 
-UIPointers:
+StatusbarPointers:
         .addr LAC58
         .addr LAC64
         .addr LAC6D
         .addr LAC79
-        .addr DrawUIStatusLineScore
-        .addr DrawUIStatusLineJawsPower
-        .addr DrawUIEncounterWaves
+        .addr DrawStatusbarScore
+        .addr DrawStatusbarJawsPower
+        .addr DrawStatusbarEncounterWaves
         .addr DrawVRAMBuffer
-        .addr DrawUIStatusLineShells
+        .addr DrawStatusbarShells
 
 
 ; ----------------------------------------------------------------------------
-DrawUIStatusLineScore:
+DrawStatusbarScore:
         jsr     DrawStatusLine_Score                           ; 8B3B 20 9E A7                  ..
         lda     #$00                            ; 8B3E A9 00                    ..
-        sta     $0303                           ; 8B40 8D 03 03                 ...
+        sta     NextStatusbarToDraw                           ; 8B40 8D 03 03                 ...
         rts                                     ; 8B43 60                       `
 
 ; ----------------------------------------------------------------------------
-DrawUIStatusLineJawsPower:
+DrawStatusbarJawsPower:
         jsr     DrawStatusLine_JawsPower                           ; 8B44 20 5C A9                  \.
         lda     #$00                            ; 8B47 A9 00                    ..
-        sta     $0303                           ; 8B49 8D 03 03                 ...
+        sta     NextStatusbarToDraw                           ; 8B49 8D 03 03                 ...
         rts                                     ; 8B4C 60                       `
 
 ; ----------------------------------------------------------------------------
-DrawUIEncounterWaves:
+DrawStatusbarEncounterWaves:
         jsr     DrawEncounterWaves                           ; 8B4D 20 E4 A9                  ..
         lda     #$00                            ; 8B50 A9 00                    ..
-        sta     $0303                           ; 8B52 8D 03 03                 ...
+        sta     NextStatusbarToDraw                           ; 8B52 8D 03 03                 ...
         rts                                     ; 8B55 60                       `
 
 ; ----------------------------------------------------------------------------
-DrawUIStatusLineShells:
+DrawStatusbarShells:
         jsr     DrawStatusLine_Shells                           ; 8B56 20 92 A9                  ..
         lda     #$00                            ; 8B59 A9 00                    ..
-        sta     $0303                           ; 8B5B 8D 03 03                 ...
+        sta     NextStatusbarToDraw                           ; 8B5B 8D 03 03                 ...
         rts                                     ; 8B5E 60                       `
 
 ; ----------------------------------------------------------------------------
 L8B5F:
-        lda     $0303                           ; 8B5F AD 03 03                 ...
+        lda     NextStatusbarToDraw                           ; 8B5F AD 03 03                 ...
         bne     @Done                           ; 8B62 D0 1E                    ..
         ldx     #$00                            ; 8B64 A2 00                    ..
         lda     #$80                            ; 8B66 A9 80                    ..
@@ -1434,7 +1447,7 @@ L8B5F:
         cmp     #$05                            ; 8B79 C9 05                    ..
         bcs     @Done                           ; 8B7B B0 05                    ..
         adc     #$05                            ; 8B7D 69 05                    i.
-        sta     $0303                           ; 8B7F 8D 03 03                 ...
+        sta     NextStatusbarToDraw                           ; 8B7F 8D 03 03                 ...
 @Done:
         rts                                     ; 8B82 60                       `
 
@@ -1443,9 +1456,9 @@ RefreshPPUState:
         lda #$40
 :       bit PPUSTATUS       ; delay until vblank
         bvc :-
-        lda $49
+        lda StatusbarPPULocation+1
         sta PPUADDR
-        lda $48
+        lda StatusbarPPULocation
         sta PPUADDR
         lda #$00
         sta PPUSCROLL
@@ -1820,8 +1833,8 @@ ClearScreenAndSprites:
         jsr     PPUDisableRendering
         jsr     PPURenderHorizontal
         lda     #$00
-        sta     $0303
-        sta     $0302
+        sta     NextStatusbarToDraw
+        sta     NMISpriteHandlingDisabled
         sta     $0304
         sta     ShowStatusBarTextLine
         jsr     ClearScreen
@@ -1831,7 +1844,7 @@ ClearScreenAndSprites:
 ; ----------------------------------------------------------------------------
 PPUClear:
         lda     #$00
-        sta     $0303
+        sta     NextStatusbarToDraw
         sta     $0304
         jsr     PPUDisableRendering
         jsr     MoveAllSpritesOffscreen
@@ -1903,14 +1916,14 @@ MoveAllSpritesOffscreen:
         inx
         bne     @MoveNextSprite
         lda     #$01
-        sta     $0302
+        sta     NMISpriteHandlingDisabled
         rts
 
 ; ----------------------------------------------------------------------------
 DMACopySprites:
         lda     #$00
         sta     OAMADDR
-        sta     $0302
+        sta     NMISpriteHandlingDisabled
         lda     #$02
         sta     OAMDMA
         rts
@@ -3740,7 +3753,7 @@ L9A81:
         bne     L9A81                           ; 9A8C D0 F3                    ..
 L9A8E:
         lda     #$01                            ; 9A8E A9 01                    ..
-        sta     $0302                           ; 9A90 8D 02 03                 ...
+        sta     NMISpriteHandlingDisabled                           ; 9A90 8D 02 03                 ...
         rts                                     ; 9A93 60                       `
 
 ; ----------------------------------------------------------------------------
@@ -4202,7 +4215,8 @@ MapRunJaws:
         jsr WorksetLoad
         bit Workset + EntityActive
         bvs @JawsIsActive
-        lda JawsPreviousX
+        ; restore jaws from the stash
+        lda JawsStashedX
         sec
         rol a
         asl a
@@ -4212,7 +4226,7 @@ MapRunJaws:
         lda #$00
         rol a
         sta Workset + EntityX  + 1
-        lda JawsPreviousY
+        lda JawsStashedY
         sec
         rol a
         asl a
@@ -5602,11 +5616,11 @@ LA736:
 LA737:
         .byte   $35,$0A,$35,$0C,$36,$0E,$37     ; A737 35 0A 35 0C 36 0E 37     5.5.6.7
 ; ----------------------------------------------------------------------------
-InitJawsPreviousLocation:
+InitJawsStashedLocation:
         lda     #$18                            ; A73E A9 18                    ..
-        sta     JawsPreviousX                           ; A740 8D 48 03                 .H.
+        sta     JawsStashedX                           ; A740 8D 48 03                 .H.
         lda     #$0C                            ; A743 A9 0C                    ..
-        sta     JawsPreviousY                           ; A745 8D 49 03                 .I.
+        sta     JawsStashedY                           ; A745 8D 49 03                 .I.
         rts                                     ; A748 60                       `
 
 ; ----------------------------------------------------------------------------
@@ -5722,12 +5736,12 @@ MapRunJawsTracker:
         beq @PlaySoundIfNeeded
         ; otherwise decrement the timer and update ui.
         dec TrackerTimer
-        jmp @UpdateUIIfNeeded
+        jmp @UpdateStatusbarIfNeeded
 @PlaySoundIfNeeded:
         ; check so that we are close enough to play the sound.
         lda TrackerDistancePrev
         cmp #$10
-        bcs @UpdateUIIfNeeded
+        bcs @UpdateStatusbarIfNeeded
         ; update the timer based on distance, play the sound and
         ; prepare the ui animation
         sta TrackerDistanceNext
@@ -5740,7 +5754,7 @@ MapRunJawsTracker:
         sta TrackerAnimationIndex
         lda #$01
         sta TrackerAnimationTimer
-@UpdateUIIfNeeded:
+@UpdateStatusbarIfNeeded:
         ; wait for next timer animation update
         lda TrackerAnimationTimer
         beq @Done
@@ -5791,7 +5805,7 @@ MapRunJawsTracker:
 @TrackerTimers:
         .byte $18,$20,$30,$40,$50,$60,$70,$80,$90,$A0,$B0,$C0,$D0,$E0,$F0,$FF
 
-; sets of two tiles showing the trackers pulse in the UI
+; sets of two tiles showing the trackers pulse in the statusbar
 @TrackerAnimationTiles:
         .byte $0D,$0C
         .byte $1D,$0C
@@ -5929,7 +5943,7 @@ DrawVRAMBuffer:
         sta VRAMBufferOffset
 @Done:
         lda #$00
-        sta $0303
+        sta NextStatusbarToDraw
         rts
 
 ; ----------------------------------------------------------------------------
@@ -5994,7 +6008,7 @@ LA9B6:
         lda     $031A                           ; A9B6 AD 1A 03                 ...
         cmp     #$10                            ; A9B9 C9 10                    ..
         bcc     LA9E0                           ; A9BB 90 23                    .#
-        lda     $0303                           ; A9BD AD 03 03                 ...
+        lda     NextStatusbarToDraw                           ; A9BD AD 03 03                 ...
         bne     LA9E3                           ; A9C0 D0 21                    .!
         lda     #$00                            ; A9C2 A9 00                    ..
         sta     $031A                           ; A9C4 8D 1A 03                 ...
@@ -6063,7 +6077,7 @@ DrawEncounterWaves:
         .byte   $EC,$ED,$EE,$EF,$DC,$DD,$DE,$DF
 ; ----------------------------------------------------------------------------
 LAA4E:
-        lda     $0303                           ; AA4E AD 03 03                 ...
+        lda     NextStatusbarToDraw                           ; AA4E AD 03 03                 ...
         beq     LAA54                           ; AA51 F0 01                    ..
         rts                                     ; AA53 60                       `
 
@@ -6116,7 +6130,7 @@ LAA8B:
         lda     $00                             ; AA96 A5 00                    ..
         cmp     $0470,x                         ; AA98 DD 70 04                 .p.
         beq     LAAA6                           ; AA9B F0 09                    ..
-        sty     $0303                           ; AA9D 8C 03 03                 ...
+        sty     NextStatusbarToDraw                           ; AA9D 8C 03 03                 ...
         jsr     LAAF0                           ; AAA0 20 F0 AA                  ..
         jsr     LAB50                           ; AAA3 20 50 AB                  P.
 LAAA6:
@@ -6375,14 +6389,14 @@ LAC58:
         jsr     DrawBGDataPage1                           ; AC58 20 A0 AB                  ..
         jsr     DrawBGDataPage3                           ; AC5B 20 1C AC                  ..
         lda     #$02                            ; AC5E A9 02                    ..
-        sta     $0303                           ; AC60 8D 03 03                 ...
+        sta     NextStatusbarToDraw                           ; AC60 8D 03 03                 ...
         rts                                     ; AC63 60                       `
 
 ; ----------------------------------------------------------------------------
 LAC64:
         jsr     DrawBGDataPage2                           ; AC64 20 DC AB                  ..
         lda     #$00                            ; AC67 A9 00                    ..
-        sta     $0303                           ; AC69 8D 03 03                 ...
+        sta     NextStatusbarToDraw                           ; AC69 8D 03 03                 ...
         rts                                     ; AC6C 60                       `
 
 ; ----------------------------------------------------------------------------
@@ -6390,14 +6404,14 @@ LAC6D:
         jsr     DrawBGDataPage2                           ; AC6D 20 DC AB                  ..
         jsr     DrawBGDataPage3                           ; AC70 20 1C AC                  ..
         lda     #$04                            ; AC73 A9 04                    ..
-        sta     $0303                           ; AC75 8D 03 03                 ...
+        sta     NextStatusbarToDraw                           ; AC75 8D 03 03                 ...
         rts                                     ; AC78 60                       `
 
 ; ----------------------------------------------------------------------------
 LAC79:
         jsr     DrawBGDataPage1                           ; AC79 20 A0 AB                  ..
         lda     #$00                            ; AC7C A9 00                    ..
-        sta     $0303                           ; AC7E 8D 03 03                 ...
+        sta     NextStatusbarToDraw                           ; AC7E 8D 03 03                 ...
         rts                                     ; AC81 60                       `
 
 ; ----------------------------------------------------------------------------
@@ -6421,7 +6435,7 @@ LAC82:
         jsr     DrawStatusLine_PowerLabel                           ; ACAA 20 D3 87                  ..
         lda     #$01                            ; ACAD A9 01                    ..
         sta     ShowStatusBarTextLine                           ; ACAF 8D 05 03                 ...
-        sta     $0302                           ; ACB2 8D 02 03                 ...
+        sta     NMISpriteHandlingDisabled                           ; ACB2 8D 02 03                 ...
         ldy     #$00                            ; ACB5 A0 00                    ..
         lda     ($44),y                         ; ACB7 B1 44                    .D
         jsr     LACE6                           ; ACB9 20 E6 AC                  ..
@@ -9238,7 +9252,7 @@ RunBonusScreen:
         sta     $0323                           ; CF31 8D 23 03                 .#.
         sta     ActiveCHR                           ; CF34 8D 07 03                 ...
         lda     #$01                            ; CF37 A9 01                    ..
-        sta     $0302                           ; CF39 8D 02 03                 ...
+        sta     NMISpriteHandlingDisabled                           ; CF39 8D 02 03                 ...
         sta     ShowStatusBarTextLine                           ; CF3C 8D 05 03                 ...
         lda     #MusicBonusScreenStart                            ; CF3F A9 03                    ..
         jsr     SoundPlay                           ; CF41 20 CD E2                  ..
@@ -9285,7 +9299,7 @@ LCF4E:
         lda     #$01                            ; CFA9 A9 01                    ..
         sta     $033F                           ; CFAB 8D 3F 03                 .?.
         lda     #$01                            ; CFAE A9 01                    ..
-        sta     $0302                           ; CFB0 8D 02 03                 ...
+        sta     NMISpriteHandlingDisabled                           ; CFB0 8D 02 03                 ...
         sta     ShowStatusBarTextLine                           ; CFB3 8D 05 03                 ...
         lda     $038B                           ; CFB6 AD 8B 03                 ...
         asl     a                               ; CFB9 0A                       .
@@ -9334,7 +9348,7 @@ RunBonusScreenEnding:
         sta     $0323                           ; D01C 8D 23 03                 .#.
         sta     ActiveCHR                           ; D01F 8D 07 03                 ...
         lda     #$01                            ; D022 A9 01                    ..
-        sta     $0302                           ; D024 8D 02 03                 ...
+        sta     NMISpriteHandlingDisabled                           ; D024 8D 02 03                 ...
         sta     ShowStatusBarTextLine                           ; D027 8D 05 03                 ...
         jsr     PPUEnableNMI                           ; D02A 20 DE 8B                  ..
         jsr     PPUEnableAndWaitFor1Frame                           ; D02D 20 C2 8B                  ..
@@ -9465,7 +9479,7 @@ WaitForAFramesAndRefreshPPU:
         jsr     WaitForYSpins
         jsr     L8B5F
         lda     #$01
-        sta     $0302
+        sta     NMISpriteHandlingDisabled
         jsr     RefreshPPUState
         dec     $12
         bne     @KeepWaiting
@@ -10173,7 +10187,7 @@ LD7A4:
         dex                                     ; D7D9 CA                       .
         bpl     @ClearBGData                           ; D7DA 10 FA                    ..
         lda     #$01                            ; D7DC A9 01                    ..
-        sta     $0302                           ; D7DE 8D 02 03                 ...
+        sta     NMISpriteHandlingDisabled                           ; D7DE 8D 02 03                 ...
         lda     #MusicFinaleScreen                            ; D7E1 A9 02                    ..
         jsr     SoundPlay                           ; D7E3 20 CD E2                  ..
         jsr     PPUEnableNMI                           ; D7E6 20 DE 8B                  ..
@@ -10802,7 +10816,7 @@ LDCB1:
         bne     LDCB1                           ; DCB9 D0 F6                    ..
 LDCBB:
         lda     #$01                            ; DCBB A9 01                    ..
-        sta     $0302                           ; DCBD 8D 02 03                 ...
+        sta     NMISpriteHandlingDisabled                           ; DCBD 8D 02 03                 ...
         rts                                     ; DCC0 60                       `
 
 ; ----------------------------------------------------------------------------
@@ -10830,7 +10844,7 @@ EnterOutroScreen:
         sta     SCROLL_Y                           ; DCF6 8D 22 03                 .".
         sta     CameraY                           ; DCF9 8D 3A 03                 .:.
         jsr     ClearEntityMemory                           ; DCFC 20 7C 97                  |.
-        sta     $0302                           ; DCFF 8D 02 03                 ...
+        sta     NMISpriteHandlingDisabled                           ; DCFF 8D 02 03                 ...
         jsr     PPUEnableNMI                           ; DD02 20 DE 8B                  ..
         jsr     PPUEnableAndWaitFor1Frame                           ; DD05 20 C2 8B                  ..
 LDD08:
@@ -10861,7 +10875,7 @@ LDD08:
         sta     CameraY+1                           ; DD4A 8D 3B 03                 .;.
         jsr     ClearEntityMemory                           ; DD4D 20 7C 97                  |.
         lda     #$01                            ; DD50 A9 01                    ..
-        sta     $0302                           ; DD52 8D 02 03                 ...
+        sta     NMISpriteHandlingDisabled                           ; DD52 8D 02 03                 ...
         jsr     PPUEnableNMI                           ; DD55 20 DE 8B                  ..
         jsr     PPUEnableAndWaitFor1Frame                           ; DD58 20 C2 8B                  ..
         lda     #$00                            ; DD5B A9 00                    ..
