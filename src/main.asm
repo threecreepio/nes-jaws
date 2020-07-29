@@ -97,6 +97,7 @@ TrackerJawsDistance   = $0346
 
 PlayerNumberOfLives   = $0387
 PlayerHasTracker      = $0341
+PlayerShellCount      = $0390
 PlayerPowerLevel      = $0391
 PlayerCrabLevel       = $0392
 PlayerStrobeCount     = $0393
@@ -734,7 +735,7 @@ L8553:
         jsr L8605
         dec PlayerNumberOfLives
         beq L8575
-        lsr $0390
+        lsr PlayerShellCount
         dec PlayerPowerLevel
         bpl @ReduceCrabLevel
         lda #0
@@ -956,10 +957,10 @@ DrawHighScore:
 
 ; ----------------------------------------------------------------------------
 L8768:
-        lda     $0390                           ; 8768 AD 90 03                 ...
+        lda     PlayerShellCount                           ; 8768 AD 90 03                 ...
         sec                                     ; 876B 38                       8
         sbc     $034C                           ; 876C ED 4C 03                 .L.
-        sta     $0390                           ; 876F 8D 90 03                 ...
+        sta     PlayerShellCount                           ; 876F 8D 90 03                 ...
         lda     $0304                           ; 8772 AD 04 03                 ...
         ora     #$08                            ; 8775 09 08                    ..
         sta     $0304                           ; 8777 8D 04 03                 ...
@@ -2102,7 +2103,7 @@ L8FD6:
         bne     L9045                           ; 8FF3 D0 50                    .P
         bit     PlayerHasTracker                           ; 8FF5 2C 41 03                 ,A.
         bmi     L9006                           ; 8FF8 30 0C                    0.
-        lda     $0390                           ; 8FFA AD 90 03                 ...
+        lda     PlayerShellCount                           ; 8FFA AD 90 03                 ...
         cmp     #$05                            ; 8FFD C9 05                    ..
         bcc     L903A                           ; 8FFF 90 39                    .9
         lda     #$05                            ; 9001 A9 05                    ..
@@ -2113,7 +2114,7 @@ L9006:
         ldx     PlayerPowerLevel                           ; 9006 AE 91 03                 ...
         cpx     #$08                            ; 9009 E0 08                    ..
         bcs     L901B                           ; 900B B0 0E                    ..
-        lda     $0390                           ; 900D AD 90 03                 ...
+        lda     PlayerShellCount                           ; 900D AD 90 03                 ...
         cmp     L909F,x                         ; 9010 DD 9F 90                 ...
         bcc     L903A                           ; 9013 90 25                    .%
         lda     L909F,x                         ; 9015 BD 9F 90                 ...
@@ -2121,7 +2122,7 @@ L9006:
 
 ; ----------------------------------------------------------------------------
 L901B:
-        lda $0390
+        lda PlayerShellCount
         cmp #$0a
         bcc L903A
         lda #$0a
@@ -5478,8 +5479,8 @@ LA66D:
         jsr     SoundPlay                           ; A674 20 CD E2                  ..
         lda     #$02                            ; A677 A9 02                    ..
         jsr     AwardPoints                           ; A679 20 D0 8C                  ..
-        inc     $0390                           ; A67C EE 90 03                 ...
-        lda     $0390                           ; A67F AD 90 03                 ...
+        inc     PlayerShellCount                           ; A67C EE 90 03                 ...
+        lda     PlayerShellCount                           ; A67F AD 90 03                 ...
         cmp     #$64                            ; A682 C9 64                    .d
         bcc     LA68B                           ; A684 90 05                    ..
         .byte   $A9,$63,$8D,$90,$03             ; A686 A9 63 8D 90 03           .c...
@@ -9378,13 +9379,13 @@ LD0AC:
         jsr     WaitForAFramesAndRefreshPPU                           ; D0D0 20 1F D1                  ..
         lda     $00                             ; D0D3 A5 00                    ..
         clc                                     ; D0D5 18                       .
-        adc     $0390                           ; D0D6 6D 90 03                 m..
+        adc     PlayerShellCount                           ; D0D6 6D 90 03                 m..
         cmp     #$64                            ; D0D9 C9 64                    .d
         bcc     LD0DF                           ; D0DB 90 02                    ..
         .byte   $A9,$63                         ; D0DD A9 63                    .c
 ; ----------------------------------------------------------------------------
 LD0DF:
-        sta     $0390                           ; D0DF 8D 90 03                 ...
+        sta     PlayerShellCount                           ; D0DF 8D 90 03                 ...
         lda     $0304                           ; D0E2 AD 04 03                 ...
         ora     #$08                            ; D0E5 09 08                    ..
         sta     $0304                           ; D0E7 8D 04 03                 ...
