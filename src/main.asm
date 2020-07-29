@@ -471,7 +471,7 @@ RunMapScreen:
 @RunMapScreenWithTracker:
         lda     #$80
         sta     PlayerHasTracker
-        sta     $0344
+        sta     TrackerDistancePrev
         sta     TrackerDistanceNext
         lda     #RomGraphicsTrackerIcon
         jsr     DrawRomGraphics
