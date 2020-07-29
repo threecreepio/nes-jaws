@@ -16,6 +16,7 @@ IPS = flips
 
 main.nes: layout src/entry.o
 	$(LD)  --dbgfile $@.dbg -C $^ -o $@
+	radiff2 -t 20 -q -x main.nes files/original.nes | head -n 20
 	diff main.nes files/original.nes && echo "\n\nROM UNCHANGED!\n\n"
 	
 

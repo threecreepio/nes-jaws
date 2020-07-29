@@ -65,6 +65,7 @@ VRAMBufferOffset      = $0101
 VRAMBuffer            = $0102
 
 
+
 EntityData            = $0680 ; 680 - 880
 PlayerData            = EntityData
 PlayerProjectile1Data = EntityData + ( 1 * $20)
@@ -73,6 +74,7 @@ PlayerProjectile3Data = EntityData + ( 3 * $20)
 JawsData              = EntityData + ( 4 * $20)
 Enemy1Data            = JawsData
 Enemy2Data            = EntityData + ( 5 * $20)
+MaxEnemies            = $05
 
 
 JawsHP                = $0388 ; 16 bit
@@ -5933,12 +5935,13 @@ DrawVRAMBuffer:
 ; ----------------------------------------------------------------------------
 DrawStatusLine_JawsPower:
         jsr     PPURenderHorizontal
-        lda     #$2B                        ; set drawing position to jaws power meter
+        ; draw at $2B94, where the jaws power bar is
+        lda     #$2B
         sta     PPUADDR
         lda     #$94
         sta     PPUADDR
-        ldy     #$08                        ; set Y to solid bar tile
-        ldx     #$0A                        ; set X to maximum bars to show
+        ldy     #$08
+        ldx     #$0A
         lda     JawsHP+1
 @DrawFullBar:
         cmp     #$02
@@ -9304,7 +9307,7 @@ LCFD6:
         jsr     ReadJoypads                           ; CFD9 20 87 8C                  ..
         jsr     BonusRunPlayer                           ; CFDC 20 B6 D1                  ..
         jsr     BonusRunProjectiles                           ; CFDF 20 8D 9B                  ..
-        jsr     LD27E                           ; CFE2 20 7E D2                  ~.
+        jsr     BonusRunJellyfish                           ; CFE2 20 7E D2                  ~.
         jsr     UpdateEntitySprites                           ; CFE5 20 37 9A                  7.
         jsr     LA9B6                           ; CFE8 20 B6 A9                  ..
         jsr     L8B5F                           ; CFEB 20 5F 8B                  _.
@@ -9634,33 +9637,37 @@ LD27B:
         jmp     WorksetSave                           ; D27B 4C 61 97                 La.
 
 ; ----------------------------------------------------------------------------
-LD27E:
-        lda     #<Enemy1Data                            ; D27E A9 00                    ..
-        sta     WorksetPtr                             ; D280 85 40                    .@
-        lda     #>Enemy1Data                            ; D282 A9 07                    ..
-        sta     WorksetPtr+1                             ; D284 85 41                    .A
-        lda     #$05                            ; D286 A9 05                    ..
-        sta     $46                             ; D288 85 46                    .F
-        lda     #$00                            ; D28A A9 00                    ..
-        sta     $00                             ; D28C 85 00                    ..
-LD28E:
-        ldy     #$00                            ; D28E A0 00                    ..
-        lda     (WorksetPtr),y                         ; D290 B1 40                    .@
-        bpl     LD29F                           ; D292 10 0B                    ..
-        inc     $00                             ; D294 E6 00                    ..
-        jsr     WorksetLoad                           ; D296 20 54 97                  T.
-        jsr     LD317                           ; D299 20 17 D3                  ..
-        jsr     WorksetSave                           ; D29C 20 61 97                  a.
-LD29F:
-        jsr     WorksetNext                           ; D29F 20 6E 97                  n.
-        dec     $46                             ; D2A2 C6 46                    .F
-        bne     LD28E                           ; D2A4 D0 E8                    ..
-        lda     $00                             ; D2A6 A5 00                    ..
-        beq     LD2AB                           ; D2A8 F0 01                    ..
-        rts                                     ; D2AA 60                       `
-
-; ----------------------------------------------------------------------------
-LD2AB:
+BonusRunJellyfish:
+        @TempCounter = $46
+        @TempLivingEnemiesFound = $00
+        lda     #<Enemy1Data
+        sta     WorksetPtr
+        lda     #>Enemy1Data
+        sta     WorksetPtr+1
+        ; count down for every enemy in a wave
+        lda     #5
+        sta     @TempCounter
+        lda     #$00
+        sta     @TempLivingEnemiesFound
+@CheckNextEnemy:
+        ; skip enemy if it is dead
+        ldy     #$00
+        lda     (WorksetPtr),y
+        bpl     @Continue
+        ; otherwise load the enemy and continue animating
+        inc     @TempLivingEnemiesFound
+        jsr     WorksetLoad
+        jsr     BonusRunSingleJellyfish
+        jsr     WorksetSave
+@Continue:
+        jsr     WorksetNext
+        dec     @TempCounter
+        bne     @CheckNextEnemy
+        ; if we found no living enemies, we need to prepare the next wave
+        lda     @TempLivingEnemiesFound
+        beq     @AllEnemiesDead
+        rts
+@AllEnemiesDead:
         lda     $53                             ; D2AB A5 53                    .S
         bmi     LD2B7                           ; D2AD 30 08                    0.
         cmp     #$06                            ; D2AF C9 06                    ..
@@ -9725,40 +9732,38 @@ LD2E4:
         rts                                     ; D316 60                       `
 
 ; ----------------------------------------------------------------------------
-LD317:
-        bit     Workset + EntityActive                             ; D317 24 20                    $ 
-        bvs     LD355                           ; D319 70 3A                    p:
-        lda     #$C0                            ; D31B A9 C0                    ..
-        sta     Workset + EntityActive                             ; D31D 85 20                    . 
-        lda     $34                             ; D31F A5 34                    .4
-        and     #$1F                            ; D321 29 1F                    ).
-        asl     a                               ; D323 0A                       .
-        asl     a                               ; D324 0A                       .
-        tax                                     ; D325 AA                       .
-        lda     LD5D2,x                         ; D326 BD D2 D5                 ...
-        sta     Workset + EntityX                             ; D329 85 22                    ."
-        lda     LD5D3,x                         ; D32B BD D3 D5                 ...
-        sta     Workset + EntityX  + 1                            ; D32E 85 23                    .#
-        lda     LD5D4,x                         ; D330 BD D4 D5                 ...
-        sta     Workset + EntityY                             ; D333 85 24                    .$
-        lda     LD5D5,x                         ; D335 BD D5 D5                 ...
-        sta     Workset + EntityY + 1                             ; D338 85 25                    .%
-        lda     Workset + EntityV15                             ; D33A A5 35                    .5
-        asl     a                               ; D33C 0A                       .
-        tax                                     ; D33D AA                       .
-        lda     LD616,x                         ; D33E BD 16 D6                 ...
-        sta     $38                             ; D341 85 38                    .8
-        lda     LD617,x                         ; D343 BD 17 D6                 ...
-        sta     Workset + EntityV19                             ; D346 85 39                    .9
-        lda     #$00                            ; D348 A9 00                    ..
-        sta     Workset + EntityV15                             ; D34A 85 35                    .5
-        sta     Workset + EntityV1A                             ; D34C 85 3A                    .:
-        sta     Workset + EntityV1D                             ; D34E 85 3D                    .=
-        lda     #AnimationEncounterJellyfishDeath                            ; D350 A9 17                    ..
-        jmp     WorksetAnimationPlay                           ; D352 4C AD 97                 L..
-
-; ----------------------------------------------------------------------------
-LD355:
+BonusRunSingleJellyfish:
+        bit Workset + EntityActive
+        bvs @AlreadyInitialized
+        lda #$C0
+        sta Workset + EntityActive
+        lda $34
+        and #$1F
+        asl a
+        asl a
+        tax
+        lda BonusJellyfishStartingPositions,x
+        sta Workset + EntityX
+        lda BonusJellyfishStartingPositions+1,x
+        sta Workset + EntityX  + 1
+        lda BonusJellyfishStartingPositions+2,x
+        sta Workset + EntityY
+        lda BonusJellyfishStartingPositions+3,x
+        sta Workset + EntityY + 1
+        lda Workset + EntityV15
+        asl a
+        tax
+        lda LD616,x
+        sta $38
+        lda LD617,x
+        sta Workset + EntityV19
+        lda #$00
+        sta Workset + EntityV15
+        sta Workset + EntityV1A
+        sta Workset + EntityV1D
+        lda #AnimationEncounterJellyfishDeath
+        jmp WorksetAnimationPlay
+@AlreadyInitialized:
         bit     Workset + EntityV1D                             ; D355 24 3D                    $=
         bpl     LD35C                           ; D357 10 03                    ..
         jmp     LD4B8                           ; D359 4C B8 D4                 L..
@@ -10029,22 +10034,38 @@ LD4DD:
         .byte   $0A,$0A,$0A,$0E,$8B,$8B,$8B,$8B ; D5BD 0A 0A 0A 0E 8B 8B 8B 8B  ........
         .byte   $8B,$0F,$0A,$0A,$0A,$0A,$0A,$0F ; D5C5 8B 0F 0A 0A 0A 0A 0A 0F  ........
         .byte   $8B,$8B,$8B,$8B,$8B             ; D5CD 8B 8B 8B 8B 8B           .....
-LD5D2:
-        .byte   $20                             ; D5D2 20                        
-LD5D3:
-        .byte   $10                             ; D5D3 10                       .
-LD5D4:
-        .byte   $D8                             ; D5D4 D8                       .
-LD5D5:
-        .byte   $00,$E0,$10,$D8,$00,$E0,$0F,$D8 ; D5D5 00 E0 10 D8 00 E0 0F D8  ........
-        .byte   $00,$20,$11,$D8,$00,$20,$10,$E8 ; D5DD 00 20 11 D8 00 20 10 E8  . ... ..
-        .byte   $00,$E0,$10,$E8,$00,$00,$10,$D8 ; D5E5 00 E0 10 E8 00 00 10 D8  ........
-        .byte   $00,$00,$11,$D8,$00,$F0,$0F,$E8 ; D5ED 00 00 11 D8 00 F0 0F E8  ........
-        .byte   $00,$10,$11,$E8,$00,$F0,$0F,$58 ; D5F5 00 10 11 E8 00 F0 0F 58  .......X
-        .byte   $00,$10,$11,$58,$00,$30,$10,$D8 ; D5FD 00 10 11 58 00 30 10 D8  ...X.0..
-        .byte   $00,$58,$10,$D8,$00,$80,$10,$D8 ; D605 00 58 10 D8 00 80 10 D8  .X......
-        .byte   $00,$A8,$10,$D8,$00,$D0,$10,$D8 ; D60D 00 A8 10 D8 00 D0 10 D8  ........
-        .byte   $00                             ; D615 00                       .
+
+
+
+
+
+
+
+;
+; Used for setting starting positions of the bonus stage jellyfish
+;
+; Each spawn position has 2 16-bit values, X then Y coordinates.
+;
+BonusJellyfishStartingPositions:
+        .word $1020, $00D8
+        .word $10E0, $00D8
+        .word $0FE0, $00D8
+        .word $1120, $00D8
+        .word $1020, $00E8
+        .word $10E0, $00E8
+        .word $1000, $00D8
+        .word $1100, $00D8
+        .word $0FF0, $00E8
+        .word $1110, $00E8
+        .word $0FF0, $0058
+        .word $1110, $0058
+        .word $1030, $00D8
+        .word $1058, $00D8
+        .word $1080, $00D8
+        .word $10A8, $00D8
+        .word $10D0, $00D8
+
+
 LD616:
         .byte   $36                             ; D616 36                       6
 LD617:
