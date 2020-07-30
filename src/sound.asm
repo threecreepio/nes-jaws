@@ -844,7 +844,7 @@ SFXEncounterJawsHit            = $0C
 SFXEncounterJawsHarpoonHit     = $0D
 SFXEncounterEnemyDeath         = $0E
 SFXEncounterBoatDespawn        = $0F
-SFXFinaleMiss                  = $10
+SFXUnused                      = $10
 SFXEncounterBoatDespawnDupe    = $11
 SFXPlayerDeath                 = $12
 SFXSilent                      = $13
@@ -853,7 +853,7 @@ SFXEncounterPickup             = $15
 SFXPause                       = $16
 SFXFinaleStrobe                = $17
 SFXFinaleHit                   = $18
-SFXUnknown2                    = $19
+SFXExtraLife                   = $19
 MusicBonusScreenEnd            = $1A
 MusicIntroScreen               = $1B
 MusicMapScreenDupe             = $1C
@@ -878,7 +878,7 @@ SoundPointers:
         .addr SFXEncounterJawsHarpoonHitData
         .addr SFXEncounterEnemyDeathData
         .addr SFXEncounterBoatDespawnData
-        .addr SFXFinaleMissData
+        .addr SFXUnusedData
         .addr SFXEncounterBoatDespawnData              ; unused duplicate?
         .addr SFXPlayerDeathData
         .addr SFXSilentData
@@ -887,7 +887,7 @@ SoundPointers:
         .addr SFXPauseData
         .addr SFXFinaleStrobeData
         .addr SFXFinaleHitData
-        .addr SFXUnknown2Data                          ; unused chime?
+        .addr SFXExtraLifeData                          ; unused chime?
         .addr MusicBonusScreenEndData
         .addr MusicIntroScreenData
         .addr MusicMapScreenData
@@ -1058,7 +1058,7 @@ MusicBonusScreenEndData:
 .byte   $17,$3F,$17,$FF,$E0,$64,$F5,$98
 .byte   $15,$17,$94,$20,$17,$3F,$20,$FF
 
-SFXUnknown2Data:
+SFXExtraLifeData:
 .byte   $04,$01,$65,$EC,$FF,$EC,$06,$ED
 .byte   $80,$F0,$18,$EE,$00,$C3,$8F,$10
 .byte   $20,$EF,$03,$F9,$EE,$00,$C3,$8F
@@ -1294,7 +1294,7 @@ SFXFinaleStrobeData:
 .byte   $F2,$44,$80,$04,$F4,$18,$85,$0F
 .byte   $FF
 
-SFXFinaleMissData:
+SFXUnusedData:
 .byte $03,$05,$F3,$FF,$EC,$07,$EE
 .byte   $01,$8E,$0F,$0D,$4B,$49,$47,$45
 .byte   $03,$FF
