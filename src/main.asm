@@ -220,6 +220,8 @@ EntityV1E             = $1E
 EntityV1F             = $1F
 
 
+EntityTypeParachuteBomb     = $04
+
 EntityHeaderActive          = %10000000
 EntityHeader7               = %01000000
 EntityHeader6               = %00100000
@@ -3634,56 +3636,74 @@ WorksetMoveY:
         rts
 
 ; ----------------------------------------------------------------------------
-L983C:
-        ldx #$10                            ; 983C A2 10                    ..
-        jmp L9843                           ; 983E 4C 43 98                 LC.
+ApproachXSpeed:
+        ldx #EntityXSubspeed
+        jmp ApproachSpeed
+ApproachYSpeed:
+        ldx #EntityYSubspeed
 
-; ----------------------------------------------------------------------------
-L9841:
-        ldx     #$12                            ; 9841 A2 12                    ..
-L9843:
-        pha                                     ; 9843 48                       H
-        clc                                     ; 9844 18                       .
-        adc     $20,x                           ; 9845 75 20                    u 
-        sta     $20,x                           ; 9847 95 20                    . 
-        pla                                     ; 9849 68                       h
-        bmi     @L9865                           ; 984A 30 19                    0.
-        lda     #$00                            ; 984C A9 00                    ..
-        adc     $21,x                           ; 984E 75 21                    u!
-        sta     $21,x                           ; 9850 95 21                    .!
-        tya                                     ; 9852 98                       .
-        eor     $21,x                           ; 9853 55 21                    U!
-        bmi     @ExitWithoutCarry                           ; 9855 30 29                    0)
-        tya                                     ; 9857 98                       .
-        clc                                     ; 9858 18                       .
-        sbc     $21,x                           ; 9859 F5 21                    .!
-        bcs     @ExitWithoutCarry                           ; 985B B0 23                    .#
-        sty     $21,x                           ; 985D 94 21                    .!
-        lda     #$00                            ; 985F A9 00                    ..
-        sta     $20,x                           ; 9861 95 20                    . 
-        beq     @ExitWithCarry                           ; 9863 F0 19                    ..
-@L9865:
-        lda     #$FF                            ; 9865 A9 FF                    ..
-        adc     $21,x                           ; 9867 75 21                    u!
-        sta     $21,x                           ; 9869 95 21                    .!
-        tya                                     ; 986B 98                       .
-        eor     $21,x                           ; 986C 55 21                    U!
-        bmi     @ExitWithoutCarry                           ; 986E 30 10                    0.
-        dey                                     ; 9870 88                       .
-        tya                                     ; 9871 98                       .
-        cmp     $21,x                           ; 9872 D5 21                    .!
-        iny                                     ; 9874 C8                       .
-        tya                                     ; 9875 98                       .
-        bcc     @ExitWithoutCarry                           ; 9876 90 08                    ..
-        sta     $21,x                           ; 9878 95 21                    .!
-        lda     #$00                            ; 987A A9 00                    ..
-        sta     $20,x                           ; 987C 95 20                    . 
+;
+; # ApproachSpeed
+; Parameters:
+;  - A is subspeed value to add.
+;  - Y is the maximum fullspeed, speed will get clamped to this.
+;  - X is EntityXSubspeed or EntityYSubspeed depending on which direction to add.
+; Note:
+;  Negative A values will trigger subtraction.
+;
+ApproachSpeed:
+        pha
+        clc
+        ; add A to the subspeed.
+        adc Workset,x
+        sta Workset,x
+        ; if A was negative, go handle that.
+        pla
+        bmi @NegativeValue
+        ; add carry to speed.
+        lda #$00
+        adc Workset+1,x
+        sta Workset+1,x
+        ; bail if signs don't match.
+        tya
+        eor Workset+1,x
+        bmi @ExitWithoutCarry
+        ; we're done if speed has not reached target.
+        tya
+        clc
+        sbc Workset+1,x
+        bcs @ExitWithoutCarry
+        ; we've reached our target speed, clamp the value.
+        sty Workset+1,x
+        lda #$00
+        sta Workset,x
+        beq @ExitWithCarry
+@NegativeValue:
+        ; add carry to speed.
+        lda #$FF
+        adc Workset+1,x
+        sta Workset+1,x
+        ; bail if signs don't match.
+        tya
+        eor Workset+1,x
+        bmi @ExitWithoutCarry
+        ; we're done if speed has not reached target.
+        dey
+        tya
+        cmp Workset+1,x
+        iny
+        tya
+        bcc @ExitWithoutCarry
+        ; we've reached our target speed, clamp the value.
+        sta Workset+1,x
+        lda #$00
+        sta Workset,x
 @ExitWithCarry:
-        sec                                     ; 987E 38                       8
-        rts                                     ; 987F 60                       `
+        sec
+        rts
 @ExitWithoutCarry:
-        clc                                     ; 9880 18                       .
-        rts                                     ; 9881 60                       `
+        clc
+        rts
 
 ; ----------------------------------------------------------------------------
 L9882:
@@ -3838,81 +3858,83 @@ L9940:
 ; ----------------------------------------------------------------------------
 HitDetectAgainstPlayer:
         @TempPlayerPointer = $42
-        lda     #<PlayerData
-        sta     @TempPlayerPointer
-        lda     #>PlayerData
-        sta     @TempPlayerPointer+1
+        lda #<PlayerData
+        sta @TempPlayerPointer
+        lda #>PlayerData
+        sta @TempPlayerPointer+1
 HitDetect:
         @TempTargetPointer = $42
         @TempXDistance     = $1A
         @TempYDistance     = $1C
-        ldy     #$02
-        lda     #$00
-        sta     $15
+        @TempUnused        = $15 ; seems to be unused? maybe a caller uses it?
+        ldy #$02
+        lda #$00
+        sta @TempUnused
         ; diff x coordinate low bytes
-        lda     (@TempTargetPointer),y
+        lda (@TempTargetPointer),y
         sec
-        sbc     Workset + EntityX
+        sbc Workset + EntityX
         iny
-        sta     @TempXDistance
+        sta @TempXDistance
         ; diff x coordinate high bytes
-        lda     (@TempTargetPointer),y
-        sbc     Workset + EntityX  + 1
+        lda (@TempTargetPointer),y
+        sbc Workset + EntityX  + 1
         iny
-        sta     @TempXDistance+1
+        sta @TempXDistance+1
         ; branch if positive distance
-        bcs     @CompareY
-        inc     $15
+        bcs @CompareY
+        inc @TempUnused
         ; convert to positive distance
-        eor     #$FF
-        sta     @TempXDistance+1
-        lda     @TempXDistance
-        eor     #$FF
-        sta     @TempXDistance
+        eor #$FF
+        sta @TempXDistance+1
+        lda @TempXDistance
+        eor #$FF
+        sta @TempXDistance
         ; and add 1
-        inc     @TempXDistance
-        bne     @CompareY
-        inc     @TempXDistance+1
+        inc @TempXDistance
+        bne @CompareY
+        inc @TempXDistance+1
 @CompareY:
         ; diff y coordinate low bytes
-        lda     (@TempTargetPointer),y
+        lda (@TempTargetPointer),y
         sec
-        sbc     Workset + EntityY
+        sbc Workset + EntityY
         iny
-        sta     @TempYDistance
+        sta @TempYDistance
         ; diff y coordinate high bytes
-        lda     (@TempTargetPointer),y
-        sbc     Workset + EntityY + 1
-        sta     @TempYDistance+1
-        bcs     @CombineDistances
-        inc     $15
-        inc     $15
+        lda (@TempTargetPointer),y
+        sbc Workset + EntityY + 1
+        sta @TempYDistance+1
+        bcs @CombineDistances
+        inc @TempUnused
+        inc @TempUnused
         ; convert to positive distance
-        eor     #$FF
-        sta     @TempYDistance+1
-        lda     @TempYDistance
-        eor     #$FF
-        sta     @TempYDistance
+        eor #$FF
+        sta @TempYDistance+1
+        lda @TempYDistance
+        eor #$FF
+        sta @TempYDistance
         ; and add 1
-        inc     @TempYDistance
-        bne     @CombineDistances
-        inc     @TempYDistance+1
+        inc @TempYDistance
+        bne @CombineDistances
+        inc @TempYDistance+1
 @CombineDistances:
         clc
-        lda     @TempXDistance+1
-        ora     @TempYDistance+1
-        bne     @Exit
-        ldy     #$0E
-        lda     (@TempTargetPointer),y
-        ; maybe these are the bounding box size?
-        adc     Workset + EntityBBoxW
-        cmp     @TempXDistance
-        bcc     @Exit
+        lda @TempXDistance+1
+        ora @TempYDistance+1
+        bne @Exit
+        ldy #EntityBBoxW
+        lda (@TempTargetPointer),y
+        ; check if within X bounding box
+        adc Workset + EntityBBoxW
+        cmp @TempXDistance
+        bcc @Exit
+        ; or if within Y bounding box
         iny
-        lda     (@TempTargetPointer),y
+        lda (@TempTargetPointer),y
         clc
-        adc     Workset + EntityBBoxH
-        cmp     @TempYDistance
+        adc Workset + EntityBBoxH
+        cmp @TempYDistance
 @Exit:
         rts
 
@@ -4257,7 +4279,7 @@ L9BBD:
 L9BE8:
         lda     #$40                            ; 9BE8 A9 40                    .@
         ldy     #$04                            ; 9BEA A0 04                    ..
-        jsr     L9841                           ; 9BEC 20 41 98                  A.
+        jsr     ApproachYSpeed                           ; 9BEC 20 41 98                  A.
         jsr     WorksetMoveX                           ; 9BEF 20 FA 97                  ..
 L9BF2:
         jsr     WorksetMoveY                           ; 9BF2 20 1B 98                  ..
@@ -4314,7 +4336,7 @@ L9C37:
         jsr     WorksetMoveY                           ; 9C42 20 1B 98                  ..
         lda     #$20                            ; 9C45 A9 20                    . 
         ldy     #$10                            ; 9C47 A0 10                    ..
-        jsr     L9841                           ; 9C49 20 41 98                  A.
+        jsr     ApproachYSpeed                           ; 9C49 20 41 98                  A.
         ldy     #$08                            ; 9C4C A0 08                    ..
         jsr     L98B8                           ; 9C4E 20 B8 98                  ..
         jsr     L99D0                           ; 9C51 20 D0 99                  ..
@@ -5731,7 +5753,7 @@ LA61A:
         bne     LA642
         lda     #$08
         ldy     #$01
-        jsr     L9841
+        jsr     ApproachYSpeed
         jsr     WorksetMoveY
         jsr     L99D0
         bcc     @Exit
@@ -5810,7 +5832,7 @@ LA6A2:
         jsr     WorksetAnimationAdvance                           ; A6A2 20 BE 97                  ..
         lda     #$04                            ; A6A5 A9 04                    ..
         ldy     #$01                            ; A6A7 A0 01                    ..
-        jsr     L9841                           ; A6A9 20 41 98                  A.
+        jsr     ApproachYSpeed                           ; A6A9 20 41 98                  A.
         jsr     WorksetMoveY                           ; A6AC 20 1B 98                  ..
         jsr     L99D0                           ; A6AF 20 D0 99                  ..
         bcc     LA6BC                           ; A6B2 90 08                    ..
@@ -5883,7 +5905,7 @@ LA711:
 LA71E:
         lda     #$04                            ; A71E A9 04                    ..
         ldy     #$01                            ; A720 A0 01                    ..
-        jsr     L9841                           ; A722 20 41 98                  A.
+        jsr     ApproachYSpeed                           ; A722 20 41 98                  A.
         jsr     WorksetMoveY                           ; A725 20 1B 98                  ..
         jsr     L99D0                           ; A728 20 D0 99                  ..
         bcc     LA735                           ; A72B 90 08                    ..
@@ -9872,52 +9894,55 @@ BonusRunPlayer:
         ; we need reversed controls when heading left
         lda #EntityHeaderFacingLeft
         bit Workset + EntityHeader
-        bne BonusRunPlayerHeadingLeft
+        bne @BonusRunPlayerHeadingLeft
         ; player is heading right
         ldx #$F8
         ldy #$01
         bit Joy1Inputs
-        bvs LD205
-        bmi LD201
+        bvs @LD205
+        bmi @LD201
         iny
-        bne LD203
-LD201:
-        ldy     #$03
-LD203:
-        ldx     #$08
-LD205:
-        txa
-        jsr     L983C
+        bne @LD203
+@LD201:
+        ldy #$03
+@LD203:
+        ldx #$08
+@LD205:
+        txa 
+        jsr ApproachXSpeed
         ; check if we're off the right edge of the screen
-        lda     Workset + EntityX
-        cmp     #$40
-        lda     Workset + EntityX  + 1
-        sbc     #$11
+        lda Workset + EntityX
+        cmp #$40
+        lda Workset + EntityX  + 1
+        sbc #$11
         ; and if so we want to turn ourselves around
-        bcs     BonusTurnPlane
-        jmp     LD24F
+        bcs @BonusTurnPlane
+        jmp @KeepMoving
 
 ; ----------------------------------------------------------------------------
-BonusRunPlayerHeadingLeft:
-        ldx     #$08                            ; D216 A2 08                    ..
-        ldy     #$FF                            ; D218 A0 FF                    ..
-        bit     Joy1Inputs                           ; D21A 2C 30 03                 ,0.
-        bmi     LD228                           ; D21D 30 09                    0.
-        bvs     LD224                           ; D21F 70 03                    p.
-        .byte   $88,$D0,$02                     ; D221 88 D0 02                 ...
-; ----------------------------------------------------------------------------
-LD224:
-        ldy     #$FD                            ; D224 A0 FD                    ..
-        ldx     #$F8                            ; D226 A2 F8                    ..
-LD228:
-        txa                                     ; D228 8A                       .
-        jsr     L983C                           ; D229 20 3C 98                  <.
-        lda     Workset + EntityX                             ; D22C A5 22                    ."
-        cmp     #$C0                            ; D22E C9 C0                    ..
-        lda     Workset + EntityX  + 1                            ; D230 A5 23                    .#
-        sbc     #$0F                            ; D232 E9 0F                    ..
-        bcs     LD24F                           ; D234 B0 19                    ..
-BonusTurnPlane:
+@BonusRunPlayerHeadingLeft:
+        ldx #$08
+        ldy #$FF
+        bit Joy1Inputs
+        bmi @LD228
+        bvs @LD224
+        dey
+        bne @LD226
+@LD224:
+        ldy #$FD
+@LD226:
+        ldx #$F8
+@LD228:
+        txa
+        jsr ApproachXSpeed
+        ; check if we're off the left edge of the screen
+        lda Workset + EntityX
+        cmp #$C0
+        lda Workset + EntityX  + 1
+        sbc #$0F
+        bcs @KeepMoving
+        ; and if so we want to turn ourselves around
+@BonusTurnPlane:
         ; invert x speed
         lda Workset + EntityXSpeed
         eor #$FF
@@ -9934,29 +9959,36 @@ BonusTurnPlane:
         lda Workset + EntityHeader
         eor #EntityHeaderFacingLeft
         sta Workset + EntityHeader
-LD24F:
-        lda     Workset + EntityX  + 1                            ; D24F A5 23                    .#
-        cmp     #$10                            ; D251 C9 10                    ..
-        bne     LD27B                           ; D253 D0 26                    .&
-        lda     #$03                            ; D255 A9 03                    ..
-        bit     Joy1Pressed                           ; D257 2C 32 03                 ,2.
-        beq     LD27B                           ; D25A F0 1F                    ..
-        ldx     #$00                            ; D25C A2 00                    ..
-        lda     $06A0,x                         ; D25E BD A0 06                 ...
-        bpl     LD271                           ; D261 10 0E                    ..
-        ldx     #$20                            ; D263 A2 20                    . 
-        lda     $06A0,x                         ; D265 BD A0 06                 ...
-        bpl     LD271                           ; D268 10 07                    ..
-        ldx     #$40                            ; D26A A2 40                    .@
-        lda     $06A0,x                         ; D26C BD A0 06                 ...
-        bmi     LD27B                           ; D26F 30 0A                    0.
-LD271:
-        lda     #$04                            ; D271 A9 04                    ..
-        sta     $06A1,x                         ; D273 9D A1 06                 ...
-        lda     #$80                            ; D276 A9 80                    ..
-        sta     $06A0,x                         ; D278 9D A0 06                 ...
-LD27B:
-        jmp     WorksetSave                           ; D27B 4C 61 97                 La.
+@KeepMoving:
+        ; finish up if we are offscreen
+        lda Workset + EntityX  + 1
+        cmp #$10
+        bne @Done
+        ; check if player wants to fire
+        lda #(JOY_A | JOY_B)
+        bit Joy1Pressed
+        beq @Done
+        ; check projectile 1 slot
+        ldx #$00
+        lda PlayerProjectile1Data,x
+        bpl @LD271 ; slot is free, bombs away!
+        ; check projectile 2 slot
+        ldx #$20
+        lda PlayerProjectile1Data,x
+        bpl @LD271 ; slot is free, bombs away!
+        ; last chance, projectile 3?
+        ldx #$40
+        lda PlayerProjectile1Data,x
+        bmi @Done ; no dice, we can't fire for now.
+@LD271:
+        ; mark the entity as a parachute bomb
+        lda #EntityTypeParachuteBomb
+        sta PlayerProjectile1Data + EntityType,x
+        ; and activate it!
+        lda #EntityHeaderActive
+        sta PlayerProjectile1Data + EntityHeader,x
+@Done:
+        jmp WorksetSave
 
 ; ----------------------------------------------------------------------------
 BonusRunJellyfish:
