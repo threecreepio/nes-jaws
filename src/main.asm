@@ -71,6 +71,8 @@ PlayerStashedY        = $038D ; 8 bit approximation of jaws last Y coord
 ShowStatusBarTextLine = $0305
 EventFlags            = $0306
 
+
+
 EventFlagsMapEnterPort           = %00000001
 EventFlagsMapPortPurchasing      = %00000010
 EventFlagsMapTriggerEncounter    = %00000100
@@ -227,6 +229,7 @@ EntityV1E             = $1E
 EntityFlags1F             = $1F
 
 
+EntityFlag1FBit1        = %00000001
 EntityFlag1FBit2        = %00000010
 EntityFlag1FHitDetected = %00100000
 EntityFlag1FBit7        = %01000000
@@ -3379,15 +3382,15 @@ FindEmptyProjectileSlot:
 
 ; ----------------------------------------------------------------------------
 CopyWorksetCoordinatesToTempCoordinate:
-        lda     Workset + EntityX                             ; 95E4 A5 22                    ."
-        sta     TempCoordX                            ; 95E6 85 16                    ..
-        lda     Workset + EntityX  + 1                            ; 95E8 A5 23                    .#
-        sta     TempCoordX + 1                             ; 95EA 85 17                    ..
-        lda     Workset + EntityY                             ; 95EC A5 24                    .$
-        sta     TempCoordY                             ; 95EE 85 18                    ..
-        lda     Workset + EntityY + 1                             ; 95F0 A5 25                    .%
-        sta     TempCoordY + 1                             ; 95F2 85 19                    ..
-        rts                                     ; 95F4 60                       `
+        lda Workset + EntityX
+        sta TempCoordX
+        lda Workset + EntityX  + 1
+        sta TempCoordX + 1
+        lda Workset + EntityY
+        sta TempCoordY
+        lda Workset + EntityY + 1
+        sta TempCoordY + 1
+        rts
 
 ; ----------------------------------------------------------------------------
 GetWorldMapFlagsAtTargetLocation:
@@ -3536,13 +3539,13 @@ MapRunCamera:
 @ClampScrollY:
         ; get max scroll y positions for the map, then subtract player scroll.
         txa
-        cmp     #$C6
+        cmp #$C6
         tya
-        sbc     #$00
-        bcc     @UpdateCameraY
+        sbc #$00
+        bcc @UpdateCameraY
         ; we are too close to the bottom, clear scroll.
-        ldx     #$C6
-        ldy     #$00
+        ldx #$C6
+        ldy #$00
 @UpdateCameraY:
         ; store scroll position
         stx MapScrollY
@@ -3830,7 +3833,7 @@ ApproachXSpeed:
 ApproachYSpeed:
         ldx #EntityYSubspeed
 
-;
+
 ; # ApproachSpeed
 ; Parameters:
 ;  - A is subspeed value to add.
@@ -3890,7 +3893,6 @@ ApproachSpeed:
         clc
         rts
 
-; ----------------------------------------------------------------------------
 
 ; # ApproachSpeed2
 ; This is a variant of ApproachSpeed, which increases speed by
@@ -11416,12 +11418,12 @@ EnterOutroScreen:
         sta NMISpriteHandlingDisabled
         jsr PPUEnableNMI
         jsr PPUEnableAndWaitFor1Frame
-LDD08:
+@WaitUntilJawsDisabled:
         jsr WaitFor1Frame
-        jsr LDE92
+        jsr OutroRunJawsDeath
         jsr UpdateEntitySprites
         lda PlayerData + EntityHeader
-        bne LDD08
+        bne @WaitUntilJawsDisabled
         jsr PPUDisableNMI
         jsr PPUDisableRendering
         lda PPUCTRL_MIRROR
@@ -11451,7 +11453,7 @@ LDD08:
         sta NMIRaisedFlag
 @WaitUntilAnimationFinish:
         jsr WaitFor1Frame
-        jsr OutroPlayPlaneAnimation
+        jsr OutroRunPlaneAnimation
         jsr UpdateEntitySprites
         lda PlayerData + EntityHeader
         bne @WaitUntilAnimationFinish
@@ -11490,7 +11492,6 @@ LDD08:
         jmp GameStartup        
 
 
-
 @OutroTextRow1:
         .addr $2356
         .byte $08
@@ -11504,15 +11505,16 @@ LDD08:
         .byte $03
         .byte $7F,$5F,$DF
 
-; ----------------------------------------------------------------------------
-OutroPlayPlaneAnimation:
+
+OutroRunPlaneAnimation:
         lda #<PlayerData
         sta WorksetPtr
         lda #>PlayerData
         sta WorksetPtr+1
         jsr WorksetLoad
         bit Workset + EntityHeader
-        bmi LDE00
+        bmi @KeepAnimatingPlane
+        ; initialize outro plane position
         lda #(EntityHeaderActive | EntityHeader7)
         sta Workset + EntityHeader
         lda #$40
@@ -11523,6 +11525,7 @@ OutroPlayPlaneAnimation:
         sta Workset + EntityY
         lda #$00
         sta Workset + EntityY + 1
+        ; init movement speed
         lda #$00
         sta Workset + EntityXSubspeed
         lda #$FC
@@ -11531,136 +11534,137 @@ OutroPlayPlaneAnimation:
         sta Workset + EntityYSubspeed
         lda #$FF
         sta Workset + EntityYSpeed
+        ; and play our animation
         lda #AnimationOutroPlane1
         jsr WorksetAnimationPlay
         jmp WorksetSave
+@KeepAnimatingPlane:
+        lda Workset + EntityAnimationIndex
+        bne @RunningAnimation2
+        jsr WorksetMoveX
+        jsr WorksetMoveY
+        bit Workset + EntityActiveAnimationIndex
+        bmi @StartAnimation2
+        lda #EntityFlag1FBit1
+        bit Workset + EntityFlags1F
+        beq @Save
+        ; mark running animation as negative to trigger next animation.
+        lda #$80
+        sta Workset + EntityActiveAnimationIndex
+@Save:
+        jmp WorksetSave
+@StartAnimation2:
+        ; exit if running flag is set
+        lda #EntityFlag1FBit1
+        bit Workset + EntityFlags1F
+        bne @Save
+        ; put animation entity in the correct place for the animation.
+        lda #$38
+        sta Workset + EntityY
+        lda #$00
+        sta Workset + EntityY + 1
+        lda #$80
+        sta Workset + EntityXSubspeed
+        lda #$02
+        sta Workset + EntityXSpeed
+        lda #$10
+        sta Workset + EntityYSubspeed
+        lda #$00
+        sta Workset + EntityYSpeed
+        ; and clear out the animation state
+        lda #$01
+        sta Workset + EntityAnimationIndex
+        lda #$00
+        sta Workset + EntityActiveAnimationIndex
+        lda #$10
+        sta Workset + EntityV16
+        ; then start the second animation
+        lda #AnimationOutroPlane2
+        jsr WorksetAnimationPlay
+        jmp WorksetSave
+@RunningAnimation2:
+        cmp #$01
+        bne @DelayUntilAnimationEnd
+        lda Workset + EntityV16
+        beq @PrepNextAnimation
+        dec Workset + EntityV16
+        jmp WorksetSave
+@PrepNextAnimation:
+        jsr WorksetMoveX
+        jsr WorksetMoveY
+        bit Workset + EntityActiveAnimationIndex
+        bmi @WaitForAnimation3
+        lda #$01
+        bit Workset + EntityFlags1F
+        beq @Exit1
+        lda #$80
+        sta Workset + EntityActiveAnimationIndex
+@Exit1:
+        jmp WorksetSave
+@WaitForAnimation3:
+        ldy #$04
+        jsr SlowdownXByY
+        bcc @Exit1
+        ; oaky, start final animation!
+        lda #$02
+        sta Workset + EntityAnimationIndex
+        lda #AnimationOutroPlane3
+        jsr WorksetAnimationPlay
+        jmp WorksetSave
+@DelayUntilAnimationEnd:
+        ; run animation frame
+        jsr WorksetAnimationAdvance
+        ; if our animation is still running, we have nothing to do.
+        lda Workset + EntityAnimTimer
+        bne @Done
+        ; animation is complete.. time to disable the outro plane!
+        ; this will trigger the next stage of the outro.
+        lda #$00
+        sta Workset + EntityHeader
+@Done:
+        jmp WorksetSave
 
-; ----------------------------------------------------------------------------
-LDE00:
-        lda     $34                             ; DE00 A5 34                    .4
-        bne     LDE4D                           ; DE02 D0 49                    .I
-        jsr     WorksetMoveX                           ; DE04 20 FA 97                  ..
-        jsr     WorksetMoveY                           ; DE07 20 1B 98                  ..
-        bit     Workset + EntityActiveAnimationIndex                             ; DE0A 24 35                    $5
-        bmi     LDE1B                           ; DE0C 30 0D                    0.
-        lda     #$01                            ; DE0E A9 01                    ..
-        bit     Workset + EntityFlags1F                             ; DE10 24 3F                    $?
-        beq     LDE18                           ; DE12 F0 04                    ..
-        lda     #$80                            ; DE14 A9 80                    ..
-        sta     Workset + EntityActiveAnimationIndex                             ; DE16 85 35                    .5
-LDE18:
-        jmp     WorksetSave                           ; DE18 4C 61 97                 La.
-
-; ----------------------------------------------------------------------------
-LDE1B:
-        lda     #$01                            ; DE1B A9 01                    ..
-        bit     Workset + EntityFlags1F                             ; DE1D 24 3F                    $?
-        bne     LDE18                           ; DE1F D0 F7                    ..
-        lda     #$38                            ; DE21 A9 38                    .8
-        sta     Workset + EntityY                             ; DE23 85 24                    .$
-        lda     #$00                            ; DE25 A9 00                    ..
-        sta     Workset + EntityY + 1                             ; DE27 85 25                    .%
-        lda     #$80                            ; DE29 A9 80                    ..
-        sta     Workset + EntityXSubspeed                             ; DE2B 85 30                    .0
-        lda     #$02                            ; DE2D A9 02                    ..
-        sta     Workset + EntityXSpeed                             ; DE2F 85 31                    .1
-        lda     #$10                            ; DE31 A9 10                    ..
-        sta     Workset + EntityYSubspeed                            ; DE33 85 32                    .2
-        lda     #$00                            ; DE35 A9 00                    ..
-        sta     Workset + EntityYSpeed                             ; DE37 85 33                    .3
-        lda     #$01                            ; DE39 A9 01                    ..
-        sta     $34                             ; DE3B 85 34                    .4
-        lda     #$00                            ; DE3D A9 00                    ..
-        sta     Workset + EntityActiveAnimationIndex                             ; DE3F 85 35                    .5
-        lda     #$10                            ; DE41 A9 10                    ..
-        sta     Workset + EntityV16                            ; DE43 85 36                    .6
-        lda     #AnimationOutroPlane2                            ; DE45 A9 09                    ..
-        jsr     WorksetAnimationPlay                           ; DE47 20 AD 97                  ..
-        jmp     WorksetSave                           ; DE4A 4C 61 97                 La.
-
-; ----------------------------------------------------------------------------
-LDE4D:
-        cmp     #$01                            ; DE4D C9 01                    ..
-        bne     LDE84                           ; DE4F D0 33                    .3
-        lda     Workset + EntityV16                            ; DE51 A5 36                    .6
-        beq     LDE5A                           ; DE53 F0 05                    ..
-        dec     Workset + EntityV16                            ; DE55 C6 36                    .6
-        jmp     WorksetSave                           ; DE57 4C 61 97                 La.
-
-; ----------------------------------------------------------------------------
-LDE5A:
-        jsr     WorksetMoveX                           ; DE5A 20 FA 97                  ..
-        jsr     WorksetMoveY                           ; DE5D 20 1B 98                  ..
-        bit     Workset + EntityActiveAnimationIndex                             ; DE60 24 35                    $5
-        bmi     LDE71                           ; DE62 30 0D                    0.
-        lda     #$01                            ; DE64 A9 01                    ..
-        bit     Workset + EntityFlags1F                             ; DE66 24 3F                    $?
-        beq     LDE6E                           ; DE68 F0 04                    ..
-        lda     #$80                            ; DE6A A9 80                    ..
-        sta     Workset + EntityActiveAnimationIndex                             ; DE6C 85 35                    .5
-LDE6E:
-        jmp     WorksetSave                           ; DE6E 4C 61 97                 La.
-
-; ----------------------------------------------------------------------------
-LDE71:
-        ldy     #$04                            ; DE71 A0 04                    ..
-        jsr     SlowdownXByY                           ; DE73 20 B8 98                  ..
-        bcc     LDE6E                           ; DE76 90 F6                    ..
-        lda     #$02                            ; DE78 A9 02                    ..
-        sta     $34                             ; DE7A 85 34                    .4
-        lda     #AnimationOutroPlane3                            ; DE7C A9 0A                    ..
-        jsr     WorksetAnimationPlay                           ; DE7E 20 AD 97                  ..
-        jmp     WorksetSave                           ; DE81 4C 61 97                 La.
-
-; ----------------------------------------------------------------------------
-LDE84:
-        jsr     WorksetAnimationAdvance                           ; DE84 20 BE 97                  ..
-        lda     Workset + EntityAnimTimer                             ; DE87 A5 2B                    .+
-        bne     LDE8F                           ; DE89 D0 04                    ..
-        lda     #$00                            ; DE8B A9 00                    ..
-        sta     Workset + EntityHeader                             ; DE8D 85 20                    . 
-LDE8F:
-        jmp     WorksetSave                           ; DE8F 4C 61 97                 La.
-
-; ----------------------------------------------------------------------------
-LDE92:
-        lda     #<PlayerData                            ; DE92 A9 80                    ..
-        sta     WorksetPtr                             ; DE94 85 40                    .@
-        lda     #>PlayerData                            ; DE96 A9 06                    ..
-        sta     WorksetPtr+1                             ; DE98 85 41                    .A
-        jsr     WorksetLoad                           ; DE9A 20 54 97                  T.
-        jsr     LDEA3                           ; DE9D 20 A3 DE                  ..
-        jmp     WorksetSave                           ; DEA0 4C 61 97                 La.
-
-; ----------------------------------------------------------------------------
-LDEA3:
-        bit     Workset + EntityHeader                             ; DEA3 24 20                    $ 
-        bvs     LDEC4                           ; DEA5 70 1D                    p.
-        lda     #(EntityHeaderActive | EntityHeader7)                            ; DEA7 A9 C0                    ..
-        sta     Workset + EntityHeader                             ; DEA9 85 20                    . 
-        lda     #$80                            ; DEAB A9 80                    ..
-        sta     Workset + EntityX                             ; DEAD 85 22                    ."
-        lda     #$A0                            ; DEAF A9 A0                    ..
-        sta     Workset + EntityY                             ; DEB1 85 24                    .$
-        lda     #$80                            ; DEB3 A9 80                    ..
-        sta     Workset + EntityYSubspeed                            ; DEB5 85 32                    .2
-        lda     #$10                            ; DEB7 A9 10                    ..
-        sta     Workset + EntityXSubspeed                             ; DEB9 85 30                    .0
-        lda     #$C0                            ; DEBB A9 C0                    ..
-        sta     $34                             ; DEBD 85 34                    .4
-        lda     #AnimationFinaleJawsDeath                            ; DEBF A9 0B                    ..
-        jmp     WorksetAnimationPlay                           ; DEC1 4C AD 97                 L..
-
-; ----------------------------------------------------------------------------
-LDEC4:
-        jsr     WorksetMoveX                           ; DEC4 20 FA 97                  ..
-        jsr     WorksetMoveY                           ; DEC7 20 1B 98                  ..
-        dec     $34                             ; DECA C6 34                    .4
-        bne     LDED2                           ; DECC D0 04                    ..
-        lda     #$00                            ; DECE A9 00                    ..
-        sta     Workset + EntityHeader                             ; DED0 85 20                    . 
-LDED2:
-        rts                                     ; DED2 60                       `
+OutroRunJawsDeath:
+        lda #<PlayerData
+        sta WorksetPtr
+        lda #>PlayerData
+        sta WorksetPtr+1
+        jsr WorksetLoad
+        jsr @OutroAnimateJawsDeath
+        jmp WorksetSave
+@OutroAnimateJawsDeath:
+        bit Workset + EntityHeader
+        bvs @JawsDeathStarted
+        lda #(EntityHeaderActive | EntityHeader7)
+        ; place out jaws animation in the right spot
+        sta Workset + EntityHeader
+        lda #$80
+        sta Workset + EntityX
+        lda #$A0
+        sta Workset + EntityY
+        ; and set the movement speed
+        lda #$80
+        sta Workset + EntityYSubspeed
+        lda #$10
+        sta Workset + EntityXSubspeed
+        ; use animationindex as a counter,
+        ; there's only one frame of the actual animation.
+        lda #$C0
+        sta Workset + EntityAnimationIndex
+        lda #AnimationFinaleJawsDeath
+        jmp WorksetAnimationPlay
+@JawsDeathStarted:
+        jsr WorksetMoveX
+        jsr WorksetMoveY
+        ; decrement timer until it reaches 0.
+        dec Workset + EntityAnimationIndex
+        bne @Done
+        ; and deactivate the workset.
+        ; this will trigger the next stage of the outro.
+        lda #$00
+        sta Workset + EntityHeader
+@Done:
+        rts
 
 ; ----------------------------------------------------------------------------
 LDED3:
