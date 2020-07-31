@@ -154,12 +154,6 @@ JawsY                 = JawsData + EntityY ; 16 bit
 CameraX               = $0338 ; 16 bit
 CameraY               = $033A ; 16 bit
 
-
-PlayerType            = PlayerData + EntityType
-PlayerX               = PlayerData + EntityX ; 16 bit
-PlayerY               = PlayerData + EntityY ; 16 bit
-
-
 PaletteLoadPending        = $0300
 NMISpriteHandlingDisabled = $0302
 
@@ -1442,34 +1436,34 @@ UnstashPlayerLocation:
         lda @Temp1
         clc
         adc #$08
-        sta PlayerX
+        sta PlayerData+EntityX
         lda @Temp2
         adc #$00
-        sta PlayerX+1
+        sta PlayerData+EntityX+1
         lda PlayerStashedY
         jsr SplitByteNybbles
         lda @Temp1
         clc
         adc #$08
-        sta PlayerY
+        sta PlayerData+EntityY
         lda @Temp2
         adc #$00
-        sta PlayerY+1
+        sta PlayerData+EntityY+1
         rts
 
 ; store an approximation of the players coordinates in PlayerStashedX and PlayerStashedY
 StashPlayerLocation:
-        lda PlayerX+1
+        lda PlayerData+EntityX+1
         lsr a
-        lda PlayerX
+        lda PlayerData+EntityX
         ror a
         lsr a
         lsr a
         lsr a
         sta PlayerStashedX
-        lda PlayerY+1
+        lda PlayerData+EntityY+1
         lsr a
-        lda PlayerY
+        lda PlayerData+EntityY
         ror a
         lsr a
         lsr a
@@ -3492,11 +3486,11 @@ GetWorldMapFlagsAtTempCoords:
 
 MapRunCamera:
         ; subtract $80 from player X, this is the minimum scroll X
-        lda PlayerX
+        lda PlayerData+EntityX
         sec
         sbc #$80
         tax
-        lda PlayerX+1
+        lda PlayerData+EntityX+1
         sbc #$00
         tay
         bcs @ClampScrollX
@@ -3529,11 +3523,11 @@ MapRunCamera:
         sta CameraX+1
         ; now we need to do the same thing for Y.
         ; subtract $60 from player Y, this is the minimum scroll Y
-        lda PlayerY
+        lda PlayerData+EntityY
         sec
         sbc #$60
         tax
-        lda PlayerY+1
+        lda PlayerData+EntityY+1
         sbc #$00
         tay
         bcs @ClampScrollY
@@ -3585,11 +3579,11 @@ MapRunCamera:
 ; ----------------------------------------------------------------------------
 EncounterRunCamera:
         ; subtract $60 from player y position, minimum scroll Y
-        lda PlayerY
+        lda PlayerData+EntityY
         sec
         sbc #$60
         tax
-        lda PlayerY+1
+        lda PlayerData+EntityY+1
         sbc #$00
         tay
         bcs @ClampScrollHeight
@@ -4064,23 +4058,23 @@ WorksetDetectProjectileHit:
         rts
 
 ; ----------------------------------------------------------------------------
-L9940:
-        lda     #EntityHeader2                            ; 9940 A9 02                    ..
-        bit     PlayerData + EntityHeader                           ; 9942 2C 80 06                 ,..
-        bne     @Exit                           ; 9945 D0 19                    ..
-        lda     Workset + EntityFlags1F                             ; 9947 A5 3F                    .?
-        and     #($FF ^ EntityFlag1FBit8)                            ; 9949 29 7F                    ).
-        sta     Workset + EntityFlags1F                             ; 994B 85 3F                    .?
-        jsr     HitDetectAgainstPlayer                           ; 994D 20 61 99                  a.
-        bcc     @Exit                           ; 9950 90 0E                    ..
-        lda     Workset + EntityFlags1F                             ; 9952 A5 3F                    .?
-        ora     #EntityFlag1FBit8                            ; 9954 09 80                    ..
-        sta     Workset + EntityFlags1F                             ; 9956 85 3F                    .?
-        lda     $069F                           ; 9958 AD 9F 06                 ...
-        ora     #$80                            ; 995B 09 80                    ..
-        sta     $069F                           ; 995D 8D 9F 06                 ...
+CheckFlagsAndHitDetectAgainstPlayer:
+        lda #EntityHeader2
+        bit PlayerData + EntityHeader
+        bne @Exit
+        lda Workset + EntityFlags1F
+        and #($FF ^ EntityFlag1FBit8)
+        sta Workset + EntityFlags1F
+        jsr HitDetectAgainstPlayer
+        bcc @Exit
+        lda Workset + EntityFlags1F
+        ora #EntityFlag1FBit8
+        sta Workset + EntityFlags1F
+        lda PlayerData + EntityFlags1F
+        ora #EntityFlag1FBit8
+        sta PlayerData + EntityFlags1F
 @Exit:
-        rts                                     ; 9960 60                       `
+        rts
 
 ; ----------------------------------------------------------------------------
 HitDetectAgainstPlayer:
@@ -4522,161 +4516,184 @@ BonusRunProjectiles:
 
 ; ----------------------------------------------------------------------------
 EncounterBoatProjectile:
-        bit     Workset + EntityHeader                             ; 9BAE 24 20                    $ 
-        bvs     L9BBD                           ; 9BB0 70 0B                    p.
-        jsr     EncounterPrepareProjectile                           ; 9BB2 20 C7 9C                  ..
-        lda     #SFXEncounterBoatFire                            ; 9BB5 A9 08                    ..
-        jsr     SoundPlay                           ; 9BB7 20 CD E2                  ..
-        jmp     L9C05                           ; 9BBA 4C 05 9C                 L..
-
-; ----------------------------------------------------------------------------
-L9BBD:
-        lda     Workset + EntityFlags1F                             ; 9BBD A5 3F                    .?
-        bmi     L9BFC                           ; 9BBF 30 3B                    0;
-        and     #$01                            ; 9BC1 29 01                    ).
-        beq     L9C01                           ; 9BC3 F0 3C                    .<
-        lda     $38                             ; 9BC5 A5 38                    .8
-        bmi     L9BF2                           ; 9BC7 30 29                    0)
-        lda     Workset + EntityY                             ; 9BC9 A5 24                    .$
-        cmp     WaterHeight                           ; 9BCB CD 3C 03                 .<.
-        lda     Workset + EntityY + 1                             ; 9BCE A5 25                    .%
-        sbc     WaterHeight+1                           ; 9BD0 ED 3D 03                 .=.
-        bcc     L9BE8                           ; 9BD3 90 13                    ..
-        lda     #$00                            ; 9BD5 A9 00                    ..
-        sta     Workset + EntityXSubspeed                             ; 9BD7 85 30                    .0
-        sta     Workset + EntityXSpeed                             ; 9BD9 85 31                    .1
-        lda     #$80                            ; 9BDB A9 80                    ..
-        ora     $38                             ; 9BDD 05 38                    .8
-        sta     $38                             ; 9BDF 85 38                    .8
-        lsr     Workset + EntityYSpeed                             ; 9BE1 46 33                    F3
-        ror     Workset + EntityYSubspeed                            ; 9BE3 66 32                    f2
-        jmp     L9BF2                           ; 9BE5 4C F2 9B                 L..
-
-; ----------------------------------------------------------------------------
-L9BE8:
-        lda     #$40                            ; 9BE8 A9 40                    .@
-        ldy     #$04                            ; 9BEA A0 04                    ..
-        jsr     ApproachYSpeed                           ; 9BEC 20 41 98                  A.
-        jsr     WorksetMoveX                           ; 9BEF 20 FA 97                  ..
-L9BF2:
-        jsr     WorksetMoveY                           ; 9BF2 20 1B 98                  ..
-        jsr     EncounterClampWorksetMaximumY                           ; 9BF5 20 D0 99                  ..
-        bcc     L9C05                           ; 9BF8 90 0B                    ..
-        .byte   $B0,$05                         ; 9BFA B0 05                    ..
-; ----------------------------------------------------------------------------
-L9BFC:
-        lda     #$00                            ; 9BFC A9 00                    ..
-        sta     HitDetectionProjectileType                           ; 9BFE 8D 4A 03                 .J.
-L9C01:
-        lda     #$00                            ; 9C01 A9 00                    ..
-        sta     Workset + EntityHeader                             ; 9C03 85 20                    . 
-L9C05:
-        rts                                     ; 9C05 60                       `
+        bit Workset + EntityHeader
+        bvs @Main
+        ; set up projectile
+        jsr EncounterPrepareProjectile
+        lda #SFXEncounterBoatFire
+        jsr SoundPlay
+        jmp @Done
+@Main:
+        ; disable projectile if hit flag is set
+        lda Workset + EntityFlags1F
+        bmi @Despawn2
+        ; or if flag 1 is set..
+        and #EntityFlag1FBit1
+        beq @Despawn
+        ; check if sinking flag is set
+        lda Workset + EntityV18
+        bmi @AlreadyInitialized
+        ; wait until projectile hits water
+        lda Workset + EntityY
+        cmp WaterHeight
+        lda Workset + EntityY + 1
+        sbc WaterHeight+1
+        bcc @ApproachWaterLevel
+        ; clear x speed
+        lda #$00
+        sta Workset + EntityXSubspeed
+        sta Workset + EntityXSpeed
+        ; mark sinking flag
+        lda #%10000000
+        ora Workset + EntityV18
+        sta Workset + EntityV18
+        ; set falling speed
+        lsr Workset + EntityYSpeed
+        ror Workset + EntityYSubspeed
+        ; and start running
+        jmp @AlreadyInitialized
+@ApproachWaterLevel:
+        ; accelerate falling speed
+        lda #$40
+        ldy #$04
+        jsr ApproachYSpeed
+        jsr WorksetMoveX
+@AlreadyInitialized:
+        jsr WorksetMoveY
+        jsr EncounterClampWorksetMaximumY
+        bcc @Done
+        ; remove projectile if it's too far down
+        bcs @Despawn
+@Despawn2:
+        lda #$00
+        sta HitDetectionProjectileType
+@Despawn:
+        lda #$00
+        sta Workset + EntityHeader
+@Done:
+        rts
 
 ; ----------------------------------------------------------------------------
 EncounterSubmarineBulletProjectile:
-        bit     Workset + EntityHeader
-        bvs     @L9C6C
-        jsr     EncounterPrepareProjectile
-        lda     #SFXEncounterBoatFire
-        jsr     SoundPlay
-        jmp     @SharedRTS1
-@L9C6C:
-        lda     Workset + EntityFlags1F
-        bmi     @L9C7A
-        and     #$01
-        beq     @L9C7A
-        jsr     WorksetMoveX
-        jmp     @SharedRTS1
-@L9C7A:
-        lda     #$00
-        sta     Workset + EntityHeader
-@SharedRTS1:
+        bit Workset + EntityHeader
+        bvs @Main
+        ; set up projectile
+        jsr EncounterPrepareProjectile
+        lda #SFXEncounterBoatFire
+        jsr SoundPlay
+        jmp @Done
+@Main:
+        ; disable projectile if hit flag is set
+        lda Workset + EntityFlags1F
+        bmi @Despawn
+        ; or if flag 1 is sset..
+        and #EntityFlag1FBit1
+        beq @Despawn
+        ; otherwise just move along.
+        jsr WorksetMoveX
+        jmp @Done
+@Despawn:
+        lda #$00
+        sta Workset + EntityHeader
+@Done:
         rts
 
 ; ----------------------------------------------------------------------------
 EncounterSubmarineBombProjectile:
-        bit     Workset + EntityHeader                             ; 9C28 24 20                    $ 
-        bvs     L9C37                                              ; 9C2A 70 0B                    p.
-        jsr     EncounterPrepareProjectile                           ; 9C2C 20 C7 9C                  ..
-        lda     #SFXEncounterSubmarineFire                            ; 9C2F A9 0A                    ..
-        jsr     SoundPlay                           ; 9C31 20 CD E2                  ..
-        jmp     L9C5C                           ; 9C34 4C 5C 9C                 L\.
-
-; ----------------------------------------------------------------------------
-L9C37:
-        lda     Workset + EntityFlags1F                             ; 9C37 A5 3F                    .?
-        bmi     L9C58                           ; 9C39 30 1D                    0.
-        and     #$01                            ; 9C3B 29 01                    ).
-        beq     L9C58                           ; 9C3D F0 19                    ..
-        jsr     WorksetMoveX                           ; 9C3F 20 FA 97                  ..
-        jsr     WorksetMoveY                           ; 9C42 20 1B 98                  ..
-        lda     #$20                            ; 9C45 A9 20                    . 
-        ldy     #$10                            ; 9C47 A0 10                    ..
-        jsr     ApproachYSpeed                           ; 9C49 20 41 98                  A.
-        ldy     #$08                            ; 9C4C A0 08                    ..
-        jsr     SlowdownXByY                           ; 9C4E 20 B8 98                  ..
-        jsr     EncounterClampWorksetMaximumY                           ; 9C51 20 D0 99                  ..
-        bcc     L9C5C                           ; 9C54 90 06                    ..
-        .byte   $B0,$00                         ; 9C56 B0 00                    ..
-; ----------------------------------------------------------------------------
-L9C58:
-        lda     #$00                            ; 9C58 A9 00                    ..
-        sta     Workset + EntityHeader                             ; 9C5A 85 20                    . 
-L9C5C:
-        rts                                     ; 9C5C 60                       `
+        bit Workset + EntityHeader
+        bvs @Main
+        ; set up projectile
+        jsr EncounterPrepareProjectile
+        lda #SFXEncounterSubmarineFire
+        jsr SoundPlay
+        jmp @Done
+@Main:
+        ; disable projectile if hit flag is set
+        lda Workset + EntityFlags1F
+        bmi @Despawn
+        ; or if flag 1 is set..
+        and #EntityFlag1FBit1
+        beq @Despawn
+        ; otherwise we move the projectile
+        jsr WorksetMoveX
+        jsr WorksetMoveY
+        ; and accelerate it toward max speed
+        lda #$20
+        ldy #$10
+        jsr ApproachYSpeed
+        ; and slow down our X to form a nice arc
+        ldy #$08
+        jsr SlowdownXByY
+        ; then check so we're not outside level bounds
+        jsr EncounterClampWorksetMaximumY
+        bcc @Done
+        ; and despawn if we are
+        bcs @Despawn
+@Despawn:
+        lda #$00
+        sta Workset + EntityHeader
+@Done:
+        rts
 
 
 EncounterHarpoonProjectile:
-        bit     Workset + EntityHeader
-        bvs     @HarpoonActive
-        jsr     EncounterPrepareProjectile
-        lda     #SFXEncounterHarpoonFire
-        jsr     SoundPlay
-        jmp     SharedRTS1
+        bit Workset + EntityHeader
+        bvs @HarpoonActive
+        ; set up projectile
+        jsr EncounterPrepareProjectile
+        lda #SFXEncounterHarpoonFire
+        jsr SoundPlay
+        jmp SharedRTS1
 @HarpoonActive:
-        lda     Workset + EntityFlags1F
-        bmi     @RemoveHarpoon
-        and     #$01
-        beq     @RemoveHarpoon
-        jsr     WorksetMoveX
-        jmp     SharedRTS1
-@RemoveHarpoon:
-        lda     #$00
-        sta     Workset + EntityHeader
+        ; disable projectile if hit flag is set
+        lda Workset + EntityFlags1F
+        bmi @Despawn
+        ; or if flag 1 is sset..
+        and #EntityFlag1FBit1
+        beq @Despawn
+        ; otherwise just move along.
+        jsr WorksetMoveX
+        jmp SharedRTS1
+@Despawn:
+        lda #$00
+        sta Workset + EntityHeader
 SharedRTS1:
         rts
 
 ; ----------------------------------------------------------------------------
 EncounterPlaneProjectile:
         bit Workset + EntityHeader
-        bvs @ProjectileActive
+        bvs @Main
+        ; set up projectile
         jsr EncounterPrepareProjectile
-        ; active projectile by, playing a sound.
         lda #SFXBonusPlaneFire
         jsr SoundPlay
         jmp SharedRTS1
-@ProjectileActive:
+@Main:
+        ; disable projectile if hit flag is set
         lda Workset + EntityFlags1F
-        bmi @DisableProjectile
-        and #$01
-        beq @DisableProjectile
+        bmi @Despawn
+        ; or if flag 1 is set..
+        and #EntityFlag1FBit1
+        beq @Despawn
+        ; drop projectile toward water
         jsr WorksetMoveY
         lda Workset + EntityV18
         bne @AlreadyRunning
-        ; set starting height
+        ; wait until projectile hits water
         lda Workset + EntityY
         cmp WaterHeight
         lda Workset + EntityY + 1
         sbc WaterHeight+1
         bcc @Done
+        ; and set a flag
         inc Workset + EntityV18
         ; and set drop speed
         lda #$00
         sta Workset + EntityYSubspeed
         lda #$03
         sta Workset + EntityYSpeed
-        ; play parabomb animation
+        ; remove parachute after hitting water
         lda #AnimationEncounterBomb
         jsr WorksetAnimationPlay
         jmp @Done
@@ -4685,14 +4702,14 @@ EncounterPlaneProjectile:
         jsr EncounterClampWorksetMaximumY
         bcc @Done
         ; entirely pointless carry check.
-        bcs @DisableProjectile
-@DisableProjectile:
+        bcs @Despawn
+@Despawn:
         lda #$00
         sta Workset + EntityHeader
 @Done:
         rts
 
-; ----------------------------------------------------------------------------
+; shared code used by all projectile types
 EncounterPrepareProjectile:
         lda #$00
         ; start by clearing some state off the workset
@@ -4704,69 +4721,77 @@ EncounterPrepareProjectile:
         bcc @ClearPreviousState
         ; load offset in the projectile data table for this
         ; projectile type.
-        lda     Workset + EntityType
-        asl     a
-        asl     a
-        asl     a
+        lda Workset + EntityType
+        asl a
+        asl a
+        asl a
         tax
-        lda     Workset + EntityHeader
-        ora     #EntityHeader7
-        sta     Workset + EntityHeader
-        and     #EntityHeaderFacingLeft
-        bne     L9CFF
-        lda     PlayerX
+        ; set header flag
+        lda Workset + EntityHeader
+        ora #EntityHeader7
+        sta Workset + EntityHeader
+        ; separate handling when heading left
+        and #EntityHeaderFacingLeft
+        bne @SetupLeftMovement
+        ; we are heading to the right!
+        ; place projectile at player x + x offset from projectile settings
+        lda PlayerData+EntityX
         clc
-        adc     EncounterProjectileSettings,x                                   ; THIS IS NOT DONE
-        sta     Workset + EntityX                                   ; THIS IS NOT DONE
-        lda     PlayerX+1                                   ; THIS IS NOT DONE
-        adc     #$00                                                    ; THIS IS NOT DONE
-        sta     Workset + EntityX  + 1                           ; THIS IS NOT DONE
-        lda     EncounterProjectileSettings+2,x                           ; THIS IS NOT DONE
-        sta     Workset + EntityXSubspeed                                  ; THIS IS NOT DONE
-        lda     EncounterProjectileSettings+3,x                           ; THIS IS NOT DONE
-        sta     Workset + EntityXSpeed                           ; THIS IS NOT DONE
-        jmp     L9D23
-L9CFF:
-        lda     PlayerX
+        adc EncounterProjectileSettings,x
+        sta Workset+EntityX
+        lda PlayerData+EntityX+1
+        adc #$00
+        sta Workset+EntityX  + 1
+        ; and set x speed
+        lda EncounterProjectileSettings+2,x
+        sta Workset+EntityXSubspeed
+        lda EncounterProjectileSettings+3,x
+        sta Workset+EntityXSpeed
+        jmp @SetupY
+@SetupLeftMovement:
+        ; place projectile at player x - x offset from projectile settings
+        lda PlayerData+EntityX
         sec
-        sbc     EncounterProjectileSettings,x
-        sta     Workset + EntityX
-        lda     PlayerX+1
-        sbc     #$00
-        sta     Workset + EntityX + 1
-        lda     EncounterProjectileSettings+2,x
-        eor     #$FF
-        sta     Workset + EntityXSubspeed
-        lda     EncounterProjectileSettings+3,x
-        eor     #$FF
-        sta     Workset + EntityXSpeed
-        inc     Workset + EntityXSubspeed
-        bne     L9D23
-        inc     Workset + EntityXSpeed
-L9D23:
-        lda     EncounterProjectileSettings+4,x
-        sta     Workset + EntityYSubspeed
-        lda     EncounterProjectileSettings+5,x
-        sta     Workset + EntityYSpeed
+        sbc EncounterProjectileSettings,x
+        sta Workset + EntityX
+        lda PlayerData+EntityX+1
+        sbc #$00
+        sta Workset + EntityX + 1
+        ; and set x speed
+        lda EncounterProjectileSettings+2,x
+        eor #$FF
+        sta Workset + EntityXSubspeed
+        lda EncounterProjectileSettings+3,x
+        eor #$FF
+        sta Workset + EntityXSpeed
+        inc Workset + EntityXSubspeed
+        bne @SetupY
+        inc Workset + EntityXSpeed
+@SetupY:
+        ; set y speed from projectile settings
+        lda EncounterProjectileSettings+4,x
+        sta Workset + EntityYSubspeed
+        lda EncounterProjectileSettings+5,x
+        sta Workset + EntityYSpeed
         clc
-        lda     EncounterProjectileSettings+1,x
-        bmi     @UnusedNegativeYOffset
-        adc     PlayerY
-        sta     Workset + EntityY
-        lda     PlayerY+1
-        adc     #$00
-        jmp     L9D4A
-
-; this would be called if the Y offset of a projectile was negative, which it never is.
-@UnusedNegativeYOffset:
-        adc PlayerY
+        lda EncounterProjectileSettings+1,x
+        bmi @UnusedNegativeYOffset
+        ; set positive y offset
+        adc PlayerData+EntityY
         sta Workset + EntityY
-        lda PlayerY + 1
+        lda PlayerData+EntityY+1
+        adc #$00
+        jmp @Done
+@UnusedNegativeYOffset:
+        ; unused negative y offset handling
+        adc PlayerData+EntityY
+        sta Workset + EntityY
+        lda PlayerData+EntityY + 1
         adc #$FF
-L9D4A:
-        sta     Workset + EntityY + 1
-        lda     EncounterProjectileSettings+6,x
-        jmp     WorksetAnimationPlay
+@Done:
+        sta Workset + EntityY + 1
+        lda EncounterProjectileSettings+6,x
+        jmp WorksetAnimationPlay
 
 ; ----------------------------------------------------------------------------
 
@@ -4832,7 +4857,7 @@ MapRunJaws:
         jsr WorksetAnimationAdvance
         lda Workset + EntityInvincibilityFrames
         bne L9DD8
-        jsr L9940
+        jsr CheckFlagsAndHitDetectAgainstPlayer
         lda Workset + EntityFlags1F
         bpl L9DDD
         jsr CopyWorksetCoordinatesToTempCoordinate
@@ -5209,7 +5234,7 @@ LA072:
 LA075:
         jsr     WorksetAnimationAdvance                           ; A075 20 BE 97                  ..
         jsr     WorksetDetectProjectileHit                           ; A078 20 F8 98                  ..
-        jsr     L9940                           ; A07B 20 40 99                  @.
+        jsr     CheckFlagsAndHitDetectAgainstPlayer                           ; A07B 20 40 99                  @.
         lda     $38                             ; A07E A5 38                    .8
         bne     LA0E3                           ; A080 D0 61                    .a
         bit     Workset + EntityFlags1F                             ; A082 24 3F                    $?
@@ -5459,7 +5484,7 @@ RunEntityJellyfish:
         rts
 LA243:
         jsr     WorksetDetectProjectileHit                           ; A243 20 F8 98                  ..
-        jsr     L9940                           ; A246 20 40 99                  @.
+        jsr     CheckFlagsAndHitDetectAgainstPlayer                           ; A246 20 40 99                  @.
         bit     Workset + EntityFlags1F                             ; A249 24 3F                    $?
         bvs     LA269                           ; A24B 70 1C                    p.
         jsr     WorksetMoveY                           ; A24D 20 1B 98                  ..
@@ -5537,7 +5562,7 @@ RunEntityJellyfish2:
         rts
 @LFF90:
         jsr     WorksetDetectProjectileHit
-        jsr     L9940
+        jsr     CheckFlagsAndHitDetectAgainstPlayer
         bit     Workset + EntityFlags1F
         bvs     @LFFD4
         jsr     WorksetMoveX
@@ -5604,7 +5629,7 @@ LA32F:
         lda     EncounterMaxDepth+1                           ; A337 AD 3F 03                 .?.
         adc     #$00                            ; A33A 69 00                    i.
         sta     Workset + EntityY + 1                             ; A33C 85 25                    .%
-        lda     PlayerX                           ; A33E AD 82 06                 ...
+        lda     PlayerData+EntityX                           ; A33E AD 82 06                 ...
         and     #$F0                            ; A341 29 F0                    ).
         sta     $12                             ; A343 85 12                    ..
 LA345:
@@ -5648,11 +5673,11 @@ RunEntityStingray:
         sta     Workset + EntityV1A                             ; A383 85 3A                    .:
         lda     #$02                            ; A385 A9 02                    ..
         sta     $38                             ; A387 85 38                    .8
-        lda     PlayerY                           ; A389 AD 84 06                 ...
+        lda     PlayerData+EntityY                           ; A389 AD 84 06                 ...
         clc                                     ; A38C 18                       .
         adc     #$10                            ; A38D 69 10                    i.
         sta     Workset + EntityY                             ; A38F 85 24                    .$
-        lda     PlayerY+1                           ; A391 AD 85 06                 ...
+        lda     PlayerData+EntityY+1                           ; A391 AD 85 06                 ...
         adc     #$00                            ; A394 69 00                    i.
         sta     Workset + EntityY + 1                             ; A396 85 25                    .%
         jsr     EncounterClampWorksetMaximumY                           ; A398 20 D0 99                  ..
@@ -5666,7 +5691,7 @@ RunEntityStingray:
 ; ----------------------------------------------------------------------------
 LA3AA:
         stx     Workset + EntityV17                            ; A3AA 86 37                    .7
-        lda     PlayerX                           ; A3AC AD 82 06                 ...
+        lda     PlayerData+EntityX                           ; A3AC AD 82 06                 ...
         bmi     LA3BF                           ; A3AF 30 0E                    0.
         lda     #(EntityHeaderActive | EntityHeader7 | EntityHeaderFacingLeft)                            ; A3B1 A9 D0                    ..
         sta     Workset + EntityHeader                             ; A3B3 85 20                    . 
@@ -5707,7 +5732,7 @@ LA3E0:
 ; ----------------------------------------------------------------------------
 LA3E7:
         jsr     WorksetDetectProjectileHit                           ; A3E7 20 F8 98                  ..
-        jsr     L9940                           ; A3EA 20 40 99                  @.
+        jsr     CheckFlagsAndHitDetectAgainstPlayer                           ; A3EA 20 40 99                  @.
         bit     Workset + EntityFlags1F                             ; A3ED 24 3F                    $?
         bvs     LA449                           ; A3EF 70 58                    pX
         jsr     WorksetMoveX                           ; A3F1 20 FA 97                  ..
@@ -5814,9 +5839,9 @@ LA494:
 RunEntityBabyshark:
         bit     Workset + EntityHeader                             ; A499 24 20                    $ 
         bvs     LA4F9                           ; A49B 70 5C                    p\
-        lda     PlayerY                           ; A49D AD 84 06                 ...
+        lda     PlayerData+EntityY                           ; A49D AD 84 06                 ...
         sta     Workset + EntityY                             ; A4A0 85 24                    .$
-        lda     PlayerY+1                           ; A4A2 AD 85 06                 ...
+        lda     PlayerData+EntityY+1                           ; A4A2 AD 85 06                 ...
         sta     Workset + EntityY + 1                             ; A4A5 85 25                    .%
         lda     #$05                            ; A4A7 A9 05                    ..
         sta     Workset + EntityActiveAnimationIndex                             ; A4A9 85 35                    .5
@@ -5830,11 +5855,11 @@ RunEntityBabyshark:
         sta     Workset + EntityV17                            ; A4BA 85 37                    .7
         lda     #AnimationEncounterBabyshark                            ; A4BC A9 1F                    ..
         jsr     WorksetAnimationPlay                           ; A4BE 20 AD 97                  ..
-        lda     PlayerX+1                           ; A4C1 AD 83 06                 ...
+        lda     PlayerData+EntityX+1                           ; A4C1 AD 83 06                 ...
         cmp     #$10                            ; A4C4 C9 10                    ..
         bcc     LA4CF                           ; A4C6 90 07                    ..
         bne     LA4E4                           ; A4C8 D0 1A                    ..
-        lda     PlayerX                           ; A4CA AD 82 06                 ...
+        lda     PlayerData+EntityX                           ; A4CA AD 82 06                 ...
         bpl     LA4E4                           ; A4CD 10 15                    ..
 LA4CF:
         lda     #(EntityHeaderActive | EntityHeader7)                            ; A4CF A9 C0                    ..
@@ -5915,7 +5940,7 @@ LA53F:
 LA56A:
         jsr     WorksetAnimationAdvance                           ; A56A 20 BE 97                  ..
         jsr     WorksetDetectProjectileHit                           ; A56D 20 F8 98                  ..
-        jsr     L9940                           ; A570 20 40 99                  @.
+        jsr     CheckFlagsAndHitDetectAgainstPlayer                           ; A570 20 40 99                  @.
         bit     Workset + EntityFlags1F                             ; A573 24 3F                    $?
         bvc     LA597                           ; A575 50 20                    P 
         lda     #SFXEncounterEnemyDeath                            ; A577 A9 0E                    ..
@@ -6039,9 +6064,9 @@ LA61A:
         ; set movement speed to +1
         ldy     #$01
         ; compare crab position to player x
-        lda     PlayerX
+        lda     PlayerData+EntityX
         cmp     Workset + EntityX
-        lda     PlayerX+1
+        lda     PlayerData+EntityX+1
         sbc     Workset + EntityX + 1
         bcs     @StoreSpeed
         ; set crab speed to -1 if player is to the left
