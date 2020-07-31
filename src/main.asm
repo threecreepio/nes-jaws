@@ -58,6 +58,8 @@ Joy1Pressed           = $0332
 Joy2Inputs            = $0331
 Joy2Pressed           = $0333
 
+SpriteUpdateDirection = $0336
+
 CurrentMapPositionFlags     = $0340
 
 
@@ -137,7 +139,7 @@ JawsData              = EntityData + ( 4 * $20)
 Enemy1Data            = JawsData
 Enemy2Data            = EntityData + ( 5 * $20)
 MaxEnemies            = $05
-MaxEntities           = $08
+MaxEntities           = $0C
 EntityDataSize        = $20
 
 
@@ -400,7 +402,7 @@ RunTitleScreen:
         lda #$37
         sta Workset + EntityY
         jsr WorksetSave
-        jsr UpdateEntitySprites
+        jsr SpritesetUpdateScreen
         jsr PPUEnableNMI
         jsr PPUEnableAndWaitFor1Frame
         lda #MusicTitleScreen
@@ -632,7 +634,7 @@ MapScreenMainLoop:
         jsr MapShowSubmarine
         jsr MapRunCamera
         jsr MapUpdateScroll
-        jsr UpdateEntitySprites
+        jsr SpritesetUpdateScreen
         lda #$00
         sta EncounterJawsActive
         lda EventFlags
@@ -772,7 +774,7 @@ RunEncounterScreen:
         jsr EncounterRunJaws
         jsr EncounterRunEnemies
         jsr EncounterRunCamera
-        jsr UpdateEntitySprites
+        jsr SpritesetUpdateScreen
         lda EventFlags
         and #(EventFlagsEncounterJawsDead | EventFlagsEncounterPlayerDead | EventFlagsEncounterFinished)
         bne @EncounterEnding
@@ -990,7 +992,7 @@ RunPlayerDeathAnimation:
         jsr RefreshPPUState
         jsr WaitFor1Frame
         jsr @Animate
-        jsr UpdateEntitySprites
+        jsr SpritesetUpdateScreen
         bit PlayerData + EntityHeader
         ; wait until the animation is completed
         bmi @Delay
@@ -1038,7 +1040,7 @@ RunPlayerDeathAnimation:
         lda @TempEntityPointer+1
         adc #$00
         sta @TempEntityPointer+1
-        cmp #MaxEntities
+        cmp #8
         bcc @NextEntity
         ; play secondary death animation
         lda #$80
@@ -1251,7 +1253,7 @@ RunPortScreen:
         lda #$67
         sta Workset + EntityY
         jsr WorksetSave
-        jsr UpdateEntitySprites
+        jsr SpritesetUpdateScreen
         lda #$01
         sta ShowStatusBarTextLine
         jsr PPUEnableNMI
@@ -1325,7 +1327,7 @@ RunPortScreen:
         lda #$00
         sta Workset + EntityXSpeed
         jsr WorksetSave
-        jsr UpdateEntitySprites
+        jsr SpritesetUpdateScreen
         lda #$01
         sta ShowStatusBarTextLine
         jsr PPUEnableNMI
@@ -1346,7 +1348,7 @@ RunPortScreen:
         cmp #$08
         bcs @IncreasePowerLevel
 @Delay:
-        jsr UpdateEntitySprites
+        jsr SpritesetUpdateScreen
         jsr RefreshPPUState
         jmp @WaitForBoatToArriveAtPort
 @IncreasePowerLevel:
@@ -4225,193 +4227,219 @@ EncounterClampWorksetMinimumYDoubled:
         rts
 
 ; ----------------------------------------------------------------------------
-UpdateEntitySprites:
-        @TempUnknown = $0336
-        lda     #$0C                            ; 9A37 A9 0C                    ..
-        sta     $46                             ; 9A39 85 46                    .F
-        lda     #$3F                            ; 9A3B A9 3F                    .?
-        sta     $47                             ; 9A3D 85 47                    .G
-        lda     #<PlayerData                            ; 9A3F A9 80                    ..
-        sta     WorksetPtr                             ; 9A41 85 40                    .@
-        lda     #>PlayerData                            ; 9A43 A9 06                    ..
-        sta     WorksetPtr+1                             ; 9A45 85 41                    .A
-        ldx     #$04                            ; 9A47 A2 04                    ..
-        ldy     #$80                            ; 9A49 A0 80                    ..
-        lda     @TempUnknown                           ; 9A4B AD 36 03                 .6.
-        beq     @L9A54                           ; 9A4E F0 04                    ..
-        ldx     #$FC                            ; 9A50 A2 FC                    ..
-        ldy     #$00                            ; 9A52 A0 00                    ..
-@L9A54:
-        stx     $0F                             ; 9A54 86 0F                    ..
-        sty     @TempUnknown                           ; 9A56 8C 36 03                 .6.
-L9A59:
+
+
+SpritesetUpdateScreen:
+        @SpritesetDrawDirection = $0F
+        @EntitySlotsRemaining   = $46
+        @SpriteSlotsRemaining   = $47
+        ; need to check every entity for sprites to draw
+        lda #MaxEntities
+        sta @EntitySlotsRemaining
+        ; and draw a maximum of 63 sprites
+        lda #$3F
+        sta @SpriteSlotsRemaining
+        lda #<PlayerData
+        sta WorksetPtr
+        lda #>PlayerData
+        sta WorksetPtr+1
+        ; every other frame we draw from the top sprite slot
+        ; down to the bottom. reasoning is.. unclear.
+        ldx #$04
+        ldy #$80
+        lda SpriteUpdateDirection
+        beq @InvertDirection
+        ldx #$FC
+        ldy #$00
+@InvertDirection:
+        stx @SpritesetDrawDirection
+        sty SpriteUpdateDirection
+
+@KeepDrawingSprites:
         ; clear bit 1 of the last byte of the entity
-        ldy     #EntityFlags1F
-        lda     (WorksetPtr),y                         ; 9A5B B1 40                    .@
-        and     #$FE                            ; 9A5D 29 FE                    ).
-        sta     (WorksetPtr),y                         ; 9A5F 91 40                    .@
+        ldy #EntityFlags1F
+        lda (WorksetPtr),y
+        and #($FF ^ EntityFlag1FBit1)
+        sta (WorksetPtr),y
         ; check if entity is active, and if so, place out sprites
-        ldy     #EntityHeader
-        lda     (WorksetPtr),y                         ; 9A63 B1 40                    .@
-        tay                                     ; 9A65 A8                       .
-        eor     #$C0                            ; 9A66 49 C0                    I.
-        and     #$C1                            ; 9A68 29 C1                    ).
-        beq     PlaceSprite                           ; 9A6A F0 28                    .(
-L9A6C:
-        lda     WorksetPtr                             ; 9A6C A5 40                    .@
-        clc                                     ; 9A6E 18                       .
-        adc     #$20                            ; 9A6F 69 20                    i 
-        sta     WorksetPtr                             ; 9A71 85 40                    .@
-        lda     WorksetPtr+1                             ; 9A73 A5 41                    .A
-        adc     #$00                            ; 9A75 69 00                    i.
-        sta     WorksetPtr+1                             ; 9A77 85 41                    .A
-        dec     $46                             ; 9A79 C6 46                    .F
-        bne     L9A59                           ; 9A7B D0 DC                    ..
-        ldy     $47                             ; 9A7D A4 47                    .G
-        beq     L9A8E                           ; 9A7F F0 0D                    ..
-L9A81:
-        lda     #$F0                            ; 9A81 A9 F0                    ..
-        sta     SpritePosY,x                         ; 9A83 9D 00 02                 ...
-        txa                                     ; 9A86 8A                       .
-        clc                                     ; 9A87 18                       .
-        adc     $0F                             ; 9A88 65 0F                    e.
-        tax                                     ; 9A8A AA                       .
-        dey                                     ; 9A8B 88                       .
-        bne     L9A81                           ; 9A8C D0 F3                    ..
-L9A8E:
-        lda     #$01                            ; 9A8E A9 01                    ..
-        sta     NMISpriteHandlingDisabled                           ; 9A90 8D 02 03                 ...
-        rts                                     ; 9A93 60                       `
+        ldy #EntityHeader
+        lda (WorksetPtr),y
+        tay
+        eor #%11000000
+        and #%11000001
+        beq @SpritesetDrawForWorkset
 
-; ----------------------------------------------------------------------------
-PlaceSprite:
-        @TempScreenX    = $02
-        @TempScreenY    = $04
-        @TempGFXPointer = $06
-        tya
-        asl     a
-        asl     a
-        and     #$C0
-        sta     $00
-        ; find low x screen coordinate
-        ldy     #EntityX
-        lda     (WorksetPtr),y
-        iny
-        sec
-        sbc     CameraX
-        sta     @TempScreenX
-        ; find high x screen coordinate
-        lda     (WorksetPtr),y
-        iny
-        sbc     CameraX+1
-        sta     @TempScreenX+1
-        ; find low y screen coordinate
-        lda     (WorksetPtr),y
-        iny
-        sec
-        sbc     CameraY
-        sta     @TempScreenY
-        ; find high y screen coordinate
-        lda     (WorksetPtr),y
-        iny
-        sbc     CameraY+1
-        sta     @TempScreenY+1
-        ; find sprite graphics pointer
-        lda     (WorksetPtr),y
-        iny
-        sta     @TempGFXPointer
-        lda     (WorksetPtr),y
-        sta     @TempGFXPointer+1
-
-        ldy     #$00
-        sty     $01
-L9ACC:
-        lda     ($06),y
-        iny
-        cmp     #$80
-        beq     L9B4F
-        bit     $00
-        bvc     L9ADC
-        eor     #$FF
-        sec
-        adc     #$F8
-L9ADC:
+@SpritesetDrawNextWorkset:
+        ; advance to next workset
+        lda WorksetPtr
         clc
-        and     #$FF
-        bmi     L9AEF
-        adc     $02
-        sta     SpritePosX,x
-        lda     $03
-        adc     #$00
-        beq     L9AFA
-        jmp     L9B49
+        adc #$20
+        sta WorksetPtr
+        lda WorksetPtr+1
+        adc #$00
+        sta WorksetPtr+1
+        ; keep going if we have more entities to check.
+        dec @EntitySlotsRemaining
+        bne @KeepDrawingSprites
+        ; otherwise finish up if we're out of sprite slots.
+        ldy @SpriteSlotsRemaining
+        beq @Finished
+        ; otherwise we're done, move the rest of the sprites off screen.
+@MoveUnusedSpritesOffScreen:
+        lda #$F0
+        sta SpritePosY,x
+        txa
+        clc
+        adc @SpritesetDrawDirection
+        tax
+        dey
+        bne @MoveUnusedSpritesOffScreen
+@Finished:
+        ; make sure NMI doesn't remove our sprites.
+        ; and we are finished!
+        lda #$01
+        sta NMISpriteHandlingDisabled
+        rts
 
-; ----------------------------------------------------------------------------
-L9AEF:
-        adc     $02                             ; 9AEF 65 02                    e.
-        sta     SpritePosX,x                         ; 9AF1 9D 03 02                 ...
-        lda     $03                             ; 9AF4 A5 03                    ..
-        adc     #$FF                            ; 9AF6 69 FF                    i.
-        bne     L9B49                           ; 9AF8 D0 4F                    .O
-L9AFA:
-        lda     ($06),y                         ; 9AFA B1 06                    ..
-        bit     $00                             ; 9AFC 24 00                    $.
-        bpl     L9B05                           ; 9AFE 10 05                    ..
-        .byte   $49,$FF,$38,$69,$F8             ; 9B00 49 FF 38 69 F8           I.8i.
-; ----------------------------------------------------------------------------
-L9B05:
-        clc                                     ; 9B05 18                       .
-        and     #$FF                            ; 9B06 29 FF                    ).
-        bmi     L9B18                           ; 9B08 30 0E                    0.
-        adc     $04                             ; 9B0A 65 04                    e.
-        sta     SpritePosY,x                         ; 9B0C 9D 00 02                 ...
-        lda     $05                             ; 9B0F A5 05                    ..
-        adc     #$00                            ; 9B11 69 00                    i.
-        beq     L9B23                           ; 9B13 F0 0E                    ..
-        jmp     L9B49                           ; 9B15 4C 49 9B                 LI.
-
-; ----------------------------------------------------------------------------
-L9B18:
-        adc     $04                             ; 9B18 65 04                    e.
-        sta     SpritePosY,x                         ; 9B1A 9D 00 02                 ...
-        lda     $05                             ; 9B1D A5 05                    ..
-        adc     #$FF                            ; 9B1F 69 FF                    i.
-        bne     L9B49                           ; 9B21 D0 26                    .&
-L9B23:
-        lda     SpritePosY,x                         ; 9B23 BD 00 02                 ...
-        cmp     #$F0                            ; 9B26 C9 F0                    ..
-        bcs     L9B49                           ; 9B28 B0 1F                    ..
-        iny                                     ; 9B2A C8                       .
-        lda     ($06),y                         ; 9B2B B1 06                    ..
-        iny                                     ; 9B2D C8                       .
-        sta     SpriteTile,x                         ; 9B2E 9D 01 02                 ...
-        lda     ($06),y                         ; 9B31 B1 06                    ..
-        iny                                     ; 9B33 C8                       .
-        eor     $00                             ; 9B34 45 00                    E.
-        sta     SpriteAttr,x                         ; 9B36 9D 02 02                 ...
-        lda     #$01                            ; 9B39 A9 01                    ..
-        sta     $01                             ; 9B3B 85 01                    ..
-        txa                                     ; 9B3D 8A                       .
-        clc                                     ; 9B3E 18                       .
-        adc     $0F                             ; 9B3F 65 0F                    e.
-        tax                                     ; 9B41 AA                       .
-        dec     $47                             ; 9B42 C6 47                    .G
-        bne     L9ACC                           ; 9B44 D0 86                    ..
-        .byte   $4C,$8E,$9A                     ; 9B46 4C 8E 9A                 L..
-; ----------------------------------------------------------------------------
-L9B49:
-        iny                                     ; 9B49 C8                       .
-        iny                                     ; 9B4A C8                       .
-        iny                                     ; 9B4B C8                       .
-        jmp     L9ACC                           ; 9B4C 4C CC 9A                 L..
-
-; ----------------------------------------------------------------------------
-L9B4F:
-        ldy     #$1F                            ; 9B4F A0 1F                    ..
-        lda     (WorksetPtr),y                         ; 9B51 B1 40                    .@
-        ora     $01                             ; 9B53 05 01                    ..
-        sta     (WorksetPtr),y                         ; 9B55 91 40                    .@
-        jmp     L9A6C                           ; 9B57 4C 6C 9A                 Ll.
+@SpritesetDrawForWorkset:
+        @ScreenX = $02
+        @ScreenY = $04
+        @SpritesetPtr = $06
+        tya
+        asl a
+        asl a
+        and #$C0
+        sta $00
+        ; find low x screen coordinate
+        ldy #EntityX
+        lda (WorksetPtr),y
+        iny
+        sec
+        sbc CameraX
+        sta @ScreenX
+        ; find high x screen coordinate
+        lda (WorksetPtr),y
+        iny
+        sbc CameraX+1
+        sta @ScreenX+1
+        ; find low y screen coordinate
+        lda (WorksetPtr),y
+        iny
+        sec
+        sbc CameraY
+        sta @ScreenY
+        ; find high y screen coordinate
+        lda (WorksetPtr),y
+        iny
+        sbc CameraY+1
+        sta @ScreenY+1
+        ; find sprite graphics pointer
+        lda (WorksetPtr),y
+        iny
+        sta @SpritesetPtr
+        lda (WorksetPtr),y
+        sta @SpritesetPtr+1
+        ; clear some flags
+        ldy #$00
+        sty $01
+@DrawNextSprite:
+        ; load sprite X offset
+        lda (@SpritesetPtr),y
+        iny
+        ; If sprite X offset is $80, we've drawn all the sprites.
+        ; So let's exit!
+        cmp #$80
+        beq @SpritesetDrawFinishEntity
+        bit $00
+        bvc @CheckXPosition
+        eor #%11111111
+        sec
+        adc #%11111000
+@CheckXPosition:
+        clc
+        and #%11111111
+        bmi @NegativeXOffset
+        ; add sprite relative X position to entity position.
+        adc @ScreenX
+        sta SpritePosX,x
+        lda @ScreenX+1
+        ; skip if sprite will be off screen, otherwise continue.
+        adc #$00
+        beq @DoneCheckingX
+        jmp @SkipToNextSpritesetSprite
+@NegativeXOffset:
+        ; subtract sprite relative X position from entity position.
+        adc @ScreenX
+        sta SpritePosX,x
+        lda @ScreenX+1
+        ; skip if sprite will be off screen, otherwise continue.
+        adc #$FF
+        bne @SkipToNextSpritesetSprite
+@DoneCheckingX:
+        lda (@SpritesetPtr),y
+        bit $00
+        bpl @CheckYPosition
+        eor #%11111111
+        sec
+        adc #%11111000
+@CheckYPosition:
+        clc
+        and #%11111111
+        bmi @NegativeYOffset
+        ; add sprite relative Y position to entity position.
+        adc @ScreenY
+        sta SpritePosY,x
+        lda @ScreenY+1
+        ; skip if sprite will be off screen, otherwise continue.
+        adc #$00
+        beq @DoneCheckingY
+        jmp @SkipToNextSpritesetSprite
+@NegativeYOffset:
+        ; subtract sprite relative Y position from entity position.
+        adc @ScreenY
+        sta SpritePosY,x
+        lda @ScreenY+1
+        ; skip if sprite will be off screen, otherwise continue.
+        adc #$FF
+        bne @SkipToNextSpritesetSprite
+@DoneCheckingY:
+        ; if the sprite we're replacing is not offscreen,
+        ; we should just let it be.
+        lda SpritePosY,x
+        cmp #$F0
+        bcs @SkipToNextSpritesetSprite
+        ; update sprite tile
+        iny
+        lda (@SpritesetPtr),y
+        iny
+        sta SpriteTile,x
+        ; update sprite attributes
+        lda (@SpritesetPtr),y
+        iny
+        eor $00
+        sta SpriteAttr,x
+        ; mark as active.
+        lda #$01
+        sta $01
+        txa
+        clc
+        adc @SpritesetDrawDirection
+        tax
+        dec @SpriteSlotsRemaining
+        bne @DrawNextSprite
+        jmp @Finished
+@SkipToNextSpritesetSprite:
+        ; increment to next sprite
+        iny
+        iny
+        iny
+        jmp @DrawNextSprite
+@SpritesetDrawFinishEntity:
+        ldy #EntityFlags1F
+        lda (WorksetPtr),y
+        ora $01
+        sta (WorksetPtr),y
+        jmp @SpritesetDrawNextWorkset
 
 ; ----------------------------------------------------------------------------
 EncounterRunProjectiles:
@@ -9864,7 +9892,7 @@ LCFD6:
         jsr     BonusRunPlayer                           ; CFDC 20 B6 D1                  ..
         jsr     BonusRunProjectiles                           ; CFDF 20 8D 9B                  ..
         jsr     BonusRunJellyfish                           ; CFE2 20 7E D2                  ~.
-        jsr     UpdateEntitySprites                           ; CFE5 20 37 9A                  7.
+        jsr     SpritesetUpdateScreen                           ; CFE5 20 37 9A                  7.
         jsr     AdvanceWaterAnimation                           ; CFE8 20 B6 A9                  ..
         jsr     SetNextPendingBGUpdate                           ; CFEB 20 5F 8B                  _.
         jsr     RefreshPPUState                           ; CFEE 20 83 8B                  ..
@@ -11421,7 +11449,7 @@ EnterOutroScreen:
 @WaitUntilJawsDisabled:
         jsr WaitFor1Frame
         jsr OutroRunJawsDeath
-        jsr UpdateEntitySprites
+        jsr SpritesetUpdateScreen
         lda PlayerData + EntityHeader
         bne @WaitUntilJawsDisabled
         jsr PPUDisableNMI
@@ -11454,7 +11482,7 @@ EnterOutroScreen:
 @WaitUntilAnimationFinish:
         jsr WaitFor1Frame
         jsr OutroRunPlaneAnimation
-        jsr UpdateEntitySprites
+        jsr SpritesetUpdateScreen
         lda PlayerData + EntityHeader
         bne @WaitUntilAnimationFinish
         ldy #$3C
