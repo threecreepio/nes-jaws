@@ -127,7 +127,8 @@ VRAMBuffer            = $0102
 EntityData            = $0680 ; 680 - 87F
 PlayerData            = EntityData
 FirstNonPlayerEntity  = EntityData + ( 1 * $20)
-PlayerProjectile1Data = FirstNonPlayerEntity
+PlayerProjectile1Data  = FirstNonPlayerEntity
+MapSubmarineEntityData = FirstNonPlayerEntity
 PlayerProjectile2Data = EntityData + ( 2 * $20)
 PlayerProjectile3Data = EntityData + ( 3 * $20)
 JawsData              = EntityData + ( 4 * $20)
@@ -221,10 +222,15 @@ EntityV18             = $18
 EntityV19             = $19
 EntityV1A             = $1A
 EntityV1C             = $1C
-EntityV1D             = $1D
+EntityInvincibilityFrames             = $1D
 EntityV1E             = $1E
-EntityV1F             = $1F
+EntityFlags1F             = $1F
 
+
+EntityFlag1FBit2        = %00000010
+EntityFlag1FHitDetected = %00100000
+EntityFlag1FBit7        = %01000000
+EntityFlag1FBit8        = %10000000
 
 EntityMovementStill = %00001000
 EntityMovementNorth = %00000110
@@ -232,7 +238,15 @@ EntityMovementSouth = %00000010
 EntityMovementWest  = %00000100
 EntityMovementEast  = %00000000
 
+EntityTypePlayerBoat        = $00
+EntityTypePlayerSubmarine   = $01
+EntityTypePlayerSwim        = $02
 EntityTypeParachuteBomb     = $04
+
+EntityTypeProjectileSubmarineBomb     = $01
+EntityTypeProjectileSubmarineBullet   = $02
+EntityTypeProjectileHarpoon           = $03
+
 
 EntityHeaderActive          = %10000000
 EntityHeader7               = %01000000
@@ -1036,7 +1050,7 @@ RunPlayerDeathAnimation:
         jmp WorksetSave
 @L8681:
         lda #$01
-        bit Workset + EntityV1F
+        bit Workset + EntityFlags1F
         bne @KeepAnimating
         lda #$00
         sta Workset + EntityHeader
@@ -1725,11 +1739,11 @@ PPURenderHorizontal:
 
 ; seemingly unused code?
 ; ----------------------------------------------------------------------------
-        .byte   $AD,$0E,$03,$09,$04,$8D,$0E,$03 ; 8C02 AD 0E 03 09 04 8D 0E 03  ........
-        .byte   $8D,$01,$20,$60,$85,$17,$18,$A9 ; 8C0A 8D 01 20 60 85 17 18 A9  .. `....
-        .byte   $00,$24,$17,$10,$03,$A9,$0F,$38 ; 8C12 00 24 17 10 03 A9 0F 38  .$.....8
-        .byte   $66,$17,$6A,$66,$17,$6A,$66,$17 ; 8C1A 66 17 6A 66 17 6A 66 17  f.jf.jf.
-        .byte   $6A,$66,$17,$6A,$85,$16,$60     ; 8C22 6A 66 17 6A 85 16 60     jf.j..`
+.byte   $AD,$0E,$03,$09,$04,$8D,$0E,$03
+.byte   $8D,$01,$20,$60,$85,$17,$18,$A9
+.byte   $00,$24,$17,$10,$03,$A9,$0F,$38
+.byte   $66,$17,$6A,$66,$17,$6A,$66,$17
+.byte   $6A,$66,$17,$6A,$85,$16,$60    
 
 ;
 ; this procedure takes a value from the A register and:
@@ -1778,8 +1792,8 @@ WaitForYFrames:
 
 ; seemingly unused code?
 ; ----------------------------------------------------------------------------
-        .byte   $A0,$3C,$20,$50,$8C,$CA,$D0,$F8 ; 8C57 A0 3C 20 50 8C CA D0 F8  .< P....
-        .byte   $60                             ; 8C5F 60                       `
+.byte   $A0,$3C,$20,$50,$8C,$CA,$D0,$F8
+.byte   $60                            
 ; ----------------------------------------------------------------------------
 
 ; waits for roughly 1300 * Y cycles by calling dex and bne over repeatedly.
@@ -2523,22 +2537,22 @@ MapRunPlayerAnimation:
 
 ; first byte is OR'ed with EntityHeader, used to flip the sprites.
 @BoatAnimations:
-.byte $00,AnimationMapBoatEW
-.byte $00,AnimationMapBoatEW        ; boat heading east
-.byte $00,AnimationMapBoatS
-.byte $00,AnimationMapBoatS         ; boat heading south
-.byte $10,AnimationMapBoatEW
-.byte $10,AnimationMapBoatEW        ; boat heading west
-.byte $00,AnimationMapBoatN
-.byte $00,AnimationMapBoatN         ; boat heading north
-.byte $00,AnimationMapBoatStillEW
-.byte $00,AnimationMapBoatStillEW   ; boat facing east
-.byte $00,AnimationMapBoatStillS
-.byte $00,AnimationMapBoatStillS    ; boat facing south
-.byte $10,AnimationMapBoatStillEW
-.byte $10,AnimationMapBoatStillEW   ; boat facing west
-.byte $00,AnimationMapBoatStillN
-.byte $00,AnimationMapBoatStillN    ; boat facing north
+        .byte $00,AnimationMapBoatEW
+        .byte $00,AnimationMapBoatEW        ; boat heading east
+        .byte $00,AnimationMapBoatS
+        .byte $00,AnimationMapBoatS         ; boat heading south
+        .byte $10,AnimationMapBoatEW
+        .byte $10,AnimationMapBoatEW        ; boat heading west
+        .byte $00,AnimationMapBoatN
+        .byte $00,AnimationMapBoatN         ; boat heading north
+        .byte $00,AnimationMapBoatStillEW
+        .byte $00,AnimationMapBoatStillEW   ; boat facing east
+        .byte $00,AnimationMapBoatStillS
+        .byte $00,AnimationMapBoatStillS    ; boat facing south
+        .byte $10,AnimationMapBoatStillEW
+        .byte $10,AnimationMapBoatStillEW   ; boat facing west
+        .byte $00,AnimationMapBoatStillN
+        .byte $00,AnimationMapBoatStillN    ; boat facing north
 
 ; ----------------------------------------------------------------------------
 MapGetDPadDirection:
@@ -2566,27 +2580,27 @@ MapGetDPadDirection:
 
 
 FacingDirectionsPerEntityType:
-.addr FacingDirectionsBoat
-.addr FacingDirectionsBoat
-.addr FacingDirectionsBoat
+        .addr FacingDirectionsBoat
+        .addr FacingDirectionsBoat
+        .addr FacingDirectionsBoat
 
 FacingDirectionsBoat:
-.byte $08 ; no directions held
-.byte $06 ; up
-.byte $02 ; down
-.byte $08 ; up + down
-.byte $04 ; left
-.byte $04 ; left + up
-.byte $04 ; left + down
-.byte $08 ; left + up + down
-.byte $00 ; right
-.byte $00 ; right + up
-.byte $00 ; right + down
-.byte $08 ; right + up + down
-.byte $08 ; right + left
-.byte $08 ; right + left + up
-.byte $08 ; right + left + down
-.byte $08 ; right + left + up + down
+        .byte $08 ; no directions held
+        .byte $06 ; up
+        .byte $02 ; down
+        .byte $08 ; up + down
+        .byte $04 ; left
+        .byte $04 ; left + up
+        .byte $04 ; left + down
+        .byte $08 ; left + up + down
+        .byte $00 ; right
+        .byte $00 ; right + up
+        .byte $00 ; right + down
+        .byte $08 ; right + up + down
+        .byte $08 ; right + left
+        .byte $08 ; right + left + up
+        .byte $08 ; right + left + down
+        .byte $08 ; right + left + up + down
 
 ; ----------------------------------------------------------------------------
 MapUpdatePlayerSpeed:
@@ -2667,49 +2681,55 @@ MapShowSubmarine:
         lda MapSubmarineSpawnLocations+1,x
         sta MapSubmarineY
         lda #$00
-        sta $06A0
+        sta MapSubmarineEntityData
 @Done:
-        bit $06A0
-        bvc L91AF
+        bit MapSubmarineEntityData
+        bvc SpawnMapSubmarineEntity
         rts
 
 ; ----------------------------------------------------------------------------
-L91AF:
-        lda     #<PlayerProjectile1Data
-        sta     WorksetPtr
-        lda     #>PlayerProjectile1Data
-        sta     WorksetPtr+1
-        jsr     WorksetLoad
-        lda     #(EntityHeaderActive | EntityHeader7)
-        sta     Workset + EntityHeader
-        lda     #$00
-        sta     Workset + (EntityX + 1)
-        sta     Workset + (EntityY + 1)
-        lda     MapSubmarineX
+SpawnMapSubmarineEntity:
+        ; load map submarine entity data
+        lda #<MapSubmarineEntityData
+        sta WorksetPtr
+        lda #>MapSubmarineEntityData
+        sta WorksetPtr+1
+        jsr WorksetLoad
+        ; mark the entity as activated
+        lda #(EntityHeaderActive | EntityHeader7)
+        sta Workset + EntityHeader
+        ; and clear out any old location data.
+        lda #$00
+        sta Workset + (EntityX + 1)
+        sta Workset + (EntityY + 1)
+        ; convert submarine X coordinate to pixel position.
+        lda MapSubmarineX
         sec
-        rol     a
-        rol     Workset + (EntityX  + 1)
-        asl     a
-        rol     Workset + (EntityX  + 1)
-        asl     a
-        rol     Workset + (EntityX  + 1)
-        asl     a
-        rol     Workset + (EntityX  + 1)
-        sta     Workset + EntityX
-        lda     MapSubmarineY
+        rol a
+        rol Workset + (EntityX  + 1)
+        asl a
+        rol Workset + (EntityX  + 1)
+        asl a
+        rol Workset + (EntityX  + 1)
+        asl a
+        rol Workset + (EntityX  + 1)
+        sta Workset + EntityX
+        ; convert submarine Y coordinate to pixel position.
+        lda MapSubmarineY
         sec
-        rol     a
-        rol     Workset + (EntityY + 1)
-        asl     a
-        rol     Workset + (EntityY + 1)
-        asl     a
-        rol     Workset + (EntityY + 1)
-        asl     a
-        rol     Workset + (EntityY + 1)
-        sta     Workset + EntityY
-        lda     #AnimationMapSubmarine
-        jsr     WorksetAnimationPlay
-        jmp     WorksetSave
+        rol a
+        rol Workset + (EntityY + 1)
+        asl a
+        rol Workset + (EntityY + 1)
+        asl a
+        rol Workset + (EntityY + 1)
+        asl a
+        rol Workset + (EntityY + 1)
+        sta Workset + EntityY
+        ; and play the submarine animation.
+        lda #AnimationMapSubmarine
+        jsr WorksetAnimationPlay
+        jmp WorksetSave
 
 ; ----------------------------------------------------------------------------
 MapSubmarineSpawnLocations:
@@ -2722,553 +2742,640 @@ MapSubmarineSpawnLocations:
 
 ; ----------------------------------------------------------------------------
 EncounterRunPlayer:
-        jsr     LoadPlayerWorkset                           ; 91F8 20 4C 97                  L.
-        lda     Workset + EntityType                             ; 91FB A5 21                    .!
-        jsr     JumpEngine                           ; 91FD 20 39 8F                  9.
-        .addr   EncounterRunPlayerBoat
-        .addr   EncounterRunPlayerSubmarine
-        .addr   EncounterRunPlayerSwim
+        jsr LoadPlayerWorkset
+        lda Workset + EntityType
+        jsr JumpEngine
+        .addr EncounterRunPlayerBoat
+        .addr EncounterRunPlayerSubmarine
+        .addr EncounterRunPlayerSwim
 
 ; ----------------------------------------------------------------------------
 EncounterRunPlayerBoat:
-        bit     Workset + EntityHeader
-        bvs     L9231
-        lda     #$80
-        sta     Workset + EntityX
-        lda     #$10
-        sta     Workset + EntityX  + 1
-        lda     WaterHeight
+        bit Workset + EntityHeader
+        bvs @BoatIsActive
+        ; place boat at starting location
+        lda #$80
+        sta Workset + EntityX
+        lda #$10
+        sta Workset + EntityX  + 1
+        lda WaterHeight
         sec
-        sbc     #$03
-        sta     Workset + EntityY
-        lda     WaterHeight+1
-        sbc     #$00
-        sta     Workset + EntityY + 1
-        lda     #$20
-        sta     Workset + EntityV1D
-        lda     #AnimationEncounterBoat
-        jsr     WorksetAnimationPlay
-        lda     #(EntityHeaderActive | EntityHeader7)
-        sta     Workset + EntityHeader
-        jmp     WorksetSave
-L9231:
-        lda     EncounterJawsActive
-        beq     L923D
-        dec     Workset + EntityV1D
-        beq     L9241
-        jmp     WorksetSave
+        sbc #$03
+        sta Workset + EntityY
+        lda WaterHeight+1
+        sbc #$00
+        sta Workset + EntityY + 1
+        ; set iframes to prevent immediate boat despawn.
+        lda #$20
+        sta Workset + EntityInvincibilityFrames
+        ; and play our boat animation!
+        lda #AnimationEncounterBoat
+        jsr WorksetAnimationPlay
+        lda #(EntityHeaderActive | EntityHeader7)
+        sta Workset + EntityHeader
+        jmp WorksetSave
+@BoatIsActive:
+        lda EncounterJawsActive
+        beq @JawsIsActive
+        ; if jaws is not active, we want to wait until iframes
+        ; run out and then despawn the boat.
+        dec Workset + EntityInvincibilityFrames
+        beq RemovePlayerVehicle
+        jmp WorksetSave
 ; -------------------------------------------
-L923D:
-        bit     Workset + EntityV1F
-        bpl     L925F
-L9241:
-        lda     Workset + EntityHeader
-        and     #($FF ^ EntityHeader7)                   ; clear flag 7
-        sta     Workset + EntityHeader
-        lda     #SFXEncounterBoatDespawn
-        jsr     SoundPlay
-        lda     PlayerHasSubmarine
-        bne     L9258
-        lda     #$02
-        sta     Workset + EntityType
-        jmp     EncounterRunPlayerSwim
+@JawsIsActive:
+        bit Workset + EntityFlags1F
+        bpl EncounterHandleBoatInputs
+RemovePlayerVehicle:
+        lda Workset + EntityHeader
+        and #($FF ^ EntityHeader7)                   ; clear flag 7
+        sta Workset + EntityHeader
+        ; play splashy noise
+        lda #SFXEncounterBoatDespawn
+        jsr SoundPlay
+        ; turn into submarine if player has collected it.
+        lda PlayerHasSubmarine
+        bne @ConvertToSubmarine
+        ; otherwise it's time to swim
+        lda #EntityTypePlayerSwim
+        sta Workset + EntityType
+        jmp EncounterRunPlayerSwim
+@ConvertToSubmarine:
+        lda #EntityTypePlayerSubmarine
+        sta Workset + EntityType
+        jmp EncounterRunPlayerSubmarine
 
 ; ----------------------------------------------------------------------------
-L9258:
-        lda     #$01                            ; 9258 A9 01                    ..
-        sta     Workset + EntityType                             ; 925A 85 21                    .!
-        jmp     EncounterRunPlayerSubmarine                           ; 925C 4C FE 92                 L..
-
-; ----------------------------------------------------------------------------
-L925F:
-        bit     Joy1Inputs
-        bpl     L9297
-        lda     Workset + EntityHeader
-        and     #($FF ^ EntityHeaderFacingLeft) ; clear left facing flag
-        sta     Workset + EntityHeader
-        lda     PlayerCrabLevel
-        asl     a
+EncounterHandleBoatInputs:
+        bit Joy1Inputs
+        bpl @CheckLeftInput
+        ; move to the right
+        lda Workset + EntityHeader
+        and #($FF ^ EntityHeaderFacingLeft) ; clear left facing flag
+        sta Workset + EntityHeader
+        ; load crab level to determine speed
+        lda PlayerCrabLevel
+        asl a
         tax
-        lda     Workset + EntityXSubpixel
+        ; andn increment position
+        lda Workset + EntityXSubpixel
         clc
-        adc     L92F4,x
-        sta     Workset + EntityXSubpixel
-        lda     Workset + EntityX
-        adc     L92F5,x
-        sta     Workset + EntityX
+        adc EncounterPlayerBoatSpeedsByCrabLevel,x
+        sta Workset + EntityXSubpixel
+        lda Workset + EntityX
+        adc EncounterPlayerBoatSpeedsByCrabLevel+1,x
+        sta Workset + EntityX
         tay
-        lda     Workset + EntityX  + 1
-        adc     #$00
-        sta     Workset + EntityX  + 1
-        cpy     #$E0
-        sbc     #$10
-        bcc     L9297
-        .byte   $A9,$00,$85,$2C,$A9,$E0,$85,$22
-        .byte   $A9,$10,$85,$23
-; ----------------------------------------------------------------------------
-L9297:
-        bit     Joy1Inputs
-        bvc     L92CF
-        lda     Workset + EntityHeader
-        ora     #EntityHeaderFacingLeft
-        sta     Workset + EntityHeader
-        lda     PlayerCrabLevel
-        asl     a
+        ; add carry
+        lda Workset + EntityX  + 1
+        adc #$00
+        sta Workset + EntityX  + 1
+        ; check so we're not at the right edge of the screen
+        cpy #$E0
+        sbc #$10
+        bcc @CheckLeftInput
+        ; if so, place boat on the right edge
+        lda #$00
+        sta Workset + EntityXSubpixel
+        lda #$E0
+        sta Workset + EntityX
+        lda #$10
+        sta Workset + EntityX + 1
+@CheckLeftInput:
+        bit Joy1Inputs
+        bvc @CheckFireInputs
+        ; move to the left
+        lda Workset + EntityHeader
+        ora #EntityHeaderFacingLeft
+        sta Workset + EntityHeader
+        ; load crab level to determine speed
+        lda PlayerCrabLevel
+        asl a
         tax
-        lda     Workset + EntityXSubpixel
+        ; andn increment position
+        lda Workset + EntityXSubpixel
         sec
-        sbc     L92F4,x
-        sta     Workset + EntityXSubpixel
-        lda     Workset + EntityX
-        sbc     L92F5,x
-        sta     Workset + EntityX
+        sbc EncounterPlayerBoatSpeedsByCrabLevel,x
+        sta Workset + EntityXSubpixel
+        lda Workset + EntityX
+        sbc EncounterPlayerBoatSpeedsByCrabLevel+1,x
+        sta Workset + EntityX
         tay
-        lda     Workset + EntityX  + 1
-        sbc     #$00
-        sta     Workset + EntityX  + 1
-        cpy     #$1F
-        sbc     #$10
-        bcs     L92CF
-        lda     #$00
-        sta     Workset + EntityXSubpixel
-        lda     #$20
-        sta     Workset + EntityX
-        lda     #$10
-        sta     Workset + EntityX  + 1
-L92CF:
-        lda     #$03
-        bit     Joy1Pressed
-        beq     L92F1
-        jsr     L95D0
-        bmi     L92F1
-        lda     #$00
-        sta     $06A1,x
-        lda     #$01
-        bit     Joy1Pressed
-        beq     L92EC
-        lda     #$80
-        jmp     L92EE
+        ; add carry
+        lda Workset + EntityX  + 1
+        sbc #$00
+        sta Workset + EntityX  + 1
+        ; check so we're not at the left edge of the screen
+        cpy #$1F
+        sbc #$10
+        bcs @CheckFireInputs
+        ; if so, place boat on the left edge
+        lda #$00
+        sta Workset + EntityXSubpixel
+        lda #$20
+        sta Workset + EntityX
+        lda #$10
+        sta Workset + EntityX  + 1
+@CheckFireInputs:
+        ; check for A or B presses
+        lda #%00000011
+        bit Joy1Pressed
+        beq @Done
+        ; check for empty projectile slot
+        jsr FindEmptyProjectileSlot
+        bmi @Done
+        ; found one, fire away!
+        lda #$00
+        sta PlayerProjectile1Data + EntityType,x
+        ; check if we want to fire to the left
+        lda #$01
+        bit Joy1Pressed
+        beq @FireLeft
+        ; otherwise fire to the right!
+        lda #EntityHeaderActive
+        jmp @Fire
+@FireLeft:
+        lda #(EntityHeaderActive | EntityHeaderFacingLeft)
+@Fire:
+        sta PlayerProjectile1Data + EntityHeader,x
+@Done:
+        jmp WorksetSave
 
 ; ----------------------------------------------------------------------------
-L92EC:
-        .byte   $A9,$90                         ; 92EC A9 90                    ..
-; ----------------------------------------------------------------------------
-L92EE:
-        sta     $06A0,x                         ; 92EE 9D A0 06                 ...
-L92F1:
-        jmp     WorksetSave                           ; 92F1 4C 61 97                 La.
+EncounterPlayerBoatSpeedsByCrabLevel:
+        .byte $00,$01
+        .byte $40,$01
+        .byte $80,$01
+        .byte $C0,$01
+        .byte $00,$02
 
-; ----------------------------------------------------------------------------
-L92F4:
-        .byte   $00                             ; 92F4 00                       .
-L92F5:
-        .byte   $01,$40,$01,$80,$01,$C0,$01,$00 ; 92F5 01 40 01 80 01 C0 01 00  .@......
-        .byte   $02                             ; 92FD 02                       .
 ; ----------------------------------------------------------------------------
 EncounterRunPlayerSubmarine:
-        bit     Workset + EntityHeader
-        bvs     L931A
-        lda     Workset + EntityHeader
-        and     #(EntityHeaderActive | EntityHeaderFacingLeft)
-        ora     #(EntityHeader7 | EntityHeader2)
-        sta     Workset + EntityHeader
-        lda     #AnimationEncounterSubmarine
-        jsr     WorksetAnimationPlay
-        lda     #$00
-        sta     Workset + EntityV1F
-        lda     #$B4
-        sta     Workset + EntityV1D
-        jmp     WorksetSave
+        bit Workset + EntityHeader
+        bvs @SubmarineActive
+        ; mark as active, and facing right
+        lda Workset + EntityHeader
+        and #(EntityHeaderActive | EntityHeaderFacingLeft)
+        ; also set these flags...
+        ora #(EntityHeader7 | EntityHeader2)
+        sta Workset + EntityHeader
+        lda #AnimationEncounterSubmarine
+        jsr WorksetAnimationPlay
+        lda #$00
+        sta Workset + EntityFlags1F
+        ; give some iframes after spawning
+        lda #$B4
+        sta Workset + EntityInvincibilityFrames
+        jmp WorksetSave
+@SubmarineActive:
+        lda Workset + EntityInvincibilityFrames
+        beq @CheckForDamage
+        dec Workset + EntityInvincibilityFrames
+        bne @HandleSubmarineInputs
+        lda Workset + EntityHeader
+        and #($FF ^ EntityHeader2)
+        sta Workset + EntityHeader
+@CheckForDamage:
+        bit Workset + EntityFlags1F
+        bpl @HandleSubmarineInputs
+        ; time to despawn the submarine
+        lda Workset + EntityHeader
+        and #($FF ^ EntityHeader7)
+        sta Workset + EntityHeader
+        ; remove submarine flag
+        lda #$00
+        sta PlayerHasSubmarine
+        ; and turn player into a swimmer, with a splash sound.
+        lda #EntityTypePlayerSwim
+        sta Workset + EntityType
+        lda #SFXEncounterBoatDespawnDupe
+        jsr SoundPlay
+        jmp EncounterRunPlayerSwim
+@HandleSubmarineInputs:
+        bit Joy1Inputs
+        bpl @NotHoldingRight
+        ; player is holding right
+        ; set acceleration temp values
+        lda #$20
+        sta $16
+        lda #$00
+        sta $17
+        ; get max speed for a given crab level
+        lda PlayerCrabLevel
+        asl a
+        tax
+        ; store speed in temp values used by ApproachSpeed2
+        lda EncounterPlayerSubmarineSpeedsByCrabLevel,x
+        sta $18
+        lda EncounterPlayerSubmarineSpeedsByCrabLevel+1,x
+        sta $19
+        ldx #EntityXSubspeed
+        jsr ApproachSpeed2
+        ; make sure the player is facing right
+        lda Workset + EntityHeader
+        and #($FF ^ EntityHeaderFacingLeft)
+        sta Workset + EntityHeader
+        ; and check vertical movement!
+        jmp @CheckDownInput
+@NotHoldingRight:
+        bvs @HoldingLeft
+        ; set some vertical movement values
+        ldy #$10
+        jsr SlowdownXByY
+        jmp @CheckDownInput
+@HoldingLeft:
+        ; player is holding left
+        ; set acceleration temp values
+        lda #$E0
+        sta $16
+        lda #$FF
+        sta $17
+        ; get max speed for a given crab level
+        lda PlayerCrabLevel
+        asl a
+        tax
+        ; store speed in temp values used by ApproachSpeed2
+        lda EncounterPlayerSubmarineNegativeSpeedsByCrabLevel,x
+        sta $18
+        lda EncounterPlayerSubmarineNegativeSpeedsByCrabLevel+1,x
+        sta $19
+        ldx #EntityXSubspeed
+        jsr ApproachSpeed2
+        ; make sure the player is facing left
+        lda Workset + EntityHeader
+        ora #EntityHeaderFacingLeft
+        sta Workset + EntityHeader
+@CheckDownInput:
+        lda #JOY_DOWN
+        bit Joy1Inputs
+        beq @NotHoldingDown
+        ; player is holding down
+        ; set acceleration temp values
+        lda #$20
+        sta $16
+        lda #$00
+        sta $17
+        ; get max speed for a given crab level
+        lda PlayerCrabLevel
+        asl a
+        tax
+        ; store speed in temp values used by ApproachSpeed2
+        lda EncounterPlayerSubmarineSpeedsByCrabLevel,x
+        sta $18
+        lda EncounterPlayerSubmarineSpeedsByCrabLevel+1,x
+        sta $19
+        ldx #EntityYSubspeed
+        jsr ApproachSpeed2
+        jmp @MoveSubmarinePlayer
+@NotHoldingDown:
+        lda #JOY_UP
+        bit Joy1Inputs
+        bne @HoldingUp
+        ldy #$10
+        jsr SlowdownYByY
+        jmp @MoveSubmarinePlayer
+@HoldingUp:
+        ; player is holding up
+        ; set acceleration temp values
+        lda #$E0
+        sta $16
+        lda #$FF
+        sta $17
+        ; get max speed for a given crab level
+        lda PlayerCrabLevel
+        asl a
+        tax
+        ; store speed in temp values used by ApproachSpeed2
+        lda EncounterPlayerSubmarineNegativeSpeedsByCrabLevel,x
+        sta $18
+        lda EncounterPlayerSubmarineNegativeSpeedsByCrabLevel+1,x
+        sta $19
+        ldx #EntityYSubspeed
+        jsr ApproachSpeed2
+@MoveSubmarinePlayer:
+        jsr WorksetMoveX
+        jsr WorksetMoveY
+        ldx Workset + EntityX
+        lda Workset + EntityX  + 1
+        ; clamp to the left edge of the screen
+        cpx #$10
+        sbc #$10
+        bcs @CheckRightEdge
+        lda #$10
+        sta Workset + EntityX
+        lda #$10
+        sta Workset + EntityX  + 1
+        bne @WithinXBounds
+@CheckRightEdge:
+        lda Workset + EntityX  + 1
+        ; clamp to the right edge of the screen
+        cpx #$F0
+        sbc #$10
+        bcc @WithinXBounds
+        lda #$F0
+        sta Workset + EntityX
+        lda #$10
+        sta Workset + EntityX  + 1
+@WithinXBounds:
+        jsr EncounterClampWorksetMinimumY
+        bcs @CheckFireProjectile
+        jsr EncounterClampWorksetMaximumY
+@CheckFireProjectile:
+        ; check for A/B inputs in order to fire.
+        lda #(JOY_A | JOY_B)
+        bit Joy1Pressed
+        beq @Done
+        ; player is trying to fire, check for empty slot.
+        ; otherwise finish up.
+        jsr FindEmptyProjectileSlot
+        bmi @Done
+        ; get bullet type based on input (bomb vs bullet)
+        lda #JOY_A
+        bit Joy1Pressed
+        beq @FireBomb
+        lda #EntityTypeProjectileSubmarineBullet
+        bne @SpawnProjectile
+@FireBomb:
+        lda #EntityTypeProjectileSubmarineBomb
+@SpawnProjectile:
+        ; store projectile type
+        sta PlayerProjectile1Data + EntityType,x
+        ; and copy active + facing directions from player
+        lda Workset + EntityHeader
+        and #(EntityHeaderActive | EntityHeaderFacingLeft)
+        ; and store it!
+        sta PlayerProjectile1Data + EntityHeader,x
+@Done:
+        ; we are done, save our workset!
+        jmp WorksetSave
 
 ; ----------------------------------------------------------------------------
-L931A:
-        lda     Workset + EntityV1D
-        beq     L9328
-        dec     Workset + EntityV1D
-        bne     L9343
-        lda     Workset + EntityHeader
-        and     #($FF ^ EntityHeader2)
-        sta     Workset + EntityHeader
-L9328:
-        bit     Workset + EntityV1F
-        bpl     L9343
-        lda     Workset + EntityHeader
-        and     #($FF ^ EntityHeader7)
-        sta     Workset + EntityHeader
-        lda     #$00
-        sta     PlayerHasSubmarine
-        lda     #$02
-        sta     Workset + EntityType
-        lda     #SFXEncounterBoatDespawnDupe
-        jsr     SoundPlay
-        jmp     EncounterRunPlayerSwim
 
-; ----------------------------------------------------------------------------
-L9343:
-        bit     Joy1Inputs                           ; 9343 2C 30 03                 ,0.
-        bpl     L936D                           ; 9346 10 25                    .%
-        lda     #$20                            ; 9348 A9 20                    . 
-        sta     $16                             ; 934A 85 16                    ..
-        lda     #$00                            ; 934C A9 00                    ..
-        sta     $17                             ; 934E 85 17                    ..
-        lda     PlayerCrabLevel                           ; 9350 AD 92 03                 ...
-        asl     a                               ; 9353 0A                       .
-        tax                                     ; 9354 AA                       .
-        lda     L9442,x                         ; 9355 BD 42 94                 .B.
-        sta     $18                             ; 9358 85 18                    ..
-        lda     L9443,x                         ; 935A BD 43 94                 .C.
-        sta     $19                             ; 935D 85 19                    ..
-        ldx     #$10                            ; 935F A2 10                    ..
-        jsr     L9882                           ; 9361 20 82 98                  ..
-        lda     Workset + EntityHeader                             ; 9364 A5 20                    . 
-        and     #($FF ^ EntityHeaderFacingLeft)
-        sta     Workset + EntityHeader                             ; 9368 85 20                    . 
-        jmp     L9399                           ; 936A 4C 99 93                 L..
+EncounterPlayerSubmarineSpeedsByCrabLevel:
+        .byte $00,$01
+        .byte $40,$01
+        .byte $80,$01
+        .byte $C0,$01
+        .byte $00,$02
 
-; ----------------------------------------------------------------------------
-L936D:
-        bvs     L9377                           ; 936D 70 08                    p.
-        ldy     #$10                            ; 936F A0 10                    ..
-        jsr     L98B8                           ; 9371 20 B8 98                  ..
-        jmp     L9399                           ; 9374 4C 99 93                 L..
+EncounterPlayerSubmarineNegativeSpeedsByCrabLevel:
+        .byte $00,$FF
+        .byte $C0,$FE
+        .byte $80,$FE
+        .byte $40,$FE
+        .byte $00,$FE
 
-; ----------------------------------------------------------------------------
-L9377:
-        lda     #$E0                            ; 9377 A9 E0                    ..
-        sta     $16                             ; 9379 85 16                    ..
-        lda     #$FF                            ; 937B A9 FF                    ..
-        sta     $17                             ; 937D 85 17                    ..
-        lda     PlayerCrabLevel                           ; 937F AD 92 03                 ...
-        asl     a                               ; 9382 0A                       .
-        tax                                     ; 9383 AA                       .
-        lda     L944C,x                         ; 9384 BD 4C 94                 .L.
-        sta     $18                             ; 9387 85 18                    ..
-        lda     L944D,x                         ; 9389 BD 4D 94                 .M.
-        sta     $19                             ; 938C 85 19                    ..
-        ldx     #$10                            ; 938E A2 10                    ..
-        jsr     L9882                           ; 9390 20 82 98                  ..
-        lda     Workset + EntityHeader                             ; 9393 A5 20                    . 
-        ora     #EntityHeaderFacingLeft                            ; 9395 09 10                    ..
-        sta     Workset + EntityHeader                             ; 9397 85 20                    . 
-L9399:
-        lda     #$20                            ; 9399 A9 20                    . 
-        bit     Joy1Inputs                           ; 939B 2C 30 03                 ,0.
-        beq     L93BF                           ; 939E F0 1F                    ..
-        lda     #$20                            ; 93A0 A9 20                    . 
-        sta     $16                             ; 93A2 85 16                    ..
-        lda     #$00                            ; 93A4 A9 00                    ..
-        sta     $17                             ; 93A6 85 17                    ..
-        lda     PlayerCrabLevel                           ; 93A8 AD 92 03                 ...
-        asl     a                               ; 93AB 0A                       .
-        tax                                     ; 93AC AA                       .
-        lda     L9442,x                         ; 93AD BD 42 94                 .B.
-        sta     $18                             ; 93B0 85 18                    ..
-        lda     L9443,x                         ; 93B2 BD 43 94                 .C.
-        sta     $19                             ; 93B5 85 19                    ..
-        ldx     #$12                            ; 93B7 A2 12                    ..
-        jsr     L9882                           ; 93B9 20 82 98                  ..
-        jmp     L93EA                           ; 93BC 4C EA 93                 L..
-
-; ----------------------------------------------------------------------------
-L93BF:
-        lda     #$10                            ; 93BF A9 10                    ..
-        bit     Joy1Inputs                           ; 93C1 2C 30 03                 ,0.
-        bne     L93CE                           ; 93C4 D0 08                    ..
-        ldy     #$10                            ; 93C6 A0 10                    ..
-        jsr     L98BD                           ; 93C8 20 BD 98                  ..
-        jmp     L93EA                           ; 93CB 4C EA 93                 L..
-
-; ----------------------------------------------------------------------------
-L93CE:
-        lda     #$E0                            ; 93CE A9 E0                    ..
-        sta     $16                             ; 93D0 85 16                    ..
-        lda     #$FF                            ; 93D2 A9 FF                    ..
-        sta     $17                             ; 93D4 85 17                    ..
-        lda     PlayerCrabLevel                           ; 93D6 AD 92 03                 ...
-        asl     a                               ; 93D9 0A                       .
-        tax                                     ; 93DA AA                       .
-        lda     L944C,x                         ; 93DB BD 4C 94                 .L.
-        sta     $18                             ; 93DE 85 18                    ..
-        lda     L944D,x                         ; 93E0 BD 4D 94                 .M.
-        sta     $19                             ; 93E3 85 19                    ..
-        ldx     #$12                            ; 93E5 A2 12                    ..
-        jsr     L9882                           ; 93E7 20 82 98                  ..
-L93EA:
-        jsr     WorksetMoveX                           ; 93EA 20 FA 97                  ..
-        jsr     WorksetMoveY                           ; 93ED 20 1B 98                  ..
-        ldx     Workset + EntityX                             ; 93F0 A6 22                    ."
-        lda     Workset + EntityX  + 1                            ; 93F2 A5 23                    .#
-        cpx     #$10                            ; 93F4 E0 10                    ..
-        sbc     #$10                            ; 93F6 E9 10                    ..
-        bcs     L9404                           ; 93F8 B0 0A                    ..
-        lda     #$10                            ; 93FA A9 10                    ..
-        sta     Workset + EntityX                             ; 93FC 85 22                    ."
-        lda     #$10                            ; 93FE A9 10                    ..
-        sta     Workset + EntityX  + 1                            ; 9400 85 23                    .#
-        bne     L9414                           ; 9402 D0 10                    ..
-L9404:
-        lda     Workset + EntityX  + 1                            ; 9404 A5 23                    .#
-        cpx     #$F0                            ; 9406 E0 F0                    ..
-        sbc     #$10                            ; 9408 E9 10                    ..
-        bcc     L9414                           ; 940A 90 08                    ..
-        lda     #$F0                            ; 940C A9 F0                    ..
-        sta     Workset + EntityX                             ; 940E 85 22                    ."
-        lda     #$10                            ; 9410 A9 10                    ..
-        sta     Workset + EntityX  + 1                            ; 9412 85 23                    .#
-L9414:
-        jsr     L99F2                           ; 9414 20 F2 99                  ..
-        bcs     L941C                           ; 9417 B0 03                    ..
-        jsr     L99D0                           ; 9419 20 D0 99                  ..
-L941C:
-        lda     #$03                            ; 941C A9 03                    ..
-        bit     Joy1Pressed                           ; 941E 2C 32 03                 ,2.
-        beq     L943F                           ; 9421 F0 1C                    ..
-        jsr     L95D0                           ; 9423 20 D0 95                  ..
-        bmi     L943F                           ; 9426 30 17                    0.
-        lda     #$01                            ; 9428 A9 01                    ..
-        bit     Joy1Pressed                           ; 942A 2C 32 03                 ,2.
-        beq     L9433                           ; 942D F0 04                    ..
-        lda     #$02                            ; 942F A9 02                    ..
-        bne     L9435                           ; 9431 D0 02                    ..
-L9433:
-        .byte   $A9,$01                         ; 9433 A9 01                    ..
-; ----------------------------------------------------------------------------
-L9435:
-        sta     $06A1,x                         ; 9435 9D A1 06                 ...
-        lda     Workset + EntityHeader                             ; 9438 A5 20                    . 
-        and     #(EntityHeaderActive | EntityHeaderFacingLeft)                            ; 943A 29 90                    ).
-        sta     $06A0,x                         ; 943C 9D A0 06                 ...
-L943F:
-        jmp     WorksetSave                           ; 943F 4C 61 97                 La.
-
-; ----------------------------------------------------------------------------
-L9442:
-        .byte   $00                             ; 9442 00                       .
-L9443:
-        .byte   $01,$40,$01,$80,$01,$C0,$01,$00 ; 9443 01 40 01 80 01 C0 01 00  .@......
-        .byte   $02                             ; 944B 02                       .
-L944C:
-        .byte   $00                             ; 944C 00                       .
-L944D:
-        .byte   $FF,$C0,$FE,$80,$FE,$40,$FE,$00 ; 944D FF C0 FE 80 FE 40 FE 00  .....@..
-        .byte   $FE                             ; 9455 FE                       .
 ; ----------------------------------------------------------------------------
 EncounterRunPlayerSwim:
-        bit     Workset + EntityHeader                             ; 9456 24 20                    $ 
-        bvs     L9472                           ; 9458 70 18                    p.
-        lda     Workset + EntityHeader                             ; 945A A5 20                    . 
-        and     #(EntityHeaderActive | EntityHeaderFacingLeft)                            ; 945C 29 90                    ).
-        ora     #(EntityHeader7 | EntityHeader2)                            ; 945E 09 42                    .B
-        sta     Workset + EntityHeader                             ; 9460 85 20                    . 
-        lda     #AnimationEncounterSwim                            ; 9462 A9 23                    .#
-        jsr     WorksetAnimationPlay                           ; 9464 20 AD 97                  ..
-        lda     #$00                            ; 9467 A9 00                    ..
-        sta     Workset + EntityV1F                             ; 9469 85 3F                    .?
-        lda     #$B4                            ; 946B A9 B4                    ..
-        sta     Workset + EntityV1D                             ; 946D 85 3D                    .=
-        jmp     WorksetSave                           ; 946F 4C 61 97                 La.
+        bit Workset + EntityHeader
+        bvs @SwimmerActive
+        ; mark as active, and facing right
+        lda Workset + EntityHeader
+        and #(EntityHeaderActive | EntityHeaderFacingLeft)
+        ; also set these flags...
+        ora #(EntityHeader7 | EntityHeader2)
+        sta Workset + EntityHeader
+        lda #AnimationEncounterSwim
+        jsr WorksetAnimationPlay
+        lda #$00
+        sta Workset + EntityFlags1F
+        ; give some iframes after spawning
+        lda #$B4
+        sta Workset + EntityInvincibilityFrames
+        jmp WorksetSave
+@SwimmerActive:
+        lda Workset + EntityInvincibilityFrames
+        beq @CheckForDamage
+        dec Workset + EntityInvincibilityFrames
+        bne @HandleSwimmerInputs
+        lda Workset + EntityHeader
+        and #($FF ^ EntityHeader2)
+        sta Workset + EntityHeader
+@CheckForDamage:
+        bit Workset + EntityFlags1F
+        bpl @HandleSwimmerInputs
+        ; i'm afraid the player has died.
+        ; play death sound and set the death event!
+        lda #SFXPlayerDeath
+        jsr SoundPlay
+        lda #EventFlagsEncounterPlayerDead
+        sta EventFlags
+        rts
+@HandleSwimmerInputs:
+        bit Joy1Inputs
+        bpl @NotHoldingRight
+        ldy #$10
+        lda #JOY_A
+        bit Joy1Pressed
+        beq @HandleRightInput
+        ; holding A reduces speed
+        ldy #$80
+@HandleRightInput:
+        ; set acceleration temp values
+        sty $16
+        lda #$00
+        sta $17
+        ; get max speed for a given crab level
+        lda PlayerCrabLevel
+        asl a
+        tax
+        ; store speed in temp values used by ApproachSpeed2
+        lda EncounterPlayerSwimSpeedsByCrabLevel,x
+        sta $18
+        lda EncounterPlayerSwimSpeedsByCrabLevel+1,x
+        sta $19
+        ldx #EntityXSubspeed
+        jsr ApproachSpeed2
+        ; make sure the player is facing right
+        lda Workset + EntityHeader
+        and #($FF ^ EntityHeaderFacingLeft)
+        sta Workset + EntityHeader
+        ; and check vertical movement!
+        jmp @CheckDownInput
+@NotHoldingRight:
+        bvs @HoldingLeft
+        ; set some vertical movement values
+        ldy #$10
+        lda #JOY_A
+        bit Joy1Pressed
+        beq @NotHoldingARight
+        ; holding A reduces speed
+        ldy #$80
+@NotHoldingARight:
+        jsr SlowdownXByY
+        jmp @CheckDownInput
+
+@HoldingLeft:
+        ; player is holding left
+        ; set acceleration temp values
+        ldy #$F0
+        lda #JOY_A
+        bit Joy1Pressed
+        beq @NotHoldingALeft
+        ; holding A reduces speed
+        ldy #$80
+@NotHoldingALeft:
+        sty $16
+        lda #$FF
+        sta $17
+        ; get max speed for a given crab level
+        lda PlayerCrabLevel
+        asl a
+        tax
+        ; store speed in temp values used by ApproachSpeed2
+        lda EncounterPlayerSwimNegativeSpeedsByCrabLevel,x
+        sta $18
+        lda EncounterPlayerSwimNegativeSpeedsByCrabLevel+1,x
+        sta $19
+        ldx #EntityXSubspeed
+        jsr ApproachSpeed2
+        ; make sure the player is facing left
+        lda Workset + EntityHeader
+        ora #EntityHeaderFacingLeft
+        sta Workset + EntityHeader
+@CheckDownInput:
+        lda #JOY_DOWN
+        bit Joy1Inputs
+        beq @NotHoldingDown
+        ; player is holding down
+        ; set acceleration temp values
+        ldy #$10
+        lda #JOY_A
+        bit Joy1Pressed
+        beq @NotHoldingADown
+        ; holding A reduces speed
+        ldy #$80
+@NotHoldingADown:
+        sty $16
+        lda #$00
+        sta $17
+        ; get max speed for a given crab level
+        lda PlayerCrabLevel
+        asl a
+        tax
+        ; store speed in temp values used by ApproachSpeed2
+        lda EncounterPlayerSwimSpeedsByCrabLevel,x
+        sta $18
+        lda EncounterPlayerSwimSpeedsByCrabLevel+1,x
+        sta $19
+        ldx #EntityYSubspeed
+        jsr ApproachSpeed2
+        jmp @MovementComplete
+@NotHoldingDown:
+        lda #JOY_UP
+        bit Joy1Inputs
+        bne @HoldingUp
+        ldy #EntityXSubspeed
+        lda #JOY_A
+        bit Joy1Pressed
+        beq @Slowdown
+        ; holding A reduces speed
+        ldy #$80
+@Slowdown:
+        jsr SlowdownYByY
+        jmp @MovementComplete
+@HoldingUp:
+        ; player is holding up
+        ; set acceleration temp values
+        ldy #$F0
+        lda #JOY_A
+        bit Joy1Pressed
+        beq @HoldingUp2
+        ldy #$80
+@HoldingUp2:
+        sty $16
+        lda #$FF
+        sta $17
+        ; get max speed for a given crab level
+        lda PlayerCrabLevel
+        asl a
+        tax
+        ; store speed in temp values used by ApproachSpeed2
+        lda EncounterPlayerSwimNegativeSpeedsByCrabLevel,x
+        sta $18
+        lda EncounterPlayerSwimNegativeSpeedsByCrabLevel+1,x
+        sta $19
+        ldx #EntityYSubspeed
+        jsr ApproachSpeed2
+@MovementComplete:
+        ; move player in the dpad direction
+        jsr WorksetAnimationAdvance
+        jsr WorksetMoveX
+        jsr WorksetMoveY
+        ldx Workset + EntityX
+        lda Workset + EntityX  + 1
+        ; clamp to the left edge of the screen
+        cpx #$10
+        sbc #$10
+        bcs @CheckRightEdge
+        lda #$10
+        sta Workset + EntityX
+        lda #$10
+        sta Workset + EntityX + 1
+        bne @WithinXBounds
+; ------------------------------------------------------------
+@CheckRightEdge:
+        lda Workset + EntityX  + 1
+        cpx #$F0
+        sbc #$10
+        bcc @WithinXBounds
+        lda #$F0
+        sta Workset + EntityX
+        lda #$10
+        sta Workset + EntityX  + 1
+@WithinXBounds:
+        jsr EncounterClampWorksetMinimumY
+        bcs @CheckFireProjectile
+        jsr EncounterClampWorksetMaximumY
+@CheckFireProjectile:
+        ; check for B input in order to fire.
+        lda #JOY_B
+        bit Joy1Pressed
+        beq @Done
+        ; player is trying to fire, check for empty slot.
+        ; otherwise finish up.
+        jsr FindEmptyProjectileSlot
+        bmi @Done
+        ; we got a slot, spawn us a harpoon!
+        lda Workset + EntityHeader
+        ; we want the harpoon heading the direction the player is facing.
+        and #(EntityHeaderActive | EntityHeaderFacingLeft)
+        sta PlayerProjectile1Data + EntityHeader,x
+        lda #EntityTypeProjectileHarpoon
+        sta PlayerProjectile1Data + EntityType,x
+@Done:
+        jmp WorksetSave
 
 ; ----------------------------------------------------------------------------
-L9472:
-        lda     Workset + EntityV1D                             ; 9472 A5 3D                    .=
-        beq     L9480                           ; 9474 F0 0A                    ..
-        dec     Workset + EntityV1D                             ; 9476 C6 3D                    .=
-        bne     L948F                           ; 9478 D0 15                    ..
-        lda     Workset + EntityHeader                             ; 947A A5 20                    . 
-        and     #($FF ^ EntityHeader2)                            ; 947C 29 FD                    ).
-        sta     Workset + EntityHeader                             ; 947E 85 20                    . 
-L9480:
-        bit     Workset + EntityV1F                             ; 9480 24 3F                    $?
-        bpl     L948F                           ; 9482 10 0B                    ..
-        lda     #SFXPlayerDeath                            ; 9484 A9 12                    ..
-        jsr     SoundPlay                           ; 9486 20 CD E2                  ..
-        lda     #%10000000                            ; 9489 A9 80                    ..
-        sta     EventFlags                           ; 948B 8D 06 03                 ...
-        rts                                     ; 948E 60                       `
+EncounterPlayerSwimSpeedsByCrabLevel:
+        .byte $00,$01
+        .byte $40,$01
+        .byte $80,$01
+        .byte $C0,$01
+        .byte $00,$02
+
+EncounterPlayerSwimNegativeSpeedsByCrabLevel:
+        .byte $00,$FF
+        .byte $C0,$FE
+        .byte $80,$FE
+        .byte $40,$FE
+        .byte $00,$FE
 
 ; ----------------------------------------------------------------------------
-L948F:
-        bit     Joy1Inputs                           ; 948F 2C 30 03                 ,0.
-        bpl     L94C2                           ; 9492 10 2E                    ..
-        ldy     #$10                            ; 9494 A0 10                    ..
-        lda     #$01                            ; 9496 A9 01                    ..
-        bit     Joy1Pressed                           ; 9498 2C 32 03                 ,2.
-        beq     L949F                           ; 949B F0 02                    ..
-        ldy     #$80                            ; 949D A0 80                    ..
-L949F:
-        sty     $16                             ; 949F 84 16                    ..
-        lda     #$00                            ; 94A1 A9 00                    ..
-        sta     $17                             ; 94A3 85 17                    ..
-        lda     PlayerCrabLevel                           ; 94A5 AD 92 03                 ...
-        asl     a                               ; 94A8 0A                       .
-        tax                                     ; 94A9 AA                       .
-        lda     L95BC,x                         ; 94AA BD BC 95                 ...
-        sta     $18                             ; 94AD 85 18                    ..
-        lda     L95BD,x                         ; 94AF BD BD 95                 ...
-        sta     $19                             ; 94B2 85 19                    ..
-        ldx     #$10                            ; 94B4 A2 10                    ..
-        jsr     L9882                           ; 94B6 20 82 98                  ..
-        lda     Workset + EntityHeader                             ; 94B9 A5 20                    . 
-        and     #($FF ^ EntityHeaderFacingLeft)                            ; 94BB 29 EF                    ).
-        sta     Workset + EntityHeader                             ; 94BD 85 20                    . 
-        jmp     L9500                           ; 94BF 4C 00 95                 L..
-
-; ----------------------------------------------------------------------------
-L94C2:
-        bvs     L94D5                           ; 94C2 70 11                    p.
-        ldy     #$10                            ; 94C4 A0 10                    ..
-        lda     #$01                            ; 94C6 A9 01                    ..
-        bit     Joy1Pressed                           ; 94C8 2C 32 03                 ,2.
-        beq     L94CF                           ; 94CB F0 02                    ..
-        ldy     #$80                            ; 94CD A0 80                    ..
-L94CF:
-        jsr     L98B8                           ; 94CF 20 B8 98                  ..
-        jmp     L9500                           ; 94D2 4C 00 95                 L..
-
-; ----------------------------------------------------------------------------
-L94D5:
-        ldy     #$F0                            ; 94D5 A0 F0                    ..
-        lda     #$01                            ; 94D7 A9 01                    ..
-        bit     Joy1Pressed                           ; 94D9 2C 32 03                 ,2.
-        beq     L94E0                           ; 94DC F0 02                    ..
-        ldy     #$80                            ; 94DE A0 80                    ..
-L94E0:
-        sty     $16                             ; 94E0 84 16                    ..
-        lda     #$FF                            ; 94E2 A9 FF                    ..
-        sta     $17                             ; 94E4 85 17                    ..
-        lda     PlayerCrabLevel                           ; 94E6 AD 92 03                 ...
-        asl     a                               ; 94E9 0A                       .
-        tax                                     ; 94EA AA                       .
-        lda     L95C6,x                         ; 94EB BD C6 95                 ...
-        sta     $18                             ; 94EE 85 18                    ..
-        lda     L95C7,x                         ; 94F0 BD C7 95                 ...
-        sta     $19                             ; 94F3 85 19                    ..
-        ldx     #$10                            ; 94F5 A2 10                    ..
-        jsr     L9882                           ; 94F7 20 82 98                  ..
-        lda     Workset + EntityHeader                             ; 94FA A5 20                    . 
-        ora     #EntityHeaderFacingLeft                            ; 94FC 09 10                    ..
-        sta     Workset + EntityHeader                             ; 94FE 85 20                    . 
-L9500:
-        lda     #$20                            ; 9500 A9 20                    . 
-        bit     Joy1Inputs                           ; 9502 2C 30 03                 ,0.
-        beq     L952F                           ; 9505 F0 28                    .(
-        ldy     #$10                            ; 9507 A0 10                    ..
-        lda     #$01                            ; 9509 A9 01                    ..
-        bit     Joy1Pressed                           ; 950B 2C 32 03                 ,2.
-        beq     L9512                           ; 950E F0 02                    ..
-        ldy     #$80                            ; 9510 A0 80                    ..
-L9512:
-        sty     $16                             ; 9512 84 16                    ..
-        lda     #$00                            ; 9514 A9 00                    ..
-        sta     $17                             ; 9516 85 17                    ..
-        lda     PlayerCrabLevel                           ; 9518 AD 92 03                 ...
-        asl     a                               ; 951B 0A                       .
-        tax                                     ; 951C AA                       .
-        lda     L95BC,x                         ; 951D BD BC 95                 ...
-        sta     $18                             ; 9520 85 18                    ..
-        lda     L95BD,x                         ; 9522 BD BD 95                 ...
-        sta     $19                             ; 9525 85 19                    ..
-        ldx     #$12                            ; 9527 A2 12                    ..
-        jsr     L9882                           ; 9529 20 82 98                  ..
-        jmp     L956C                           ; 952C 4C 6C 95                 Ll.
-
-; ----------------------------------------------------------------------------
-L952F:
-        lda     #$10                            ; 952F A9 10                    ..
-        bit     Joy1Inputs                           ; 9531 2C 30 03                 ,0.
-        bne     L9547                           ; 9534 D0 11                    ..
-        ldy     #$10                            ; 9536 A0 10                    ..
-        lda     #$01                            ; 9538 A9 01                    ..
-        bit     Joy1Pressed                           ; 953A 2C 32 03                 ,2.
-        beq     L9541                           ; 953D F0 02                    ..
-        ldy     #$80                            ; 953F A0 80                    ..
-L9541:
-        jsr     L98BD                           ; 9541 20 BD 98                  ..
-        jmp     L956C                           ; 9544 4C 6C 95                 Ll.
-
-; ----------------------------------------------------------------------------
-L9547:
-        ldy     #$F0                            ; 9547 A0 F0                    ..
-        lda     #$01                            ; 9549 A9 01                    ..
-        bit     Joy1Pressed                           ; 954B 2C 32 03                 ,2.
-        beq     L9552                           ; 954E F0 02                    ..
-        .byte   $A0,$80                         ; 9550 A0 80                    ..
-; ----------------------------------------------------------------------------
-L9552:
-        sty     $16                             ; 9552 84 16                    ..
-        lda     #$FF                            ; 9554 A9 FF                    ..
-        sta     $17                             ; 9556 85 17                    ..
-        lda     PlayerCrabLevel                           ; 9558 AD 92 03                 ...
-        asl     a                               ; 955B 0A                       .
-        tax                                     ; 955C AA                       .
-        lda     L95C6,x                         ; 955D BD C6 95                 ...
-        sta     $18                             ; 9560 85 18                    ..
-        lda     L95C7,x                         ; 9562 BD C7 95                 ...
-        sta     $19                             ; 9565 85 19                    ..
-        ldx     #$12                            ; 9567 A2 12                    ..
-        jsr     L9882                           ; 9569 20 82 98                  ..
-L956C:
-        jsr     WorksetAnimationAdvance                           ; 956C 20 BE 97                  ..
-        jsr     WorksetMoveX                           ; 956F 20 FA 97                  ..
-        jsr     WorksetMoveY                           ; 9572 20 1B 98                  ..
-        ldx     Workset + EntityX                             ; 9575 A6 22                    ."
-        lda     Workset + EntityX  + 1                            ; 9577 A5 23                    .#
-        cpx     #$10                            ; 9579 E0 10                    ..
-        sbc     #$10                            ; 957B E9 10                    ..
-        bcs     L9589                           ; 957D B0 0A                    ..
-        .byte   $A9,$10,$85,$22,$A9,$10,$85,$23 ; 957F A9 10 85 22 A9 10 85 23  ..."...#
-        .byte   $D0,$10                         ; 9587 D0 10                    ..
-; ----------------------------------------------------------------------------
-L9589:
-        lda     Workset + EntityX  + 1                            ; 9589 A5 23                    .#
-        cpx     #$F0                            ; 958B E0 F0                    ..
-        sbc     #$10                            ; 958D E9 10                    ..
-        bcc     L9599                           ; 958F 90 08                    ..
-        lda     #$F0                            ; 9591 A9 F0                    ..
-        sta     Workset + EntityX                             ; 9593 85 22                    ."
-        lda     #$10                            ; 9595 A9 10                    ..
-        sta     Workset + EntityX  + 1                            ; 9597 85 23                    .#
-L9599:
-        jsr     L99F2                           ; 9599 20 F2 99                  ..
-        bcs     L95A1                           ; 959C B0 03                    ..
-        jsr     L99D0                           ; 959E 20 D0 99                  ..
-L95A1:
-        lda     #$02                            ; 95A1 A9 02                    ..
-        bit     Joy1Pressed                           ; 95A3 2C 32 03                 ,2.
-        beq     L95B9                           ; 95A6 F0 11                    ..
-        jsr     L95D0                           ; 95A8 20 D0 95                  ..
-        bmi     L95B9                           ; 95AB 30 0C                    0.
-        lda     Workset + EntityHeader                             ; 95AD A5 20                    . 
-        and     #(EntityHeaderActive | EntityHeaderFacingLeft)                           ; 95AF 29 90                    ).
-        sta     $06A0,x                         ; 95B1 9D A0 06                 ...
-        lda     #$03                            ; 95B4 A9 03                    ..
-        sta     $06A1,x                         ; 95B6 9D A1 06                 ...
-L95B9:
-        jmp     WorksetSave                           ; 95B9 4C 61 97                 La.
-
-; ----------------------------------------------------------------------------
-L95BC:
-        .byte   $00                             ; 95BC 00                       .
-L95BD:
-        .byte   $01,$40,$01,$80,$01,$C0,$01,$00 ; 95BD 01 40 01 80 01 C0 01 00  .@......
-        .byte   $02                             ; 95C5 02                       .
-L95C6:
-        .byte   $00                             ; 95C6 00                       .
-L95C7:
-        .byte   $FF,$C0,$FE,$80,$FE,$40,$FE,$00 ; 95C7 FF C0 FE 80 FE 40 FE 00  .....@..
-        .byte   $FE                             ; 95CF FE                       .
-; ----------------------------------------------------------------------------
-L95D0:
-        ldx     #$00                            ; 95D0 A2 00                    ..
-        lda     $06A0,x                         ; 95D2 BD A0 06                 ...
-        bpl     L95E3                           ; 95D5 10 0C                    ..
-        ldx     #$20                            ; 95D7 A2 20                    . 
-        lda     $06A0,x                         ; 95D9 BD A0 06                 ...
-        bpl     L95E3                           ; 95DC 10 05                    ..
-        ldx     #$40                            ; 95DE A2 40                    .@
-        lda     $06A0,x                         ; 95E0 BD A0 06                 ...
-L95E3:
-        rts                                     ; 95E3 60                       `
+FindEmptyProjectileSlot:
+        ; check if slot 1 is open.
+        ldx #$00
+        lda PlayerProjectile1Data,x
+        bpl @Exit
+        ; nope, how about slot 2?
+        ldx #$20
+        lda PlayerProjectile1Data,x
+        bpl @Exit
+        ; okay last chance.. slot 3?
+        ldx #$40
+        lda PlayerProjectile1Data,x
+@Exit:
+        rts
 
 ; ----------------------------------------------------------------------------
 CopyWorksetCoordinatesToTempCoordinate:
@@ -3729,9 +3836,6 @@ ApproachYSpeed:
 ;  - A is subspeed value to add.
 ;  - Y is the maximum fullspeed, speed will get clamped to this.
 ;  - X is EntityXSubspeed or EntityYSubspeed depending on which direction to add.
-; Note:
-;  Negative A values will trigger subtraction.
-;
 ApproachSpeed:
         pha
         clc
@@ -3745,7 +3849,7 @@ ApproachSpeed:
         lda #$00
         adc Workset+1,x
         sta Workset+1,x
-        ; bail if signs don't match.
+        ; if signs don't match, no need to clamp.
         tya
         eor Workset+1,x
         bmi @ExitWithoutCarry
@@ -3787,85 +3891,105 @@ ApproachSpeed:
         rts
 
 ; ----------------------------------------------------------------------------
-L9882:
-        lda     $16                             ; 9882 A5 16                    ..
-        clc                                     ; 9884 18                       .
-        adc     $20,x                           ; 9885 75 20                    u 
-        sta     $20,x                           ; 9887 95 20                    . 
-        lda     $17                             ; 9889 A5 17                    ..
-        tay                                     ; 988B A8                       .
-        adc     $21,x                           ; 988C 75 21                    u!
-        sta     $21,x                           ; 988E 95 21                    .!
-        tay                                     ; 9890 A8                       .
-        clc                                     ; 9891 18                       .
-        eor     $19                             ; 9892 45 19                    E.
-        bmi     L98B7                           ; 9894 30 21                    0!
-        tya                                     ; 9896 98                       .
-        bmi     L98A5                           ; 9897 30 0C                    0.
-        lda     $20,x                           ; 9899 B5 20                    . 
-        cmp     $18                             ; 989B C5 18                    ..
-        lda     $21,x                           ; 989D B5 21                    .!
-        sbc     $19                             ; 989F E5 19                    ..
-        bcs     L98AF                           ; 98A1 B0 0C                    ..
-        bcc     L98B7                           ; 98A3 90 12                    ..
-L98A5:
-        lda     $18                             ; 98A5 A5 18                    ..
-        cmp     $20,x                           ; 98A7 D5 20                    . 
-        lda     $19                             ; 98A9 A5 19                    ..
-        sbc     $21,x                           ; 98AB F5 21                    .!
-        bcc     L98B7                           ; 98AD 90 08                    ..
-L98AF:
-        lda     $18                             ; 98AF A5 18                    ..
-        sta     $20,x                           ; 98B1 95 20                    . 
-        lda     $19                             ; 98B3 A5 19                    ..
-        sta     $21,x                           ; 98B5 95 21                    .!
-L98B7:
-        rts                                     ; 98B7 60                       `
+
+; # ApproachSpeed2
+; This is a variant of ApproachSpeed, which increases speed by
+; both subspeed+speed instead of just subspeed.
+; Parameters:
+;  $16 - subspeed to add
+;  $17 - fullspeed to add
+;  $18 - target subspeed
+;  $19 - target fullspeed
+ApproachSpeed2:
+        @Subspeed  = $20
+        @Fullspeed = $21
+        @SubspeedToAdd = $16
+        @FullspeedToAdd = $17
+        @TargetSubspeed = $18
+        @TargetFullspeed = $19
+        ; start by adding tempsubspeed value to the subspeed
+        lda @SubspeedToAdd
+        clc
+        adc @Subspeed,x
+        sta @Subspeed,x
+        ; then add tempfullspeed + subspeed carry to the fullspeed
+        lda @FullspeedToAdd
+        tay
+        adc @Fullspeed,x
+        sta @Fullspeed,x
+        ; if signs don't match, no need to clamp.
+        tay
+        clc
+        eor @TargetFullspeed
+        bmi @Done
+        ; branch if we are heading left
+        tya
+        bmi @NegativeSpeed
+        ; check if we have accelerated past target speed
+        lda @Subspeed,x
+        cmp @TargetSubspeed
+        lda @Fullspeed,x
+        sbc @TargetFullspeed
+        ; and branch to clamp
+        bcs @Clamp
+        bcc @Done
+@NegativeSpeed:
+        ; check if we have accelerated past target speed.
+        lda @TargetSubspeed
+        cmp @Subspeed,x
+        lda @TargetFullspeed
+        sbc @Fullspeed,x
+        ; otherwise we are done!
+        bcc @Done
+@Clamp:
+        ; we are already at target speed, make sure we don't go faster.
+        lda @TargetSubspeed
+        sta @Subspeed,x
+        lda @TargetFullspeed
+        sta @Fullspeed,x
+@Done:
+        rts
 
 ; ----------------------------------------------------------------------------
-L98B8:
-        ldx     #$10                            ; 98B8 A2 10                    ..
-        jmp     L98BF                           ; 98BA 4C BF 98                 L..
-
-; ----------------------------------------------------------------------------
-L98BD:
-        ldx     #$12                            ; 98BD A2 12                    ..
-L98BF:
-        lda     $21,x                           ; 98BF B5 21                    .!
-        bpl     L98D3                           ; 98C1 10 10                    ..
-        tya                                     ; 98C3 98                       .
-        clc                                     ; 98C4 18                       .
-        adc     $20,x                           ; 98C5 75 20                    u 
-        sta     $20,x                           ; 98C7 95 20                    . 
-        lda     $21,x                           ; 98C9 B5 21                    .!
-        adc     #$00                            ; 98CB 69 00                    i.
-        sta     $21,x                           ; 98CD 95 21                    .!
-        bpl     L98E3                           ; 98CF 10 12                    ..
-        clc                                     ; 98D1 18                       .
-        rts                                     ; 98D2 60                       `
-
-; ----------------------------------------------------------------------------
-L98D3:
-        tya                                     ; 98D3 98                       .
-        eor     #$FF                            ; 98D4 49 FF                    I.
-        sec                                     ; 98D6 38                       8
-        adc     $20,x                           ; 98D7 75 20                    u 
-        sta     $20,x                           ; 98D9 95 20                    . 
-        lda     $21,x                           ; 98DB B5 21                    .!
-        adc     #$FF                            ; 98DD 69 FF                    i.
-        sta     $21,x                           ; 98DF 95 21                    .!
-        bpl     L98EB                           ; 98E1 10 08                    ..
-L98E3:
-        lda     #$00                            ; 98E3 A9 00                    ..
-        sta     $20,x                           ; 98E5 95 20                    . 
-        sta     $21,x                           ; 98E7 95 21                    .!
-        sec                                     ; 98E9 38                       8
-        rts                                     ; 98EA 60                       `
-
-; ----------------------------------------------------------------------------
-L98EB:
-        clc                                     ; 98EB 18                       .
-        rts                                     ; 98EC 60                       `
+SlowdownXByY:
+        ldx #EntityXSubspeed
+        jmp SlowdownByY
+SlowdownYByY:
+        ldx #EntityYSubspeed
+SlowdownByY:
+        @Subspeed  = $20
+        @Fullspeed = $21
+        lda @Fullspeed,x
+        bpl @PositiveValue
+        tya
+        clc
+        adc @Subspeed,x
+        sta @Subspeed,x
+        lda @Fullspeed,x
+        adc #$00
+        sta @Fullspeed,x
+        bpl @Nullify
+        clc
+        rts
+@PositiveValue:
+        tya
+        eor #$FF
+        sec
+        adc @Subspeed,x
+        sta @Subspeed,x
+        lda @Fullspeed,x
+        adc #$FF
+        sta @Fullspeed,x
+        bpl @DoneWithoutCarry
+@Nullify:
+        lda #$00
+        sta @Subspeed,x
+        sta @Fullspeed,x
+        sec
+        rts
+@DoneWithoutCarry:
+        clc
+        rts
 
 ; ----------------------------------------------------------------------------
 WorksetClearSpeed:
@@ -3882,9 +4006,9 @@ L98F8:
         sta     $42                             ; 98FA 85 42                    .B
         lda     #$06                            ; 98FC A9 06                    ..
         sta     $43                             ; 98FE 85 43                    .C
-        lda     Workset + EntityV1F                             ; 9900 A5 3F                    .?
-        and     #$BF                            ; 9902 29 BF                    ).
-        sta     Workset + EntityV1F                             ; 9904 85 3F                    .?
+        lda     Workset + EntityFlags1F                             ; 9900 A5 3F                    .?
+        and     #($FF ^ EntityFlag1FBit7)                            ; 9902 29 BF                    ).
+        sta     Workset + EntityFlags1F                             ; 9904 85 3F                    .?
         lda     #$03                            ; 9906 A9 03                    ..
         sta     $47                             ; 9908 85 47                    .G
 L990A:
@@ -3899,9 +4023,9 @@ L990A:
         lda     ($42),y                         ; 991B B1 42                    .B
         ora     #$80                            ; 991D 09 80                    ..
         sta     ($42),y                         ; 991F 91 42                    .B
-        lda     Workset + EntityV1F                             ; 9921 A5 3F                    .?
-        ora     #$40                            ; 9923 09 40                    .@
-        sta     Workset + EntityV1F                             ; 9925 85 3F                    .?
+        lda     Workset + EntityFlags1F                             ; 9921 A5 3F                    .?
+        ora     #EntityFlag1FBit7                            ; 9923 09 40                    .@
+        sta     Workset + EntityFlags1F                             ; 9925 85 3F                    .?
         ldy     #$01                            ; 9927 A0 01                    ..
         lda     ($42),y                         ; 9929 B1 42                    .B
         sta     JawsDamagedByProjectileType                           ; 992B 8D 4A 03                 .J.
@@ -3922,14 +4046,14 @@ L9940:
         lda     #EntityHeader2                            ; 9940 A9 02                    ..
         bit     PlayerData + EntityHeader                           ; 9942 2C 80 06                 ,..
         bne     @Exit                           ; 9945 D0 19                    ..
-        lda     Workset + EntityV1F                             ; 9947 A5 3F                    .?
-        and     #$7F                            ; 9949 29 7F                    ).
-        sta     Workset + EntityV1F                             ; 994B 85 3F                    .?
+        lda     Workset + EntityFlags1F                             ; 9947 A5 3F                    .?
+        and     #($FF ^ EntityFlag1FBit8)                            ; 9949 29 7F                    ).
+        sta     Workset + EntityFlags1F                             ; 994B 85 3F                    .?
         jsr     HitDetectAgainstPlayer                           ; 994D 20 61 99                  a.
         bcc     @Exit                           ; 9950 90 0E                    ..
-        lda     Workset + EntityV1F                             ; 9952 A5 3F                    .?
-        ora     #$80                            ; 9954 09 80                    ..
-        sta     Workset + EntityV1F                             ; 9956 85 3F                    .?
+        lda     Workset + EntityFlags1F                             ; 9952 A5 3F                    .?
+        ora     #EntityFlag1FBit8                            ; 9954 09 80                    ..
+        sta     Workset + EntityFlags1F                             ; 9956 85 3F                    .?
         lda     $069F                           ; 9958 AD 9F 06                 ...
         ora     #$80                            ; 995B 09 80                    ..
         sta     $069F                           ; 995D 8D 9F 06                 ...
@@ -4020,68 +4144,83 @@ HitDetect:
         rts
 
 ; ----------------------------------------------------------------------------
-L99D0:
-        lda     EncounterMaxDepth                           ; 99D0 AD 3E 03                 .>.
-        sec                                     ; 99D3 38                       8
-        sbc     #$10                            ; 99D4 E9 10                    ..
-        sta     $16                             ; 99D6 85 16                    ..
-        lda     EncounterMaxDepth+1                           ; 99D8 AD 3F 03                 .?.
-        sbc     #$00                            ; 99DB E9 00                    ..
-        sta     $17                             ; 99DD 85 17                    ..
-        lda     Workset + EntityY                             ; 99DF A5 24                    .$
-        cmp     $16                             ; 99E1 C5 16                    ..
-        lda     Workset + EntityY + 1                             ; 99E3 A5 25                    .%
-        sbc     $17                             ; 99E5 E5 17                    ..
-        bcc     L99F1                           ; 99E7 90 08                    ..
-        lda     $16                             ; 99E9 A5 16                    ..
-        sta     Workset + EntityY                             ; 99EB 85 24                    .$
-        lda     $17                             ; 99ED A5 17                    ..
-        sta     Workset + EntityY + 1                             ; 99EF 85 25                    .%
-L99F1:
-        rts                                     ; 99F1 60                       `
+EncounterClampWorksetMaximumY:
+        @TempMaximumY = $16
+        ; we dont want to allow entities to drop closer
+        ; than 10px away from the max depth.
+        lda EncounterMaxDepth
+        sec
+        sbc #$10
+        sta @TempMaximumY
+        lda EncounterMaxDepth+1
+        sbc #$00
+        sta @TempMaximumY+1
+        lda Workset + EntityY
+        cmp @TempMaximumY
+        lda Workset + EntityY + 1
+        sbc @TempMaximumY+1
+        ; we aren't too deep, so finish up.
+        bcc @Done
+        ; otherwise clamp to maximum level
+        lda @TempMaximumY
+        sta Workset + EntityY
+        lda @TempMaximumY+1
+        sta Workset + EntityY + 1
+@Done:
+        rts
 
 ; ----------------------------------------------------------------------------
-L99F2:
-        lda     Workset + EntityBBoxH                             ; 99F2 A5 2F                    ./
-        clc                                     ; 99F4 18                       .
-        adc     WaterHeight                           ; 99F5 6D 3C 03                 m<.
-        sta     $16                             ; 99F8 85 16                    ..
-        lda     #$00                            ; 99FA A9 00                    ..
-        adc     WaterHeight+1                           ; 99FC 6D 3D 03                 m=.
-        sta     $17                             ; 99FF 85 17                    ..
-        lda     $16                             ; 9A01 A5 16                    ..
-        cmp     Workset + EntityY                             ; 9A03 C5 24                    .$
-        lda     $17                             ; 9A05 A5 17                    ..
-        sbc     Workset + EntityY + 1                             ; 9A07 E5 25                    .%
-        bcc     L9A13                           ; 9A09 90 08                    ..
-        lda     $16                             ; 9A0B A5 16                    ..
-        sta     Workset + EntityY                             ; 9A0D 85 24                    .$
-        lda     $17                             ; 9A0F A5 17                    ..
-        sta     Workset + EntityY + 1                             ; 9A11 85 25                    .%
-L9A13:
-        rts                                     ; 9A13 60                       `
+EncounterClampWorksetMinimumY:
+        @TempMinimumY = $16
+        ; we want to take the water height + our bounding box
+        ; to determine the minimum possible Y coordinate.
+        lda Workset + EntityBBoxH
+        clc
+        adc WaterHeight
+        sta @TempMinimumY
+        lda #$00
+        adc WaterHeight+1
+        sta @TempMinimumY+1
+        lda @TempMinimumY
+        cmp Workset + EntityY
+        lda @TempMinimumY+1
+        sbc Workset + EntityY + 1
+        ; we aren't at the water level, so finish up.
+        bcc @Done
+        ; otherwise clamp workset to water level.
+        lda @TempMinimumY
+        sta Workset + EntityY
+        lda @TempMinimumY+1
+        sta Workset + EntityY + 1
+@Done:
+        rts
 
 ; ----------------------------------------------------------------------------
-L9A14:
-        lda     Workset + EntityBBoxH                             ; 9A14 A5 2F                    ./
-        asl     a                               ; 9A16 0A                       .
-        clc                                     ; 9A17 18                       .
-        adc     WaterHeight                           ; 9A18 6D 3C 03                 m<.
-        sta     $16                             ; 9A1B 85 16                    ..
-        lda     #$00                            ; 9A1D A9 00                    ..
-        adc     WaterHeight+1                           ; 9A1F 6D 3D 03                 m=.
-        sta     $17                             ; 9A22 85 17                    ..
-        lda     $16                             ; 9A24 A5 16                    ..
-        cmp     Workset + EntityY                             ; 9A26 C5 24                    .$
-        lda     $17                             ; 9A28 A5 17                    ..
-        sbc     Workset + EntityY + 1                             ; 9A2A E5 25                    .%
-        bcc     L9A36                           ; 9A2C 90 08                    ..
-        lda     $16                             ; 9A2E A5 16                    ..
-        sta     Workset + EntityY                             ; 9A30 85 24                    .$
-        lda     $17                             ; 9A32 A5 17                    ..
-        sta     Workset + EntityY + 1                             ; 9A34 85 25                    .%
-L9A36:
-        rts                                     ; 9A36 60                       `
+EncounterClampWorksetMinimumYDoubled:
+        @TempMinimumY = $16
+        ; we want to take the water height + double our bounding box
+        ; to determine the minimum possible Y coordinate.
+        lda Workset + EntityBBoxH
+        asl a
+        clc
+        adc WaterHeight
+        sta @TempMinimumY
+        lda #$00
+        adc WaterHeight+1
+        sta @TempMinimumY+1
+        lda @TempMinimumY
+        cmp Workset + EntityY
+        lda @TempMinimumY+1
+        sbc Workset + EntityY + 1
+        ; we aren't at the water level, so finish up.
+        bcc @Done
+        ; otherwise clamp workset to minimum level
+        lda @TempMinimumY
+        sta Workset + EntityY
+        lda @TempMinimumY+1
+        sta Workset + EntityY + 1
+@Done:
+        rts
 
 ; ----------------------------------------------------------------------------
 UpdateEntitySprites:
@@ -4105,7 +4244,7 @@ UpdateEntitySprites:
         sty     @TempUnknown                           ; 9A56 8C 36 03                 .6.
 L9A59:
         ; clear bit 1 of the last byte of the entity
-        ldy     #EntityV1F
+        ldy     #EntityFlags1F
         lda     (WorksetPtr),y                         ; 9A5B B1 40                    .@
         and     #$FE                            ; 9A5D 29 FE                    ).
         sta     (WorksetPtr),y                         ; 9A5F 91 40                    .@
@@ -4335,7 +4474,7 @@ EncounterBoatProjectile:
 
 ; ----------------------------------------------------------------------------
 L9BBD:
-        lda     Workset + EntityV1F                             ; 9BBD A5 3F                    .?
+        lda     Workset + EntityFlags1F                             ; 9BBD A5 3F                    .?
         bmi     L9BFC                           ; 9BBF 30 3B                    0;
         and     #$01                            ; 9BC1 29 01                    ).
         beq     L9C01                           ; 9BC3 F0 3C                    .<
@@ -4364,7 +4503,7 @@ L9BE8:
         jsr     WorksetMoveX                           ; 9BEF 20 FA 97                  ..
 L9BF2:
         jsr     WorksetMoveY                           ; 9BF2 20 1B 98                  ..
-        jsr     L99D0                           ; 9BF5 20 D0 99                  ..
+        jsr     EncounterClampWorksetMaximumY                           ; 9BF5 20 D0 99                  ..
         bcc     L9C05                           ; 9BF8 90 0B                    ..
         .byte   $B0,$05                         ; 9BFA B0 05                    ..
 ; ----------------------------------------------------------------------------
@@ -4386,7 +4525,7 @@ EncounterSubmarineBulletProjectile:
         jsr     SoundPlay
         jmp     @SharedRTS1
 @L9C6C:
-        lda     Workset + EntityV1F
+        lda     Workset + EntityFlags1F
         bmi     @L9C7A
         and     #$01
         beq     @L9C7A
@@ -4409,7 +4548,7 @@ EncounterSubmarineBombProjectile:
 
 ; ----------------------------------------------------------------------------
 L9C37:
-        lda     Workset + EntityV1F                             ; 9C37 A5 3F                    .?
+        lda     Workset + EntityFlags1F                             ; 9C37 A5 3F                    .?
         bmi     L9C58                           ; 9C39 30 1D                    0.
         and     #$01                            ; 9C3B 29 01                    ).
         beq     L9C58                           ; 9C3D F0 19                    ..
@@ -4419,8 +4558,8 @@ L9C37:
         ldy     #$10                            ; 9C47 A0 10                    ..
         jsr     ApproachYSpeed                           ; 9C49 20 41 98                  A.
         ldy     #$08                            ; 9C4C A0 08                    ..
-        jsr     L98B8                           ; 9C4E 20 B8 98                  ..
-        jsr     L99D0                           ; 9C51 20 D0 99                  ..
+        jsr     SlowdownXByY                           ; 9C4E 20 B8 98                  ..
+        jsr     EncounterClampWorksetMaximumY                           ; 9C51 20 D0 99                  ..
         bcc     L9C5C                           ; 9C54 90 06                    ..
         .byte   $B0,$00                         ; 9C56 B0 00                    ..
 ; ----------------------------------------------------------------------------
@@ -4439,7 +4578,7 @@ EncounterHarpoonProjectile:
         jsr     SoundPlay
         jmp     SharedRTS1
 @HarpoonActive:
-        lda     Workset + EntityV1F
+        lda     Workset + EntityFlags1F
         bmi     @RemoveHarpoon
         and     #$01
         beq     @RemoveHarpoon
@@ -4462,7 +4601,7 @@ EncounterPlaneProjectile:
 
 ; ----------------------------------------------------------------------------
 L9C8E:
-        lda     Workset + EntityV1F                             ; 9C8E A5 3F                    .?
+        lda     Workset + EntityFlags1F                             ; 9C8E A5 3F                    .?
         bmi     L9CC2                           ; 9C90 30 30                    00
         and     #$01                            ; 9C92 29 01                    ).
         beq     L9CC2                           ; 9C94 F0 2C                    .,
@@ -4485,7 +4624,7 @@ L9C8E:
 
 ; ----------------------------------------------------------------------------
 L9CBB:
-        jsr     L99D0                           ; 9CBB 20 D0 99                  ..
+        jsr     EncounterClampWorksetMaximumY                           ; 9CBB 20 D0 99                  ..
         bcc     L9CC6                           ; 9CBE 90 06                    ..
         .byte   $B0,$00                         ; 9CC0 B0 00                    ..
 ; ----------------------------------------------------------------------------
@@ -4503,7 +4642,7 @@ EncounterPrepareProjectile:
 @ClearPreviousState:
         sta     Workset,x
         inx
-        cpx     #EntityV1F+1
+        cpx     #EntityFlags1F+1
         bcc     @ClearPreviousState
         ; load offset in the projectile data table for this
         ; projectile type.
@@ -4629,14 +4768,14 @@ MapRunJaws:
         lda #(EntityHeaderActive | EntityHeader7 | EntityHeader1)
         sta Workset + EntityHeader
         lda #$80
-        sta Workset + EntityV1D
+        sta Workset + EntityInvincibilityFrames
         jmp WorksetSave
 @JawsIsActive:
         jsr WorksetAnimationAdvance
-        lda Workset + EntityV1D
+        lda Workset + EntityInvincibilityFrames
         bne L9DD8
         jsr L9940
-        lda Workset + EntityV1F
+        lda Workset + EntityFlags1F
         bpl L9DDD
         jsr CopyWorksetCoordinatesToTempCoordinate
         jsr GetWorldMapFlagsAtTempCoords
@@ -4647,7 +4786,7 @@ MapRunJaws:
 
 ; ----------------------------------------------------------------------------
 L9DD8:
-        dec     Workset + EntityV1D                             ; 9DD8 C6 3D                    .=
+        dec     Workset + EntityInvincibilityFrames                             ; 9DD8 C6 3D                    .=
         jmp     L9E05                           ; 9DDA 4C 05 9E                 L..
 
 ; ----------------------------------------------------------------------------
@@ -5015,7 +5154,7 @@ LA075:
         jsr     L9940                           ; A07B 20 40 99                  @.
         lda     $38                             ; A07E A5 38                    .8
         bne     LA0E3                           ; A080 D0 61                    .a
-        bit     Workset + EntityV1F                             ; A082 24 3F                    $?
+        bit     Workset + EntityFlags1F                             ; A082 24 3F                    $?
         bvc     LA0EE                           ; A084 50 68                    Ph
         ldx     PlayerPowerLevel                           ; A086 AE 91 03                 ...
         lda     JawsDamageByPowerLevel,x                         ; A089 BD 2D A1                 .-.
@@ -5092,8 +5231,8 @@ LA10F:
         sta     Workset + EntityYSpeed                             ; A115 85 33                    .3
 LA117:
         jsr     WorksetMoveY                           ; A117 20 1B 98                  ..
-        jsr     L9A14                           ; A11A 20 14 9A                  ..
-        jsr     L99D0                           ; A11D 20 D0 99                  ..
+        jsr     EncounterClampWorksetMinimumYDoubled                           ; A11A 20 14 9A                  ..
+        jsr     EncounterClampWorksetMaximumY                           ; A11D 20 D0 99                  ..
         jmp     WorksetSave                           ; A120 4C 61 97                 La.
 
 
@@ -5246,7 +5385,7 @@ RunEntityJellyfish:
         bit     Workset + EntityHeader
         bvs     @EntityIsActive
         lda     #$00
-        sta     Workset + EntityV1F
+        sta     Workset + EntityFlags1F
         lda     #(EntityHeaderActive | EntityHeader7)
         sta     Workset + EntityHeader
         jsr     LA32F
@@ -5263,13 +5402,13 @@ RunEntityJellyfish:
 LA243:
         jsr     L98F8                           ; A243 20 F8 98                  ..
         jsr     L9940                           ; A246 20 40 99                  @.
-        bit     Workset + EntityV1F                             ; A249 24 3F                    $?
+        bit     Workset + EntityFlags1F                             ; A249 24 3F                    $?
         bvs     LA269                           ; A24B 70 1C                    p.
         jsr     WorksetMoveY                           ; A24D 20 1B 98                  ..
-        jsr     L99F2                           ; A250 20 F2 99                  ..
+        jsr     EncounterClampWorksetMinimumY                           ; A250 20 F2 99                  ..
         bcs     WorksetDisableEntity                           ; A253 B0 3B                    .;
         ldy     #$08                            ; A255 A0 08                    ..
-        jsr     L98BD                           ; A257 20 BD 98                  ..
+        jsr     SlowdownYByY                           ; A257 20 BD 98                  ..
         bcc     SharedRTS                           ; A25A 90 38                    .8
 LA25C:
         lda     #$00                            ; A25C A9 00                    ..
@@ -5324,7 +5463,7 @@ RunEntityJellyfish2:
         bit     Workset + EntityHeader
         bvs     @EntityIsActive
         lda     #$00
-        sta     Workset + EntityV1F
+        sta     Workset + EntityFlags1F
         lda     #(EntityHeaderActive | EntityHeader7)
         sta     Workset + EntityHeader
         jsr     LA32F
@@ -5341,14 +5480,14 @@ RunEntityJellyfish2:
 @LFF90:
         jsr     L98F8
         jsr     L9940
-        bit     Workset + EntityV1F
+        bit     Workset + EntityFlags1F
         bvs     @LFFD4
         jsr     WorksetMoveX
         jsr     WorksetMoveY
-        jsr     L99F2
+        jsr     EncounterClampWorksetMinimumY
         bcs     @Disable
         ldy     #$08
-        jsr     L98BD
+        jsr     SlowdownYByY
         bcc     @Exit
 @Continue1:
         lda     #$00
@@ -5446,7 +5585,7 @@ RunEntityStingray:
         bit     Workset + EntityHeader                             ; A379 24 20                    $ 
         bvs     LA3D6                           ; A37B 70 59                    pY
         lda     #$00                            ; A37D A9 00                    ..
-        sta     Workset + EntityV1F                             ; A37F 85 3F                    .?
+        sta     Workset + EntityFlags1F                             ; A37F 85 3F                    .?
         sta     Workset + EntityV19                             ; A381 85 39                    .9
         sta     Workset + EntityV1A                             ; A383 85 3A                    .:
         lda     #$02                            ; A385 A9 02                    ..
@@ -5458,7 +5597,7 @@ RunEntityStingray:
         lda     PlayerY+1                           ; A391 AD 85 06                 ...
         adc     #$00                            ; A394 69 00                    i.
         sta     Workset + EntityY + 1                             ; A396 85 25                    .%
-        jsr     L99D0                           ; A398 20 D0 99                  ..
+        jsr     EncounterClampWorksetMaximumY                           ; A398 20 D0 99                  ..
         lda     #AnimationEncounterStingray                            ; A39B A9 3C                    .<
         jsr     WorksetAnimationPlay                           ; A39D 20 AD 97                  ..
         ldx     #$00                            ; A3A0 A2 00                    ..
@@ -5511,7 +5650,7 @@ LA3E0:
 LA3E7:
         jsr     L98F8                           ; A3E7 20 F8 98                  ..
         jsr     L9940                           ; A3EA 20 40 99                  @.
-        bit     Workset + EntityV1F                             ; A3ED 24 3F                    $?
+        bit     Workset + EntityFlags1F                             ; A3ED 24 3F                    $?
         bvs     LA449                           ; A3EF 70 58                    pX
         jsr     WorksetMoveX                           ; A3F1 20 FA 97                  ..
         lda     #EntityHeaderFacingLeft                            ; A3F4 A9 10                    ..
@@ -5558,7 +5697,7 @@ LA435:
         lda     Workset + EntityY + 1                             ; A43C A5 25                    .%
         sbc     #$00                            ; A43E E9 00                    ..
         sta     Workset + EntityY + 1                             ; A440 85 25                    .%
-        jsr     L99F2                           ; A442 20 F2 99                  ..
+        jsr     EncounterClampWorksetMinimumY                           ; A442 20 F2 99                  ..
         bcc     LA488                           ; A445 90 41                    .A
         bcs     LA484                           ; A447 B0 3B                    .;
 LA449:
@@ -5689,12 +5828,12 @@ LA523:
         jsr     WorksetMoveX                           ; A523 20 FA 97                  ..
 LA526:
         jsr     WorksetMoveY                           ; A526 20 1B 98                  ..
-        jsr     L99F2                           ; A529 20 F2 99                  ..
-        jsr     L99D0                           ; A52C 20 D0 99                  ..
+        jsr     EncounterClampWorksetMinimumY                           ; A529 20 F2 99                  ..
+        jsr     EncounterClampWorksetMaximumY                           ; A52C 20 D0 99                  ..
         bit     Workset + EntityV16                            ; A52F 24 36                    $6
         bmi     LA53F                           ; A531 30 0C                    0.
         lda     #$01                            ; A533 A9 01                    ..
-        bit     Workset + EntityV1F                             ; A535 24 3F                    $?
+        bit     Workset + EntityFlags1F                             ; A535 24 3F                    $?
         bne     LA53A                           ; A537 D0 01                    ..
         rts                                     ; A539 60                       `
 
@@ -5707,7 +5846,7 @@ LA53A:
 ; ----------------------------------------------------------------------------
 LA53F:
         lda     #$01                            ; A53F A9 01                    ..
-        bit     Workset + EntityV1F                             ; A541 24 3F                    $?
+        bit     Workset + EntityFlags1F                             ; A541 24 3F                    $?
         bne     LA56A                           ; A543 D0 25                    .%
         .byte   $C6,$35,$D0,$05,$A9,$00,$85,$20 ; A545 C6 35 D0 05 A9 00 85 20  .5..... 
         .byte   $60,$A9,$00,$85,$36,$A5,$20,$49 ; A54D 60 A9 00 85 36 A5 20 49  `...6. I
@@ -5719,7 +5858,7 @@ LA56A:
         jsr     WorksetAnimationAdvance                           ; A56A 20 BE 97                  ..
         jsr     L98F8                           ; A56D 20 F8 98                  ..
         jsr     L9940                           ; A570 20 40 99                  @.
-        bit     Workset + EntityV1F                             ; A573 24 3F                    $?
+        bit     Workset + EntityFlags1F                             ; A573 24 3F                    $?
         bvc     LA597                           ; A575 50 20                    P 
         lda     #SFXEncounterEnemyDeath                            ; A577 A9 0E                    ..
         jsr     SoundPlay                           ; A579 20 CD E2                  ..
@@ -5801,7 +5940,7 @@ LA5E5:
         jsr     WorksetClearSpeed                           ; A5E9 20 ED 98                  ..
         lda     #$00                            ; A5EC A9 00                    ..
         sta     $38                             ; A5EE 85 38                    .8
-        sta     Workset + EntityV1F                             ; A5F0 85 3F                    .?
+        sta     Workset + EntityFlags1F                             ; A5F0 85 3F                    .?
         lda     #AnimationEncounterCrab                            ; A5F2 A9 2C                    .,
         jmp     WorksetAnimationPlay                           ; A5F4 4C AD 97                 L..
 
@@ -5836,7 +5975,7 @@ LA61A:
         ldy     #$01
         jsr     ApproachYSpeed
         jsr     WorksetMoveY
-        jsr     L99D0
+        jsr     EncounterClampWorksetMaximumY
         bcc     @Exit
         inc     Workset + EntityV18
         ; set movement speed to +1
@@ -5860,7 +5999,7 @@ LA642:
         jsr     WorksetMoveX                           ; A645 20 FA 97                  ..
         lda     Workset + EntityX  + 1                            ; A648 A5 23                    .#
         lda     #$01                            ; A64A A9 01                    ..
-        and     Workset + EntityV1F                             ; A64C 25 3F                    %?
+        and     Workset + EntityFlags1F                             ; A64C 25 3F                    %?
         bne     LA658                           ; A64E D0 08                    ..
         .byte   $C9,$10,$F0,$04,$A9,$00,$85,$20 ; A650 C9 10 F0 04 A9 00 85 20  ....... 
 ; ----------------------------------------------------------------------------
@@ -5915,7 +6054,7 @@ LA6A2:
         ldy     #$01                            ; A6A7 A0 01                    ..
         jsr     ApproachYSpeed                           ; A6A9 20 41 98                  A.
         jsr     WorksetMoveY                           ; A6AC 20 1B 98                  ..
-        jsr     L99D0                           ; A6AF 20 D0 99                  ..
+        jsr     EncounterClampWorksetMaximumY                           ; A6AF 20 D0 99                  ..
         bcc     LA6BC                           ; A6B2 90 08                    ..
         lda     #$80                            ; A6B4 A9 80                    ..
         sta     $38                             ; A6B6 85 38                    .8
@@ -5988,7 +6127,7 @@ LA71E:
         ldy     #$01                            ; A720 A0 01                    ..
         jsr     ApproachYSpeed                           ; A722 20 41 98                  A.
         jsr     WorksetMoveY                           ; A725 20 1B 98                  ..
-        jsr     L99D0                           ; A728 20 D0 99                  ..
+        jsr     EncounterClampWorksetMaximumY                           ; A728 20 D0 99                  ..
         bcc     LA735                           ; A72B 90 08                    ..
         lda     #$80                            ; A72D A9 80                    ..
         sta     $38                             ; A72F 85 38                    .8
@@ -10204,11 +10343,11 @@ BonusRunSingleJellyfish:
         lda #$00
         sta Workset + EntityActiveAnimationIndex
         sta Workset + EntityV1A
-        sta Workset + EntityV1D
+        sta Workset + EntityInvincibilityFrames
         lda #AnimationEncounterJellyfishDeath
         jmp WorksetAnimationPlay
 @AlreadyInitialized:
-        bit     Workset + EntityV1D                             ; D355 24 3D                    $=
+        bit     Workset + EntityInvincibilityFrames                             ; D355 24 3D                    $=
         bpl     LD35C                           ; D357 10 03                    ..
         jmp     LD4B8                           ; D359 4C B8 D4                 L..
 
@@ -10296,7 +10435,7 @@ LD3C2:
         lda     LD4DD,x                         ; D3DB BD DD D4                 ...
         jsr     AwardPoints                           ; D3DE 20 D0 8C                  ..
         lda     #$80                            ; D3E1 A9 80                    ..
-        sta     Workset + EntityV1D                             ; D3E3 85 3D                    .=
+        sta     Workset + EntityInvincibilityFrames                             ; D3E3 85 3D                    .=
         lda     #$00                            ; D3E5 A9 00                    ..
         sta     Workset + EntityYSubspeed                            ; D3E7 85 32                    .2
         lda     #$FF                            ; D3E9 A9 FF                    ..
@@ -10350,7 +10489,7 @@ LD43E:
         bit     Workset + EntityActiveAnimationIndex                             ; D447 24 35                    $5
         bvs     LD458                           ; D449 70 0D                    p.
         lda     #$01                            ; D44B A9 01                    ..
-        bit     Workset + EntityV1F                             ; D44D 24 3F                    $?
+        bit     Workset + EntityFlags1F                             ; D44D 24 3F                    $?
         beq     LD463                           ; D44F F0 12                    ..
         lda     #$C0                            ; D451 A9 C0                    ..
         sta     Workset + EntityActiveAnimationIndex                             ; D453 85 35                    .5
@@ -10359,7 +10498,7 @@ LD43E:
 ; ----------------------------------------------------------------------------
 LD458:
         lda     #$01                            ; D458 A9 01                    ..
-        bit     Workset + EntityV1F                             ; D45A 24 3F                    $?
+        bit     Workset + EntityFlags1F                             ; D45A 24 3F                    $?
         bne     LD463                           ; D45C D0 05                    ..
         .byte   $A9,$00,$85,$20,$60             ; D45E A9 00 85 20 60           ... `
 ; ----------------------------------------------------------------------------
@@ -10427,12 +10566,12 @@ LD4B7:
 LD4B8:
         jsr     WorksetAnimationAdvance
         jsr     WorksetMoveY
-        bit     Workset + EntityV1D
+        bit     Workset + EntityInvincibilityFrames
         bvs     @LD4CF
         lda     Workset + EntityAnimTimer
         bne     @Done
         lda     #$C0
-        sta     Workset + EntityV1D
+        sta     Workset + EntityInvincibilityFrames
         lda     Workset + EntityV1C
         jmp     WorksetAnimationPlay
 @LD4CF:
@@ -11066,7 +11205,7 @@ LDB9E:
 ; ----------------------------------------------------------------------------
 LDBA5:
         lda     #$02                            ; DBA5 A9 02                    ..
-        bit     Workset + EntityV1F                             ; DBA7 24 3F                    $?
+        bit     Workset + EntityFlags1F                             ; DBA7 24 3F                    $?
         beq     LDBB1                           ; DBA9 F0 06                    ..
         .byte   $A5,$21,$29,$01,$85,$21         ; DBAB A5 21 29 01 85 21        .!)..!
 ; ----------------------------------------------------------------------------
@@ -11148,9 +11287,9 @@ LDC11:
 LDC1A:
         sta     Workset + EntityAnimTimer                             ; DC1A 85 2B                    .+
         tax                                     ; DC1C AA                       .
-        lda     Workset + EntityV1F                             ; DC1D A5 3F                    .?
-        and     #$FD                            ; DC1F 29 FD                    ).
-        sta     Workset + EntityV1F                             ; DC21 85 3F                    .?
+        lda     Workset + EntityFlags1F                             ; DC1D A5 3F                    .?
+        and     #($FF ^ EntityFlag1FBit2)                            ; DC1F 29 FD                    ).
+        sta     Workset + EntityFlags1F                             ; DC21 85 3F                    .?
         lda     ($28),y                         ; DC23 B1 28                    .(
         iny                                     ; DC25 C8                       .
         sta     Workset + (EntitySpritesetPtr + 0)                            ; DC26 85 26                    .&
@@ -11251,134 +11390,150 @@ LDCBB:
 
 ; ----------------------------------------------------------------------------
 EnterOutroScreen:
-        jsr     PPUDisableNMI                           ; DCC1 20 EA 8B                  ..
-        jsr     ClearScreenAndSprites                           ; DCC4 20 12 8E                  ..
-        jsr     DrawStatusLine                           ; DCC7 20 8F A7                  ..
-        lda     #RomGraphicsBonusScreenHitsLabel                            ; DCCA A9 05                    ..
-        jsr     DrawRomGraphics                           ; DCCC 20 69 8D                  i.
-        lda     #EncounterBackgroundDeep                            ; DCCF A9 01                    ..
-        jsr     LoadEncounterBackground                           ; DCD1 20 E6 AC                  ..
-        lda     #RomGraphicsEncounterDeep                            ; DCD4 A9 03                    ..
-        jsr     DrawRomGraphics                           ; DCD6 20 69 8D                  i.
-        lda     #PaletteEncounterDeep                            ; DCD9 A9 03                    ..
-        jsr     StoreActivePaletteAndWaitFor1Frame                           ; DCDB 20 BD 8E                  ..
-        lda     #CHREncounterAndIntroScreen
-        sta     ActiveCHR                           ; DCE0 8D 07 03                 ...
-        lda     #$00                            ; DCE3 A9 00                    ..
-        sta     SCROLL_X                           ; DCE5 8D 20 03                 . .
-        sta     UseHighPPUNametables                           ; DCE8 8D 23 03                 .#.
-        sta     CameraX                           ; DCEB 8D 38 03                 .8.
-        sta     CameraX+1                           ; DCEE 8D 39 03                 .9.
-        sta     CameraY+1                           ; DCF1 8D 3B 03                 .;.
-        lda     #$20                            ; DCF4 A9 20                    . 
-        sta     SCROLL_Y                           ; DCF6 8D 22 03                 .".
-        sta     CameraY                           ; DCF9 8D 3A 03                 .:.
-        jsr     ClearEntityMemory                           ; DCFC 20 7C 97                  |.
-        sta     NMISpriteHandlingDisabled                           ; DCFF 8D 02 03                 ...
-        jsr     PPUEnableNMI                           ; DD02 20 DE 8B                  ..
-        jsr     PPUEnableAndWaitFor1Frame                           ; DD05 20 C2 8B                  ..
+        jsr PPUDisableNMI
+        jsr ClearScreenAndSprites
+        jsr DrawStatusLine
+        lda #RomGraphicsBonusScreenHitsLabel
+        jsr DrawRomGraphics
+        lda #EncounterBackgroundDeep
+        jsr LoadEncounterBackground
+        lda #RomGraphicsEncounterDeep
+        jsr DrawRomGraphics
+        lda #PaletteEncounterDeep
+        jsr StoreActivePaletteAndWaitFor1Frame
+        lda #CHREncounterAndIntroScreen
+        sta ActiveCHR
+        lda #$00
+        sta SCROLL_X
+        sta UseHighPPUNametables
+        sta CameraX
+        sta CameraX+1
+        sta CameraY+1
+        lda #$20
+        sta SCROLL_Y
+        sta CameraY
+        jsr ClearEntityMemory
+        sta NMISpriteHandlingDisabled
+        jsr PPUEnableNMI
+        jsr PPUEnableAndWaitFor1Frame
 LDD08:
-        jsr     WaitFor1Frame                           ; DD08 20 40 8C                  @.
-        jsr     LDE92                           ; DD0B 20 92 DE                  ..
-        jsr     UpdateEntitySprites                           ; DD0E 20 37 9A                  7.
-        lda     PlayerData + EntityHeader                           ; DD11 AD 80 06                 ...
-        bne     LDD08                           ; DD14 D0 F2                    ..
-        jsr     PPUDisableNMI                           ; DD16 20 EA 8B                  ..
-        jsr     PPUDisableRendering                           ; DD19 20 B6 8B                  ..
-        lda     PPUCTRL_MIRROR                           ; DD1C AD 0E 03                 ...
-        ora     #$18                            ; DD1F 09 18                    ..
-        sta     PPUCTRL_MIRROR                           ; DD21 8D 0E 03                 ...
-        jsr     ClearScreenAndSprites                           ; DD24 20 12 8E                  ..
-        lda     #PaletteOutroScreen                            ; DD27 A9 05                    ..
-        jsr     StoreActivePaletteAndWaitFor1Frame                           ; DD29 20 BD 8E                  ..
-        lda     #CHRFinaleAndOutroScreen
-        sta     ActiveCHR                           ; DD2E 8D 07 03                 ...
-        lda     #RomGraphicsOutroScreen                            ; DD31 A9 06                    ..
-        jsr     DrawRomGraphics                           ; DD33 20 69 8D                  i.
-        lda     #$00                            ; DD36 A9 00                    ..
-        sta     SCROLL_X                           ; DD38 8D 20 03                 . .
-        sta     SCROLL_Y                           ; DD3B 8D 22 03                 .".
-        sta     UseHighPPUNametables                           ; DD3E 8D 23 03                 .#.
-        sta     CameraX                           ; DD41 8D 38 03                 .8.
-        sta     CameraX+1                           ; DD44 8D 39 03                 .9.
-        sta     CameraY                           ; DD47 8D 3A 03                 .:.
-        sta     CameraY+1                           ; DD4A 8D 3B 03                 .;.
-        jsr     ClearEntityMemory                           ; DD4D 20 7C 97                  |.
-        lda     #$01                            ; DD50 A9 01                    ..
-        sta     NMISpriteHandlingDisabled                           ; DD52 8D 02 03                 ...
-        jsr     PPUEnableNMI                           ; DD55 20 DE 8B                  ..
-        jsr     PPUEnableAndWaitFor1Frame                           ; DD58 20 C2 8B                  ..
-        lda     #$00                            ; DD5B A9 00                    ..
-        sta     NMIRaisedFlag                           ; DD5D 8D 01 03                 ...
-LDD60:
-        jsr     WaitFor1Frame                           ; DD60 20 40 8C                  @.
-        jsr     LDDC5                           ; DD63 20 C5 DD                  ..
-        jsr     UpdateEntitySprites                           ; DD66 20 37 9A                  7.
-        lda     PlayerData + EntityHeader                           ; DD69 AD 80 06                 ...
-        bne     LDD60                           ; DD6C D0 F2                    ..
-        ldy     #$3C                            ; DD6E A0 3C                    .<
-        jsr     WaitForYFrames                           ; DD70 20 50 8C                  P.
-        jsr     CopyToVRAMBuffer                           ; DD73 20 A1 A8                  ..
-        .addr   LDDA9
+        jsr WaitFor1Frame
+        jsr LDE92
+        jsr UpdateEntitySprites
+        lda PlayerData + EntityHeader
+        bne LDD08
+        jsr PPUDisableNMI
+        jsr PPUDisableRendering
+        lda PPUCTRL_MIRROR
+        ora #$18
+        sta PPUCTRL_MIRROR
+        jsr ClearScreenAndSprites
+        lda #PaletteOutroScreen
+        jsr StoreActivePaletteAndWaitFor1Frame
+        lda #CHRFinaleAndOutroScreen
+        sta ActiveCHR
+        lda #RomGraphicsOutroScreen
+        jsr DrawRomGraphics
+        lda #$00
+        sta SCROLL_X
+        sta SCROLL_Y
+        sta UseHighPPUNametables
+        sta CameraX
+        sta CameraX+1
+        sta CameraY
+        sta CameraY+1
+        jsr ClearEntityMemory
+        lda #$01
+        sta NMISpriteHandlingDisabled
+        jsr PPUEnableNMI
+        jsr PPUEnableAndWaitFor1Frame
+        lda #$00
+        sta NMIRaisedFlag
+@WaitUntilAnimationFinish:
+        jsr WaitFor1Frame
+        jsr OutroPlayPlaneAnimation
+        jsr UpdateEntitySprites
+        lda PlayerData + EntityHeader
+        bne @WaitUntilAnimationFinish
+        ldy #$3C
+        jsr WaitForYFrames
+        ; show THE END text in the bottom right corner.
+        jsr CopyToVRAMBuffer
+        .addr @OutroTextRow1
+        jsr CopyToVRAMBuffer
+        .addr @OutroTextRow2
+        jsr CopyToVRAMBuffer
+        .addr @OutroTextRowAttributes
+        jsr SetNextPendingBGUpdate
+        ; and play some outro music.
+        lda #MusicOutroScreen
+        jsr SoundPlay
+@KeepEnjoyingTheOutro:
+        ; loop until sound stops.
+        jsr WaitFor1Frame
+        lda $0574
+        bmi @KeepEnjoyingTheOutro
+        ; check for start inputs to restart the game after the outro music finishes.
+        ; one problem - the outro music repeats, so we never get here. :)
+        ; so we can enjoy the ending tune forever!
+        jsr ReadJoypads
+        lda #(JOY_START)
+        bit Joy1Pressed
+        beq @KeepEnjoyingTheOutro
+        lda PPUCTRL_MIRROR
+        ; clear sprite and background nametables,
+        ; and set sprite nametable to $1000
+        and #%11100111         
+        ora #%00001000
+        sta PPUCTRL_MIRROR
+        ; then head back to startup.
+        jmp GameStartup        
+
+
+
+@OutroTextRow1:
+        .addr $2356
+        .byte $08
+        .byte $E8,$E9,$EA,$EB,$EC,$ED,$EE,$EF
+@OutroTextRow2:
+        .addr $2376
+        .byte $08
+        .byte $F8,$F9,$FA,$FB,$FC,$FD,$FE,$FF
+@OutroTextRowAttributes:
+        .addr $23F5
+        .byte $03
+        .byte $7F,$5F,$DF
+
 ; ----------------------------------------------------------------------------
-        jsr     CopyToVRAMBuffer                           ; DD78 20 A1 A8                  ..
-        .addr   LDDB4                         ; DD7B B4 DD                    ..
-; ----------------------------------------------------------------------------
-        jsr     CopyToVRAMBuffer                           ; DD7D 20 A1 A8                  ..
-        .addr   LDDBF                        ; DD80 BF DD                    ..
-; ----------------------------------------------------------------------------
-        jsr     SetNextPendingBGUpdate                           ; DD82 20 5F 8B                  _.
-        lda     #MusicOutroScreen                            ; DD85 A9 04                    ..
-        jsr     SoundPlay                           ; DD87 20 CD E2                  ..
-LDD8A:
-        jsr     WaitFor1Frame                           ; DD8A 20 40 8C                  @.
-        lda     $0574                           ; DD8D AD 74 05                 .t.
-        bmi     LDD8A                           ; DD90 30 F8                    0.
-        jsr     ReadJoypads                           ; DD92 20 87 8C                  ..
-        lda     #$08                            ; DD95 A9 08                    ..
-        bit     Joy1Pressed                           ; DD97 2C 32 03                 ,2.
-        beq     LDD8A                           ; DD9A F0 EE                    ..
-        .byte   $AD,$0E,$03,$29,$E7,$09,$08,$8D ; DD9C AD 0E 03 29 E7 09 08 8D  ...)....
-        .byte   $0E,$03,$4C,$48,$81
-LDDA9:
-        .byte   $56,$23,$08 ; DDA4 0E 03 4C 48 81 56 23 08  ..LH.V#.
-        .byte   $E8,$E9,$EA,$EB,$EC,$ED,$EE,$EF ; DDAC E8 E9 EA EB EC ED EE EF  ........
-LDDB4:
-        .byte   $76,$23,$08,$F8,$F9,$FA,$FB,$FC ; DDB4 76 23 08 F8 F9 FA FB FC  v#......
-        .byte   $FD,$FE,$FF
-LDDBF:
-        .byte $F5,$23,$03,$7F,$5F ; DDBC FD FE FF F5 23 03 7F 5F  ....#.._
-        .byte   $DF                             ; DDC4 DF                       .
-; ----------------------------------------------------------------------------
-LDDC5:
-        lda     #<PlayerData                            ; DDC5 A9 80                    ..
-        sta     WorksetPtr                             ; DDC7 85 40                    .@
-        lda     #>PlayerData                            ; DDC9 A9 06                    ..
-        sta     WorksetPtr+1                             ; DDCB 85 41                    .A
-        jsr     WorksetLoad                           ; DDCD 20 54 97                  T.
-        bit     Workset + EntityHeader                             ; DDD0 24 20                    $ 
-        bmi     LDE00                           ; DDD2 30 2C                    0,
-        lda     #(EntityHeaderActive | EntityHeader7)                            ; DDD4 A9 C0                    ..
-        sta     Workset + EntityHeader                             ; DDD6 85 20                    . 
-        lda     #$40                            ; DDD8 A9 40                    .@
-        sta     Workset + EntityX                             ; DDDA 85 22                    ."
-        lda     #$01                            ; DDDC A9 01                    ..
-        sta     Workset + EntityX  + 1                            ; DDDE 85 23                    .#
-        lda     #$90                            ; DDE0 A9 90                    ..
-        sta     Workset + EntityY                             ; DDE2 85 24                    .$
-        lda     #$00                            ; DDE4 A9 00                    ..
-        sta     Workset + EntityY + 1                             ; DDE6 85 25                    .%
-        lda     #$00                            ; DDE8 A9 00                    ..
-        sta     Workset + EntityXSubspeed                             ; DDEA 85 30                    .0
-        lda     #$FC                            ; DDEC A9 FC                    ..
-        sta     Workset + EntityXSpeed                             ; DDEE 85 31                    .1
-        lda     #$00                            ; DDF0 A9 00                    ..
-        sta     Workset + EntityYSubspeed                            ; DDF2 85 32                    .2
-        lda     #$FF                            ; DDF4 A9 FF                    ..
-        sta     Workset + EntityYSpeed                             ; DDF6 85 33                    .3
-        lda     #AnimationOutroPlane1                            ; DDF8 A9 08                    ..
-        jsr     WorksetAnimationPlay                           ; DDFA 20 AD 97                  ..
-        jmp     WorksetSave                           ; DDFD 4C 61 97                 La.
+OutroPlayPlaneAnimation:
+        lda #<PlayerData
+        sta WorksetPtr
+        lda #>PlayerData
+        sta WorksetPtr+1
+        jsr WorksetLoad
+        bit Workset + EntityHeader
+        bmi LDE00
+        lda #(EntityHeaderActive | EntityHeader7)
+        sta Workset + EntityHeader
+        lda #$40
+        sta Workset + EntityX
+        lda #$01
+        sta Workset + EntityX  + 1
+        lda #$90
+        sta Workset + EntityY
+        lda #$00
+        sta Workset + EntityY + 1
+        lda #$00
+        sta Workset + EntityXSubspeed
+        lda #$FC
+        sta Workset + EntityXSpeed
+        lda #$00
+        sta Workset + EntityYSubspeed
+        lda #$FF
+        sta Workset + EntityYSpeed
+        lda #AnimationOutroPlane1
+        jsr WorksetAnimationPlay
+        jmp WorksetSave
 
 ; ----------------------------------------------------------------------------
 LDE00:
@@ -11389,7 +11544,7 @@ LDE00:
         bit     Workset + EntityActiveAnimationIndex                             ; DE0A 24 35                    $5
         bmi     LDE1B                           ; DE0C 30 0D                    0.
         lda     #$01                            ; DE0E A9 01                    ..
-        bit     Workset + EntityV1F                             ; DE10 24 3F                    $?
+        bit     Workset + EntityFlags1F                             ; DE10 24 3F                    $?
         beq     LDE18                           ; DE12 F0 04                    ..
         lda     #$80                            ; DE14 A9 80                    ..
         sta     Workset + EntityActiveAnimationIndex                             ; DE16 85 35                    .5
@@ -11399,7 +11554,7 @@ LDE18:
 ; ----------------------------------------------------------------------------
 LDE1B:
         lda     #$01                            ; DE1B A9 01                    ..
-        bit     Workset + EntityV1F                             ; DE1D 24 3F                    $?
+        bit     Workset + EntityFlags1F                             ; DE1D 24 3F                    $?
         bne     LDE18                           ; DE1F D0 F7                    ..
         lda     #$38                            ; DE21 A9 38                    .8
         sta     Workset + EntityY                             ; DE23 85 24                    .$
@@ -11439,7 +11594,7 @@ LDE5A:
         bit     Workset + EntityActiveAnimationIndex                             ; DE60 24 35                    $5
         bmi     LDE71                           ; DE62 30 0D                    0.
         lda     #$01                            ; DE64 A9 01                    ..
-        bit     Workset + EntityV1F                             ; DE66 24 3F                    $?
+        bit     Workset + EntityFlags1F                             ; DE66 24 3F                    $?
         beq     LDE6E                           ; DE68 F0 04                    ..
         lda     #$80                            ; DE6A A9 80                    ..
         sta     Workset + EntityActiveAnimationIndex                             ; DE6C 85 35                    .5
@@ -11449,7 +11604,7 @@ LDE6E:
 ; ----------------------------------------------------------------------------
 LDE71:
         ldy     #$04                            ; DE71 A0 04                    ..
-        jsr     L98B8                           ; DE73 20 B8 98                  ..
+        jsr     SlowdownXByY                           ; DE73 20 B8 98                  ..
         bcc     LDE6E                           ; DE76 90 F6                    ..
         lda     #$02                            ; DE78 A9 02                    ..
         sta     $34                             ; DE7A 85 34                    .4
