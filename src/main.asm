@@ -272,6 +272,14 @@ EntityTypeProjectileSubmarineBomb     = $01
 EntityTypeProjectileSubmarineBullet   = $02
 EntityTypeProjectileHarpoon           = $03
 
+EncounterEntityJellyfish        = $0
+EncounterEntityStingray         = $1
+EncounterEntityHomingJellyfish  = $2
+EncounterEntityBabyshark        = $3
+EncounterEntityStingray2        = $4
+EncounterEntityCrab             = $8
+EncounterEntityStar             = $9
+EncounterEntityShell            = $A
 
 EntityHeaderActive          = %10000000
 ; all i can find using this flag is if it blocks projectiles
@@ -5630,14 +5638,14 @@ SharedRTS:
         rts
 
 CrabOrStarRNG:
-        .byte $00
-        .byte $00
-        .byte $00
-        .byte $08 ; crab
-        .byte $00
-        .byte $00
-        .byte $00
-        .byte $09 ; star
+        .byte 0
+        .byte 0
+        .byte 0
+        .byte EncounterEntityCrab
+        .byte 0
+        .byte 0
+        .byte 0
+        .byte EncounterEntityStar
 
 ; pretty near duplicate of jellyfish code, except it moves towards the player.
 RunEntityHomingJellyfish:
@@ -5960,14 +5968,14 @@ RunEntityStingray:
 @Exit:
         rts
 @RewardRNG:
-        .byte $00
-        .byte $08 ; crab
-        .byte $00
-        .byte $09 ; star
-        .byte $00
-        .byte $0A ; shell
-        .byte $00
-        .byte $09 ; star
+        .byte 0
+        .byte EncounterEntityCrab
+        .byte 0
+        .byte EncounterEntityStar
+        .byte 0
+        .byte EncounterEntityShell
+        .byte 0
+        .byte EncounterEntityStar
 @StingraySpeeds:
         .byte $00,$01 ; slow stingray heading right
         .byte $00,$FF ; slow stingray heading left
@@ -6155,7 +6163,7 @@ RunEntityBabyshark:
 @ProcessDeath:
         lda #EntityHeaderActive
         sta Workset + EntityHeader
-        lda #$09 ; spawn a star
+        lda #EncounterEntityStar ; spawn a star on death
         sta Workset + EntityType
         jmp RunEntity
 
@@ -9357,96 +9365,127 @@ EncounterPatterns:
 @EncounterPatterns00Data:
 .byte $02, $40
 .addr @EncounterSpawns00Data
+
 @EncounterPatterns01Data:
 .byte $02, $40
 .addr @EncounterSpawns01Data
+
 @EncounterPatterns02Data:
 .byte $03, $30
 .addr @EncounterSpawns00Data
+
 @EncounterPatterns03Data:
 .byte $03, $30
 .addr @EncounterSpawns01Data
+
 @EncounterPatterns04Data:
 .byte $03, $20
 .addr @EncounterSpawns02Data
+
 @EncounterPatterns05Data:
 .byte $03, $20
 .addr @EncounterSpawns03Data
+
 @EncounterPatterns06Data:
 .byte $04, $20
 .addr @EncounterSpawns00Data
+
 @EncounterPatterns07Data:
 .byte $04, $20
 .addr @EncounterSpawns01Data
+
 @EncounterPatterns08Data:
 .byte $04, $10
 .addr @EncounterSpawns02Data
+
 @EncounterPatterns09Data:
 .byte $04, $10
 .addr @EncounterSpawns03Data
+
 @EncounterPatterns0AData:
 .byte $03, $10
 .addr @EncounterSpawns04Data
+
 @EncounterPatterns0BData:
 .byte $03, $10
 .addr @EncounterSpawns05Data
+
 @EncounterPatterns0CData:
 .byte $04, $10
 .addr @EncounterSpawns05Data
+
 @EncounterPatterns0DData:
 .byte $02, $10
 .addr @EncounterSpawns06Data
+
 @EncounterPatterns0EData:
 .byte $02, $10
 .addr @EncounterSpawns07Data
+
 @EncounterPatterns0FData:
 .byte $02, $10
 .addr @EncounterSpawns08Data
+
 @EncounterPatterns10Data:
 .byte $03, $08
 .addr @EncounterSpawns05Data
+
 @EncounterPatterns11Data:
 .byte $03, $08
 .addr @EncounterSpawns06Data
+
 @EncounterPatterns12Data:
 .byte $03, $08
 .addr @EncounterSpawns07Data
+
 @EncounterPatterns13Data:
 .byte $03, $08
 .addr @EncounterSpawns08Data
+
 @EncounterPatterns14Data:
 .byte $03, $08
 .addr @EncounterSpawns09Data
+
 @EncounterPatterns15Data:
 .byte $03, $08
 .addr @EncounterSpawns0AData
+
 @EncounterPatterns16Data:
 .byte $03, $08
 .addr @EncounterSpawns0BData
+
 @EncounterPatterns17Data:
 .byte $03, $08
 .addr @EncounterSpawns0CData
+
 @EncounterPatterns18Data:
 .byte $04, $04
 .addr @EncounterSpawns05Data
+
 @EncounterPatterns19Data:
 .byte $04, $04
 .addr @EncounterSpawns06Data
+
 @EncounterPatterns1AData:
 .byte $04, $04
 .addr @EncounterSpawns07Data
+
 @EncounterPatterns1BData:
 .byte $04, $04
 .addr @EncounterSpawns08Data
+
 @EncounterPatterns1CData:
 .byte $04, $04
 .addr @EncounterSpawns09Data
+
 @EncounterPatterns1DData:
 .byte $04, $04
 .addr @EncounterSpawns0AData
+
 @EncounterPatterns1EData:
 .byte $04, $04
 .addr @EncounterSpawns0BData
+
 @EncounterPatterns1FData:
 .byte $04, $04
 .addr @EncounterSpawns0CData
@@ -9455,136 +9494,424 @@ EncounterPatterns:
 ; tables of enemies to spawn.
 ; each encounter is terminated by $FF.
 ; the numbers indicate what kind of enemy to spawn.
-;  0 - jellyfish
-;  1 - stingray
-;  2 - homing stingray
-;  3 - baby shark
-;  4 - stingray
 @EncounterSpawns00Data:
-.byte $00,$01,$00,$01
-.byte $00,$01,$00,$01
-.byte $00,$01,$00,$01
-.byte $00,$01,$00,$01
-.byte $00,$01,$00,$01
-.byte $00,$01,$00,$01
+.byte EncounterEntityJellyfish
+.byte EncounterEntityStingray
+.byte EncounterEntityJellyfish
+.byte EncounterEntityStingray
+.byte EncounterEntityJellyfish
+.byte EncounterEntityStingray
+.byte EncounterEntityJellyfish
+.byte EncounterEntityStingray
+.byte EncounterEntityJellyfish
+.byte EncounterEntityStingray
+.byte EncounterEntityJellyfish
+.byte EncounterEntityStingray
+.byte EncounterEntityJellyfish
+.byte EncounterEntityStingray
+.byte EncounterEntityJellyfish
+.byte EncounterEntityStingray
+.byte EncounterEntityJellyfish
+.byte EncounterEntityStingray
+.byte EncounterEntityJellyfish
+.byte EncounterEntityStingray
+.byte EncounterEntityJellyfish
+.byte EncounterEntityStingray
+.byte EncounterEntityJellyfish
+.byte EncounterEntityStingray
 .byte $FF
 @EncounterSpawns01Data:
-.byte $01,$01,$00,$01
-.byte $01,$00,$01,$01
-.byte $00,$01,$01,$00
-.byte $01,$01,$00,$01
-.byte $01,$00,$01,$01
-.byte $00,$01,$01,$03
+.byte EncounterEntityStingray
+.byte EncounterEntityStingray
+.byte EncounterEntityJellyfish
+.byte EncounterEntityStingray
+.byte EncounterEntityStingray
+.byte EncounterEntityJellyfish
+.byte EncounterEntityStingray
+.byte EncounterEntityStingray
+.byte EncounterEntityJellyfish
+.byte EncounterEntityStingray
+.byte EncounterEntityStingray
+.byte EncounterEntityJellyfish
+.byte EncounterEntityStingray
+.byte EncounterEntityStingray
+.byte EncounterEntityJellyfish
+.byte EncounterEntityStingray
+.byte EncounterEntityStingray
+.byte EncounterEntityJellyfish
+.byte EncounterEntityStingray
+.byte EncounterEntityStingray
+.byte EncounterEntityJellyfish
+.byte EncounterEntityStingray
+.byte EncounterEntityStingray
+.byte EncounterEntityBabyshark
 .byte $FF
 @EncounterSpawns02Data:
-.byte $00,$00,$00,$00
-.byte $00,$00,$00,$00
-.byte $00,$00,$00,$01
-.byte $00,$00,$00,$01
-.byte $00,$01,$00,$01
-.byte $00,$01,$00,$01
-.byte $01,$01,$01,$00
-.byte $01,$01,$01,$03
+.byte EncounterEntityJellyfish
+.byte EncounterEntityJellyfish
+.byte EncounterEntityJellyfish
+.byte EncounterEntityJellyfish
+.byte EncounterEntityJellyfish
+.byte EncounterEntityJellyfish
+.byte EncounterEntityJellyfish
+.byte EncounterEntityJellyfish
+.byte EncounterEntityJellyfish
+.byte EncounterEntityJellyfish
+.byte EncounterEntityJellyfish
+.byte EncounterEntityStingray
+.byte EncounterEntityJellyfish
+.byte EncounterEntityJellyfish
+.byte EncounterEntityJellyfish
+.byte EncounterEntityStingray
+.byte EncounterEntityJellyfish
+.byte EncounterEntityStingray
+.byte EncounterEntityJellyfish
+.byte EncounterEntityStingray
+.byte EncounterEntityJellyfish
+.byte EncounterEntityStingray
+.byte EncounterEntityJellyfish
+.byte EncounterEntityStingray
+.byte EncounterEntityStingray
+.byte EncounterEntityStingray
+.byte EncounterEntityStingray
+.byte EncounterEntityJellyfish
+.byte EncounterEntityStingray
+.byte EncounterEntityStingray
+.byte EncounterEntityStingray
+.byte EncounterEntityBabyshark
 .byte $FF
 @EncounterSpawns03Data:
-.byte $00,$01,$02,$00
-.byte $01,$02,$00,$01
-.byte $02,$03,$00,$01
-.byte $02,$00,$01,$02
-.byte $00,$01,$02,$03
-.byte $00,$01,$02,$00
-.byte $01,$02,$00,$01
-.byte $02,$00,$01,$03
+.byte EncounterEntityJellyfish
+.byte EncounterEntityStingray
+.byte EncounterEntityHomingJellyfish
+.byte EncounterEntityJellyfish
+.byte EncounterEntityStingray
+.byte EncounterEntityHomingJellyfish
+.byte EncounterEntityJellyfish
+.byte EncounterEntityStingray
+.byte EncounterEntityHomingJellyfish
+.byte EncounterEntityBabyshark
+.byte EncounterEntityJellyfish
+.byte EncounterEntityStingray
+.byte EncounterEntityHomingJellyfish
+.byte EncounterEntityJellyfish
+.byte EncounterEntityStingray
+.byte EncounterEntityHomingJellyfish
+.byte EncounterEntityJellyfish
+.byte EncounterEntityStingray
+.byte EncounterEntityHomingJellyfish
+.byte EncounterEntityBabyshark
+.byte EncounterEntityJellyfish
+.byte EncounterEntityStingray
+.byte EncounterEntityHomingJellyfish
+.byte EncounterEntityJellyfish
+.byte EncounterEntityStingray
+.byte EncounterEntityHomingJellyfish
+.byte EncounterEntityJellyfish
+.byte EncounterEntityStingray
+.byte EncounterEntityHomingJellyfish
+.byte EncounterEntityJellyfish
+.byte EncounterEntityStingray
+.byte EncounterEntityBabyshark
 .byte $FF
 @EncounterSpawns04Data:
-.byte $01,$01,$01,$01
-.byte $01,$01,$01,$01
-.byte $01,$01,$01,$03
-.byte $01,$01,$01,$01
-.byte $01,$01,$01,$03
-.byte $01,$01,$01,$01
-.byte $01,$03,$01,$01
-.byte $01,$01,$01,$03
-.byte $01,$01,$01,$03
-.byte $01,$01,$01,$03
+.byte EncounterEntityStingray
+.byte EncounterEntityStingray
+.byte EncounterEntityStingray
+.byte EncounterEntityStingray
+.byte EncounterEntityStingray
+.byte EncounterEntityStingray
+.byte EncounterEntityStingray
+.byte EncounterEntityStingray
+.byte EncounterEntityStingray
+.byte EncounterEntityStingray
+.byte EncounterEntityStingray
+.byte EncounterEntityBabyshark
+.byte EncounterEntityStingray
+.byte EncounterEntityStingray
+.byte EncounterEntityStingray
+.byte EncounterEntityStingray
+.byte EncounterEntityStingray
+.byte EncounterEntityStingray
+.byte EncounterEntityStingray
+.byte EncounterEntityBabyshark
+.byte EncounterEntityStingray
+.byte EncounterEntityStingray
+.byte EncounterEntityStingray
+.byte EncounterEntityStingray
+.byte EncounterEntityStingray
+.byte EncounterEntityBabyshark
+.byte EncounterEntityStingray
+.byte EncounterEntityStingray
+.byte EncounterEntityStingray
+.byte EncounterEntityStingray
+.byte EncounterEntityStingray
+.byte EncounterEntityBabyshark
+.byte EncounterEntityStingray
+.byte EncounterEntityStingray
+.byte EncounterEntityStingray
+.byte EncounterEntityBabyshark
+.byte EncounterEntityStingray
+.byte EncounterEntityStingray
+.byte EncounterEntityStingray
+.byte EncounterEntityBabyshark
 .byte $FF
 @EncounterSpawns05Data:
-.byte $02,$02,$02,$02
-.byte $02,$02,$02,$02
-.byte $02,$02,$02,$02
-.byte $02,$02,$02,$02
-.byte $02,$02,$02,$02
-.byte $02,$02,$02,$02
-.byte $02,$02,$02,$02
-.byte $02,$02,$02,$02
+.byte EncounterEntityHomingJellyfish
+.byte EncounterEntityHomingJellyfish
+.byte EncounterEntityHomingJellyfish
+.byte EncounterEntityHomingJellyfish
+.byte EncounterEntityHomingJellyfish
+.byte EncounterEntityHomingJellyfish
+.byte EncounterEntityHomingJellyfish
+.byte EncounterEntityHomingJellyfish
+.byte EncounterEntityHomingJellyfish
+.byte EncounterEntityHomingJellyfish
+.byte EncounterEntityHomingJellyfish
+.byte EncounterEntityHomingJellyfish
+.byte EncounterEntityHomingJellyfish
+.byte EncounterEntityHomingJellyfish
+.byte EncounterEntityHomingJellyfish
+.byte EncounterEntityHomingJellyfish
+.byte EncounterEntityHomingJellyfish
+.byte EncounterEntityHomingJellyfish
+.byte EncounterEntityHomingJellyfish
+.byte EncounterEntityHomingJellyfish
+.byte EncounterEntityHomingJellyfish
+.byte EncounterEntityHomingJellyfish
+.byte EncounterEntityHomingJellyfish
+.byte EncounterEntityHomingJellyfish
+.byte EncounterEntityHomingJellyfish
+.byte EncounterEntityHomingJellyfish
+.byte EncounterEntityHomingJellyfish
+.byte EncounterEntityHomingJellyfish
+.byte EncounterEntityHomingJellyfish
+.byte EncounterEntityHomingJellyfish
+.byte EncounterEntityHomingJellyfish
+.byte EncounterEntityHomingJellyfish
 .byte $FF
 @EncounterSpawns06Data:
-.byte $03,$03,$03,$03
-.byte $03,$03,$03,$03
-.byte $03,$03,$03,$03
-.byte $03,$03,$03,$03
+.byte EncounterEntityBabyshark
+.byte EncounterEntityBabyshark
+.byte EncounterEntityBabyshark
+.byte EncounterEntityBabyshark
+.byte EncounterEntityBabyshark
+.byte EncounterEntityBabyshark
+.byte EncounterEntityBabyshark
+.byte EncounterEntityBabyshark
+.byte EncounterEntityBabyshark
+.byte EncounterEntityBabyshark
+.byte EncounterEntityBabyshark
+.byte EncounterEntityBabyshark
+.byte EncounterEntityBabyshark
+.byte EncounterEntityBabyshark
+.byte EncounterEntityBabyshark
+.byte EncounterEntityBabyshark
 .byte $FF
 @EncounterSpawns07Data:
-.byte $02,$02,$02,$03
-.byte $02,$02,$02,$03
-.byte $02,$02,$02,$03
-.byte $02,$02,$02,$03
-.byte $02,$02,$02,$03
-.byte $02,$02,$02,$03
-.byte $02,$02,$02,$03
-.byte $02,$02,$02,$03
+.byte EncounterEntityHomingJellyfish
+.byte EncounterEntityHomingJellyfish
+.byte EncounterEntityHomingJellyfish
+.byte EncounterEntityBabyshark
+.byte EncounterEntityHomingJellyfish
+.byte EncounterEntityHomingJellyfish
+.byte EncounterEntityHomingJellyfish
+.byte EncounterEntityBabyshark
+.byte EncounterEntityHomingJellyfish
+.byte EncounterEntityHomingJellyfish
+.byte EncounterEntityHomingJellyfish
+.byte EncounterEntityBabyshark
+.byte EncounterEntityHomingJellyfish
+.byte EncounterEntityHomingJellyfish
+.byte EncounterEntityHomingJellyfish
+.byte EncounterEntityBabyshark
+.byte EncounterEntityHomingJellyfish
+.byte EncounterEntityHomingJellyfish
+.byte EncounterEntityHomingJellyfish
+.byte EncounterEntityBabyshark
+.byte EncounterEntityHomingJellyfish
+.byte EncounterEntityHomingJellyfish
+.byte EncounterEntityHomingJellyfish
+.byte EncounterEntityBabyshark
+.byte EncounterEntityHomingJellyfish
+.byte EncounterEntityHomingJellyfish
+.byte EncounterEntityHomingJellyfish
+.byte EncounterEntityBabyshark
+.byte EncounterEntityHomingJellyfish
+.byte EncounterEntityHomingJellyfish
+.byte EncounterEntityHomingJellyfish
+.byte EncounterEntityBabyshark
 .byte $FF
 @EncounterSpawns08Data:
-.byte $00,$01,$02,$03
-.byte $00,$01,$02,$03
-.byte $00,$01,$02,$03
-.byte $00,$01,$02,$03
-.byte $00,$01,$02,$03
-.byte $00,$01,$02,$03
-.byte $00,$01,$02,$03
-.byte $00,$01,$02,$03
+.byte EncounterEntityJellyfish
+.byte EncounterEntityStingray
+.byte EncounterEntityHomingJellyfish
+.byte EncounterEntityBabyshark
+.byte EncounterEntityJellyfish
+.byte EncounterEntityStingray
+.byte EncounterEntityHomingJellyfish
+.byte EncounterEntityBabyshark
+.byte EncounterEntityJellyfish
+.byte EncounterEntityStingray
+.byte EncounterEntityHomingJellyfish
+.byte EncounterEntityBabyshark
+.byte EncounterEntityJellyfish
+.byte EncounterEntityStingray
+.byte EncounterEntityHomingJellyfish
+.byte EncounterEntityBabyshark
+.byte EncounterEntityJellyfish
+.byte EncounterEntityStingray
+.byte EncounterEntityHomingJellyfish
+.byte EncounterEntityBabyshark
+.byte EncounterEntityJellyfish
+.byte EncounterEntityStingray
+.byte EncounterEntityHomingJellyfish
+.byte EncounterEntityBabyshark
+.byte EncounterEntityJellyfish
+.byte EncounterEntityStingray
+.byte EncounterEntityHomingJellyfish
+.byte EncounterEntityBabyshark
+.byte EncounterEntityJellyfish
+.byte EncounterEntityStingray
+.byte EncounterEntityHomingJellyfish
+.byte EncounterEntityBabyshark
 .byte $FF
 @EncounterSpawns09Data:
-.byte $00,$01,$00,$01
-.byte $00,$01,$00,$03
-.byte $00,$01,$00,$01
-.byte $00,$01,$00,$03
-.byte $00,$01,$00,$01
-.byte $00,$01,$00,$03
-.byte $00,$01,$00,$01
-.byte $00,$01,$00,$03
+.byte EncounterEntityJellyfish
+.byte EncounterEntityStingray
+.byte EncounterEntityJellyfish
+.byte EncounterEntityStingray
+.byte EncounterEntityJellyfish
+.byte EncounterEntityStingray
+.byte EncounterEntityJellyfish
+.byte EncounterEntityBabyshark
+.byte EncounterEntityJellyfish
+.byte EncounterEntityStingray
+.byte EncounterEntityJellyfish
+.byte EncounterEntityStingray
+.byte EncounterEntityJellyfish
+.byte EncounterEntityStingray
+.byte EncounterEntityJellyfish
+.byte EncounterEntityBabyshark
+.byte EncounterEntityJellyfish
+.byte EncounterEntityStingray
+.byte EncounterEntityJellyfish
+.byte EncounterEntityStingray
+.byte EncounterEntityJellyfish
+.byte EncounterEntityStingray
+.byte EncounterEntityJellyfish
+.byte EncounterEntityBabyshark
+.byte EncounterEntityJellyfish
+.byte EncounterEntityStingray
+.byte EncounterEntityJellyfish
+.byte EncounterEntityStingray
+.byte EncounterEntityJellyfish
+.byte EncounterEntityStingray
+.byte EncounterEntityJellyfish
+.byte EncounterEntityBabyshark
 .byte $FF
 @EncounterSpawns0AData:
-.byte $00,$01,$02,$03
-.byte $04,$00,$01,$02
-.byte $03,$04,$00,$01
-.byte $02,$03,$04,$00
-.byte $01,$02,$03,$04
-.byte $00,$01,$02,$03
-.byte $04,$00,$01,$02
-.byte $03,$04,$00,$01
+.byte EncounterEntityJellyfish
+.byte EncounterEntityStingray
+.byte EncounterEntityHomingJellyfish
+.byte EncounterEntityBabyshark
+.byte EncounterEntityStingray2
+.byte EncounterEntityJellyfish
+.byte EncounterEntityStingray
+.byte EncounterEntityHomingJellyfish
+.byte EncounterEntityBabyshark
+.byte EncounterEntityStingray2
+.byte EncounterEntityJellyfish
+.byte EncounterEntityStingray
+.byte EncounterEntityHomingJellyfish
+.byte EncounterEntityBabyshark
+.byte EncounterEntityStingray2
+.byte EncounterEntityJellyfish
+.byte EncounterEntityStingray
+.byte EncounterEntityHomingJellyfish
+.byte EncounterEntityBabyshark
+.byte EncounterEntityStingray2
+.byte EncounterEntityJellyfish
+.byte EncounterEntityStingray
+.byte EncounterEntityHomingJellyfish
+.byte EncounterEntityBabyshark
+.byte EncounterEntityStingray2
+.byte EncounterEntityJellyfish
+.byte EncounterEntityStingray
+.byte EncounterEntityHomingJellyfish
+.byte EncounterEntityBabyshark
+.byte EncounterEntityStingray2
+.byte EncounterEntityJellyfish
+.byte EncounterEntityStingray
 .byte $FF
 @EncounterSpawns0BData:
-.byte $04,$04,$04,$04
-.byte $04,$04,$04,$03
-.byte $04,$04,$04,$04
-.byte $04,$04,$04,$03
-.byte $04,$04,$04,$04
-.byte $04,$04,$04,$03
-.byte $04,$04,$04,$04
-.byte $04,$04,$04,$03
+.byte EncounterEntityStingray2
+.byte EncounterEntityStingray2
+.byte EncounterEntityStingray2
+.byte EncounterEntityStingray2
+.byte EncounterEntityStingray2
+.byte EncounterEntityStingray2
+.byte EncounterEntityStingray2
+.byte EncounterEntityBabyshark
+.byte EncounterEntityStingray2
+.byte EncounterEntityStingray2
+.byte EncounterEntityStingray2
+.byte EncounterEntityStingray2
+.byte EncounterEntityStingray2
+.byte EncounterEntityStingray2
+.byte EncounterEntityStingray2
+.byte EncounterEntityBabyshark
+.byte EncounterEntityStingray2
+.byte EncounterEntityStingray2
+.byte EncounterEntityStingray2
+.byte EncounterEntityStingray2
+.byte EncounterEntityStingray2
+.byte EncounterEntityStingray2
+.byte EncounterEntityStingray2
+.byte EncounterEntityBabyshark
+.byte EncounterEntityStingray2
+.byte EncounterEntityStingray2
+.byte EncounterEntityStingray2
+.byte EncounterEntityStingray2
+.byte EncounterEntityStingray2
+.byte EncounterEntityStingray2
+.byte EncounterEntityStingray2
+.byte EncounterEntityBabyshark
 .byte $FF
 @EncounterSpawns0CData:
-.byte $04,$02,$04,$03
-.byte $04,$02,$04,$03
-.byte $04,$02,$04,$03
-.byte $04,$02,$04,$03
-.byte $04,$02,$04,$03
-.byte $04,$02,$04,$03
-.byte $04,$02,$04,$03
-.byte $04,$02,$04,$03
+.byte EncounterEntityStingray2
+.byte EncounterEntityHomingJellyfish
+.byte EncounterEntityStingray2
+.byte EncounterEntityBabyshark
+.byte EncounterEntityStingray2
+.byte EncounterEntityHomingJellyfish
+.byte EncounterEntityStingray2
+.byte EncounterEntityBabyshark
+.byte EncounterEntityStingray2
+.byte EncounterEntityHomingJellyfish
+.byte EncounterEntityStingray2
+.byte EncounterEntityBabyshark
+.byte EncounterEntityStingray2
+.byte EncounterEntityHomingJellyfish
+.byte EncounterEntityStingray2
+.byte EncounterEntityBabyshark
+.byte EncounterEntityStingray2
+.byte EncounterEntityHomingJellyfish
+.byte EncounterEntityStingray2
+.byte EncounterEntityBabyshark
+.byte EncounterEntityStingray2
+.byte EncounterEntityHomingJellyfish
+.byte EncounterEntityStingray2
+.byte EncounterEntityBabyshark
+.byte EncounterEntityStingray2
+.byte EncounterEntityHomingJellyfish
+.byte EncounterEntityStingray2
+.byte EncounterEntityBabyshark
+.byte EncounterEntityStingray2
+.byte EncounterEntityHomingJellyfish
+.byte EncounterEntityStingray2
+.byte EncounterEntityBabyshark
 .byte $FF
-
 
 
 RomGraphicsTitleScreen = 0
