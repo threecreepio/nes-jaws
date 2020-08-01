@@ -244,19 +244,18 @@ EntityV18             = $18
 EntityV19             = $19
 EntityV1A             = $1A
 EntityV1C             = $1C
-EntityInvincibilityFrames             = $1D
+EntityV1D             = $1D
 EntityV1E             = $1E
-EntityFlags1F             = $1F
+EntityHitDetection    = $1F
 
 
 EntityJawsSpawnTimer = $14
 
 
-EntityFlag1FBit1        = %00000001
+EntityHitEnabled        = %00000001
 EntityFlag1FBit2        = %00000010
-EntityFlag1FHitDetected = %00100000
-EntityFlag1FBit7        = %01000000
-EntityFlag1FBit8        = %10000000
+EntityHitProjectile     = %01000000
+EntityHitDetected       = %10000000
 
 EntityMovementStill = %00001000
 EntityMovementNorth = %00000110
@@ -275,10 +274,13 @@ EntityTypeProjectileHarpoon           = $03
 
 
 EntityHeaderActive          = %10000000
+; all i can find using this flag is if it blocks projectiles
 EntityHeader7               = %01000000
+; cant find actual usages of this
 EntityHeader6               = %00100000
 EntityHeaderFacingLeft      = %00010000
-EntityHeader2               = %00000010
+EntityHeaderInvincible      = %00000010
+; i think this is if jaws is on the surface on the map screen
 EntityHeader1               = %00000001
 
 
@@ -1079,8 +1081,8 @@ RunPlayerDeathAnimation:
         sta Workset + EntityYSpeed
         jmp WorksetSave
 @L8681:
-        lda #$01
-        bit Workset + EntityFlags1F
+        lda #EntityHitEnabled
+        bit Workset + EntityHitDetection
         bne @KeepAnimating
         lda #$00
         sta Workset + EntityHeader
@@ -2797,7 +2799,7 @@ EncounterRunPlayerBoat:
         sta Workset + EntityY + 1
         ; set iframes to prevent immediate boat despawn.
         lda #$20
-        sta Workset + EntityInvincibilityFrames
+        sta Workset + EntityV1D
         ; and play our boat animation!
         lda #AnimationEncounterBoat
         jsr WorksetAnimationPlay
@@ -2809,12 +2811,12 @@ EncounterRunPlayerBoat:
         beq @JawsIsActive
         ; if jaws is not active, we want to wait until iframes
         ; run out and then despawn the boat.
-        dec Workset + EntityInvincibilityFrames
+        dec Workset + EntityV1D
         beq RemovePlayerVehicle
         jmp WorksetSave
 ; -------------------------------------------
 @JawsIsActive:
-        bit Workset + EntityFlags1F
+        bit Workset + EntityHitDetection
         bpl EncounterHandleBoatInputs
 RemovePlayerVehicle:
         ; clear flag 7
@@ -2948,26 +2950,26 @@ EncounterRunPlayerSubmarine:
         lda Workset + EntityHeader
         and #(EntityHeaderActive | EntityHeaderFacingLeft)
         ; also set these flags...
-        ora #(EntityHeader7 | EntityHeader2)
+        ora #(EntityHeader7 | EntityHeaderInvincible)
         sta Workset + EntityHeader
         lda #AnimationEncounterSubmarine
         jsr WorksetAnimationPlay
         lda #$00
-        sta Workset + EntityFlags1F
+        sta Workset + EntityHitDetection
         ; give some iframes after spawning
         lda #$B4
-        sta Workset + EntityInvincibilityFrames
+        sta Workset + EntityV1D
         jmp WorksetSave
 @SubmarineActive:
-        lda Workset + EntityInvincibilityFrames
+        lda Workset + EntityV1D
         beq @CheckForDamage
-        dec Workset + EntityInvincibilityFrames
+        dec Workset + EntityV1D
         bne @HandleSubmarineInputs
         lda Workset + EntityHeader
-        and #($FF ^ EntityHeader2)
+        and #($FF ^ EntityHeaderInvincible)
         sta Workset + EntityHeader
 @CheckForDamage:
-        bit Workset + EntityFlags1F
+        bit Workset + EntityHitDetection
         bpl @HandleSubmarineInputs
         ; time to despawn the submarine
         lda Workset + EntityHeader
@@ -3164,26 +3166,26 @@ EncounterRunPlayerSwim:
         lda Workset + EntityHeader
         and #(EntityHeaderActive | EntityHeaderFacingLeft)
         ; also set these flags...
-        ora #(EntityHeader7 | EntityHeader2)
+        ora #(EntityHeader7 | EntityHeaderInvincible)
         sta Workset + EntityHeader
         lda #AnimationEncounterSwim
         jsr WorksetAnimationPlay
         lda #$00
-        sta Workset + EntityFlags1F
+        sta Workset + EntityHitDetection
         ; give some iframes after spawning
         lda #$B4
-        sta Workset + EntityInvincibilityFrames
+        sta Workset + EntityV1D
         jmp WorksetSave
 @SwimmerActive:
-        lda Workset + EntityInvincibilityFrames
+        lda Workset + EntityV1D
         beq @CheckForDamage
-        dec Workset + EntityInvincibilityFrames
+        dec Workset + EntityV1D
         bne @HandleSwimmerInputs
         lda Workset + EntityHeader
-        and #($FF ^ EntityHeader2)
+        and #($FF ^ EntityHeaderInvincible)
         sta Workset + EntityHeader
 @CheckForDamage:
-        bit Workset + EntityFlags1F
+        bit Workset + EntityHitDetection
         bpl @HandleSwimmerInputs
         ; i'm afraid the player has died.
         ; play death sound and set the death event!
@@ -4039,13 +4041,13 @@ WorksetDetectProjectileHit:
         lda #>PlayerProjectile1Data
         sta @ProjectilePtr+1
         ; clear workset flag
-        lda Workset + EntityFlags1F
-        and #($FF ^ EntityFlag1FBit7)
-        sta Workset + EntityFlags1F
+        lda Workset + EntityHitDetection
+        and #($FF ^ EntityHitProjectile)
+        sta Workset + EntityHitDetection
         lda #MaxProjectiles
         sta @ProjectileCount
 @CheckForHit:
-        ldy #$00
+        ldy #EntityHeader
         ; load projectile header
         lda (@ProjectilePtr),y
         ; if projectile not active, skip.
@@ -4056,15 +4058,15 @@ WorksetDetectProjectileHit:
         ; if we aren't intersecting with the projectile, skip.
         jsr HitDetect
         bcc @CheckNextProjectile
-        ldy #EntityFlags1F
+        ldy #EntityHitDetection
         ; mark projectile as hit.
         lda (@ProjectilePtr),y
-        ora #EntityFlag1FBit8
+        ora #EntityHitDetected
         sta (@ProjectilePtr),y
         ; mark workset entity as hit.
-        lda Workset + EntityFlags1F
-        ora #EntityFlag1FBit7
-        sta Workset + EntityFlags1F
+        lda Workset + EntityHitDetection
+        ora #EntityHitProjectile
+        sta Workset + EntityHitDetection
         ; load projectile type, and store in jaws damage slot.
         ; seems like a hacky way to go about this.
         ldy #EntityType
@@ -4088,20 +4090,23 @@ WorksetDetectProjectileHit:
 
 ; ----------------------------------------------------------------------------
 CheckFlagsAndHitDetectAgainstPlayer:
-        lda #EntityHeader2
+        ; dont hit detect if the player is invincible
+        lda #EntityHeaderInvincible
         bit PlayerData + EntityHeader
         bne @Exit
-        lda Workset + EntityFlags1F
-        and #($FF ^ EntityFlag1FBit8)
-        sta Workset + EntityFlags1F
+        ; dont hit detect if the enemy is dying
+        lda Workset + EntityHitDetection
+        and #($FF ^ EntityHitDetected)
+        sta Workset + EntityHitDetection
         jsr HitDetectAgainstPlayer
         bcc @Exit
-        lda Workset + EntityFlags1F
-        ora #EntityFlag1FBit8
-        sta Workset + EntityFlags1F
-        lda PlayerData + EntityFlags1F
-        ora #EntityFlag1FBit8
-        sta PlayerData + EntityFlags1F
+        ; mark both entities as hit
+        lda Workset + EntityHitDetection
+        ora #EntityHitDetected
+        sta Workset + EntityHitDetection
+        lda PlayerData + EntityHitDetection
+        ora #EntityHitDetected
+        sta PlayerData + EntityHitDetection
 @Exit:
         rts
 
@@ -4295,9 +4300,9 @@ SpritesetUpdateScreen:
 
 @KeepDrawingSprites:
         ; clear bit 1 of the last byte of the entity
-        ldy #EntityFlags1F
+        ldy #EntityHitDetection
         lda (WorksetPtr),y
-        and #($FF ^ EntityFlag1FBit1)
+        and #($FF ^ EntityHitEnabled)
         sta (WorksetPtr),y
         ; check if entity is active, and if so, place out sprites
         ldy #EntityHeader
@@ -4457,7 +4462,7 @@ SpritesetUpdateScreen:
         eor $00
         sta SpriteAttr,x
         ; mark as active.
-        lda #$01
+        lda #EntityHitEnabled
         sta $01
         txa
         clc
@@ -4473,7 +4478,7 @@ SpritesetUpdateScreen:
         iny
         jmp @DrawNextSprite
 @SpritesetDrawFinishEntity:
-        ldy #EntityFlags1F
+        ldy #EntityHitDetection
         lda (WorksetPtr),y
         ora $01
         sta (WorksetPtr),y
@@ -4551,10 +4556,10 @@ EncounterBoatProjectile:
         jmp @Done
 @Main:
         ; disable projectile if hit flag is set
-        lda Workset + EntityFlags1F
+        lda Workset + EntityHitDetection
         bmi @Despawn2
         ; or if flag 1 is set..
-        and #EntityFlag1FBit1
+        and #EntityHitEnabled
         beq @Despawn
         ; check if sinking flag is set
         lda Workset + EntityV18
@@ -4610,10 +4615,10 @@ EncounterSubmarineBulletProjectile:
         jmp @Done
 @Main:
         ; disable projectile if hit flag is set
-        lda Workset + EntityFlags1F
+        lda Workset + EntityHitDetection
         bmi @Despawn
-        ; or if flag 1 is sset..
-        and #EntityFlag1FBit1
+        ; or if flag 1 is set..
+        and #EntityHitEnabled
         beq @Despawn
         ; otherwise just move along.
         jsr WorksetMoveX
@@ -4635,10 +4640,10 @@ EncounterSubmarineBombProjectile:
         jmp @Done
 @Main:
         ; disable projectile if hit flag is set
-        lda Workset + EntityFlags1F
+        lda Workset + EntityHitDetection
         bmi @Despawn
         ; or if flag 1 is set..
-        and #EntityFlag1FBit1
+        and #EntityHitEnabled
         beq @Despawn
         ; otherwise we move the projectile
         jsr WorksetMoveX
@@ -4672,10 +4677,10 @@ EncounterHarpoonProjectile:
         jmp SharedRTS1
 @HarpoonActive:
         ; disable projectile if hit flag is set
-        lda Workset + EntityFlags1F
+        lda Workset + EntityHitDetection
         bmi @Despawn
-        ; or if flag 1 is sset..
-        and #EntityFlag1FBit1
+        ; or if flag 1 is set..
+        and #EntityHitEnabled
         beq @Despawn
         ; otherwise just move along.
         jsr WorksetMoveX
@@ -4697,10 +4702,10 @@ EncounterPlaneProjectile:
         jmp SharedRTS1
 @Main:
         ; disable projectile if hit flag is set
-        lda Workset + EntityFlags1F
+        lda Workset + EntityHitDetection
         bmi @Despawn
         ; or if flag 1 is set..
-        and #EntityFlag1FBit1
+        and #EntityHitEnabled
         beq @Despawn
         ; drop projectile toward water
         jsr WorksetMoveY
@@ -4743,7 +4748,7 @@ EncounterPrepareProjectile:
 @ClearPreviousState:
         sta Workset,x
         inx
-        cpx #EntityFlags1F+1
+        cpx #EntityHitDetection+1
         bcc @ClearPreviousState
         ; load offset in the projectile data table for this
         ; projectile type.
@@ -4879,14 +4884,14 @@ MapRunJaws:
         sta Workset + EntityHeader
         ; jaws won't move during iframes.
         lda #$80
-        sta Workset + EntityInvincibilityFrames
+        sta Workset + EntityV1D
         jmp WorksetSave
 @JawsIsActive:
         jsr WorksetAnimationAdvance
-        lda Workset + EntityInvincibilityFrames
+        lda Workset + EntityV1D
         bne @InvincibilityFrames
         jsr CheckFlagsAndHitDetectAgainstPlayer
-        lda Workset + EntityFlags1F
+        lda Workset + EntityHitDetection
         bpl @UpdateJawsTrackerDistance
         jsr CopyWorksetCoordinatesToTempCoordinate
         jsr GetWorldMapFlagsAtTempCoords
@@ -4895,7 +4900,7 @@ MapRunJaws:
         sta EventFlags
         jmp WorksetSave
 @InvincibilityFrames:
-        dec Workset + EntityInvincibilityFrames
+        dec Workset + EntityV1D
         jmp @L9E05
 
 ; convert jaws distance from player to a single number
@@ -5299,7 +5304,7 @@ LA075:
         jsr     CheckFlagsAndHitDetectAgainstPlayer                           ; A07B 20 40 99                  @.
         lda     $38                             ; A07E A5 38                    .8
         bne     LA0E3                           ; A080 D0 61                    .a
-        bit     Workset + EntityFlags1F                             ; A082 24 3F                    $?
+        bit     Workset + EntityHitDetection                             ; A082 24 3F                    $?
         bvc     LA0EE                           ; A084 50 68                    Ph
         ldx     PlayerPowerLevel                           ; A086 AE 91 03                 ...
         lda     JawsDamageByPowerLevel,x                         ; A089 BD 2D A1                 .-.
@@ -5550,7 +5555,7 @@ RunEntityJellyfish:
         bvs @Main
         ; initialize enemy settings
         lda #$00
-        sta Workset + EntityFlags1F
+        sta Workset + EntityHitDetection
         lda #(EntityHeaderActive | EntityHeader7)
         sta Workset + EntityHeader
         jsr SetJellyfishStartingLocation
@@ -5570,7 +5575,7 @@ RunEntityJellyfish:
         ; check if it's time to die.
         jsr WorksetDetectProjectileHit
         jsr CheckFlagsAndHitDetectAgainstPlayer
-        bit Workset + EntityFlags1F
+        bit Workset + EntityHitDetection
         bvs @HitByProjectile
         ; otherwise keep moving
         jsr WorksetMoveY
@@ -5640,7 +5645,7 @@ RunEntityHomingJellyfish:
         bvs @Main
         ; initialize enemy settings
         lda #$00
-        sta Workset + EntityFlags1F
+        sta Workset + EntityHitDetection
         lda #(EntityHeaderActive | EntityHeader7)
         sta Workset + EntityHeader
         jsr SetJellyfishStartingLocation
@@ -5660,7 +5665,7 @@ RunEntityHomingJellyfish:
         ; check if it's time to die.
         jsr WorksetDetectProjectileHit
         jsr CheckFlagsAndHitDetectAgainstPlayer
-        bit Workset + EntityFlags1F
+        bit Workset + EntityHitDetection
         bvs @HitByProjectile
         ; otherwise keep moving
         jsr WorksetMoveX
@@ -5793,7 +5798,7 @@ RunEntityStingray:
         bvs @Main
         ; clear out a bunch of flags
         lda #$00
-        sta Workset + EntityFlags1F
+        sta Workset + EntityHitDetection
         sta Workset + EntityV19
         sta Workset + EntityV1A
         lda #%00000010
@@ -5860,7 +5865,7 @@ RunEntityStingray:
         ; run hit detection
         jsr WorksetDetectProjectileHit
         jsr CheckFlagsAndHitDetectAgainstPlayer
-        bit Workset + EntityFlags1F
+        bit Workset + EntityHitDetection
         bvs @ProcessHit
         ; move enemy
         jsr WorksetMoveX
@@ -6000,7 +6005,7 @@ RunEntityBabyshark:
         lda PlayerData+EntityX
         bpl @SpawnFromRight
 @SpawnFromLeft:
-        ; spawn on the far left of the screeen
+        ; spawn on the far left of the screen
         lda #(EntityHeaderActive | EntityHeader7)
         sta Workset + EntityHeader
         lda #$E0
@@ -6013,7 +6018,7 @@ RunEntityBabyshark:
         sta Workset + EntityXSpeed
         rts
 @SpawnFromRight:
-        ; spawn on the far right of the screeen
+        ; spawn on the far right of the screen
         lda #(EntityHeaderActive | EntityHeader7 | EntityHeaderFacingLeft)
         sta Workset + EntityHeader
         lda #$20
@@ -6059,7 +6064,7 @@ RunEntityBabyshark:
         bit Workset + EntityV16
         bmi @KeepRunning
         lda #$01
-        bit Workset + EntityFlags1F
+        bit Workset + EntityHitDetection
         bne @SetV16
         rts
 @SetV16:
@@ -6068,7 +6073,7 @@ RunEntityBabyshark:
         rts
 @KeepRunning:
         lda #$01
-        bit Workset + EntityFlags1F
+        bit Workset + EntityHitDetection
         bne @RunStandardEnemyLogic
         dec Workset + EntityActiveAnimationIndex
         bne @FlipDirection
@@ -6095,7 +6100,7 @@ RunEntityBabyshark:
         jsr WorksetAnimationAdvance
         jsr WorksetDetectProjectileHit
         jsr CheckFlagsAndHitDetectAgainstPlayer
-        bit Workset + EntityFlags1F
+        bit Workset + EntityHitDetection
         bvc @UpdateSpeeds
         ; we seem to have been shot, play a sound effect and lower hp
         lda #SFXEncounterEnemyDeath
@@ -6173,7 +6178,7 @@ RunEntityCrab:
         jsr WorksetClearSpeed
         lda #$00
         sta Workset + EntityV18
-        sta Workset + EntityFlags1F
+        sta Workset + EntityHitDetection
         ; and play the crab animation
         lda #AnimationEncounterCrab
         jmp WorksetAnimationPlay
@@ -6237,7 +6242,7 @@ RunEntityCrab:
         ; and immediately overwrite with 1..
         lda #$01
         ; compare against hit detection flag
-        and Workset + EntityFlags1F
+        and Workset + EntityHitDetection
         bne @Exit2
         ; do pointless check
         cmp #$10
@@ -10660,11 +10665,11 @@ BonusRunSingleJellyfish:
         lda #$00
         sta Workset + EntityActiveAnimationIndex
         sta Workset + EntityV1A
-        sta Workset + EntityInvincibilityFrames
+        sta Workset + EntityV1D
         lda #AnimationEncounterJellyfishDeath
         jmp WorksetAnimationPlay
 @AlreadyInitialized:
-        bit Workset + EntityInvincibilityFrames                             ; D355 24 3D                    $=
+        bit Workset + EntityV1D                             ; D355 24 3D                    $=
         bpl LD35C                           ; D357 10 03                    ..
         jmp LD4B8                           ; D359 4C B8 D4                 L..
 
@@ -10752,7 +10757,7 @@ LD3C2:
         lda     LD4DD,x                         ; D3DB BD DD D4                 ...
         jsr     AwardPoints                           ; D3DE 20 D0 8C                  ..
         lda     #$80                            ; D3E1 A9 80                    ..
-        sta     Workset + EntityInvincibilityFrames                             ; D3E3 85 3D                    .=
+        sta     Workset + EntityV1D                             ; D3E3 85 3D                    .=
         lda     #$00                            ; D3E5 A9 00                    ..
         sta     Workset + EntityYSubspeed                            ; D3E7 85 32                    .2
         lda     #$FF                            ; D3E9 A9 FF                    ..
@@ -10806,7 +10811,7 @@ LD43E:
         bit     Workset + EntityActiveAnimationIndex                             ; D447 24 35                    $5
         bvs     LD458                           ; D449 70 0D                    p.
         lda     #$01                            ; D44B A9 01                    ..
-        bit     Workset + EntityFlags1F                             ; D44D 24 3F                    $?
+        bit     Workset + EntityHitDetection                             ; D44D 24 3F                    $?
         beq     LD463                           ; D44F F0 12                    ..
         lda     #$C0                            ; D451 A9 C0                    ..
         sta     Workset + EntityActiveAnimationIndex                             ; D453 85 35                    .5
@@ -10815,7 +10820,7 @@ LD43E:
 ; ----------------------------------------------------------------------------
 LD458:
         lda     #$01                            ; D458 A9 01                    ..
-        bit     Workset + EntityFlags1F                             ; D45A 24 3F                    $?
+        bit     Workset + EntityHitDetection                             ; D45A 24 3F                    $?
         bne     LD463                           ; D45C D0 05                    ..
         .byte   $A9,$00,$85,$20,$60             ; D45E A9 00 85 20 60           ... `
 ; ----------------------------------------------------------------------------
@@ -10883,12 +10888,12 @@ LD4B7:
 LD4B8:
         jsr     WorksetAnimationAdvance
         jsr     WorksetMoveY
-        bit     Workset + EntityInvincibilityFrames
+        bit     Workset + EntityV1D
         bvs     @LD4CF
         lda     Workset + EntityAnimTimer
         bne     @Done
         lda     #$C0
-        sta     Workset + EntityInvincibilityFrames
+        sta     Workset + EntityV1D
         lda     Workset + EntityV1C
         jmp     WorksetAnimationPlay
 @LD4CF:
@@ -11712,9 +11717,9 @@ LDC11:
 LDC1A:
         sta FinaleJawsTimer
         tax
-        lda Workset + EntityFlags1F
-        and #($FF ^ EntityFlag1FBit2)
-        sta Workset + EntityFlags1F
+        lda Workset + EntityHitDetection
+        and #$FD
+        sta Workset + EntityHitDetection
         lda (FinaleJawsPtr2),y
         iny
         sta Workset + (EntitySpritesetPtr + 0)
@@ -11969,8 +11974,8 @@ OutroRunPlaneAnimation:
         jsr WorksetMoveY
         bit Workset + EntityActiveAnimationIndex
         bmi @StartAnimation2
-        lda #EntityFlag1FBit1
-        bit Workset + EntityFlags1F
+        lda #EntityHitEnabled
+        bit Workset + EntityHitDetection
         beq @Save
         ; mark running animation as negative to trigger next animation.
         lda #$80
@@ -11979,8 +11984,8 @@ OutroRunPlaneAnimation:
         jmp WorksetSave
 @StartAnimation2:
         ; exit if running flag is set
-        lda #EntityFlag1FBit1
-        bit Workset + EntityFlags1F
+        lda #EntityHitEnabled
+        bit Workset + EntityHitDetection
         bne @Save
         ; put animation entity in the correct place for the animation.
         lda #$38
@@ -12019,7 +12024,7 @@ OutroRunPlaneAnimation:
         bit Workset + EntityActiveAnimationIndex
         bmi @WaitForAnimation3
         lda #$01
-        bit Workset + EntityFlags1F
+        bit Workset + EntityHitDetection
         beq @Exit1
         lda #$80
         sta Workset + EntityActiveAnimationIndex
