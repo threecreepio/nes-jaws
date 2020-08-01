@@ -44,6 +44,11 @@ NextBGUpdate          = $0303
 PendingBGUpdates      = $0304
 CheatsEnabled         = $0308
 SoundtestSelected     = $00
+BonusEncounterPtr = $50
+BonusEncounterOffset = $52
+BonusCurrentWave = $53
+BonusNumberOfEnemiesHit = $54
+BonusScreenV4 = $55
 
 ; this flag is raised during NMI.
 ; it's used in the main loops of each screen
@@ -80,34 +85,37 @@ EventFlagsMapPortPurchasing      = %00000010
 EventFlagsMapTriggerEncounter    = %00000100
 EventFlagsPortNotEnoughShells    = %00001000
 
-EventFlagsFinaleJawsDead      = %10000000
+EventFlagsEncounterNoEnemies     = %00000001
+EventFlagsEncounterNoSpawns      = %00000010
+EventFlagsEncounterEnding        = %00000100
+EventFlagsEncounterJawsDead      = %00100000
+EventFlagsEncounterFinished      = %01000000
+EventFlagsEncounterPlayerDead    = %10000000
 
-EventFlagsEncounterJawsDead   = %00100000
-EventFlagsEncounterFinished   = %01000000
-EventFlagsEncounterPlayerDead = %10000000
+EventFlagsFinaleJawsDead         = %10000000
 
 HighScore             = $0350
 CurrentScore          = $0380
 
-EnemySettingsPtr = $0482
-EnemyPatternIndex = $0481
-EnemyPatternTiming = $0484
-EnemyPatternCountdown1 = $0485
-EnemyPatternCountdown2 = $0487
-EnemyNextPatternTiming = $0486
+EncounterEnemiesOnScreen= $0480
+EncounterSpawnsIndex      = $0481
+EncounterPatternsPtr      = $0482
+EncounterSpawnTimer       = $0484
+EncounterNextSpawnTimer  = $0486
+EncounterNextSpawnTimer2 = $0487
 
-EncounterMaxDepth     = $033E ; 16 bit
-WaterHeight           = $033C ; 16 bit
+EncounterMaxDepth          = $033E ; 16 bit
+WaterHeight                = $033C ; 16 bit
 HitDetectionProjectileType = $034A
-WaterAnimationFrame   = $031B
-WaterAnimationTimer   = $031A
+WaterAnimationFrame        = $031B
+WaterAnimationTimer        = $031A
 
 ; stores how many enounters the player has completed, maxout at $20.
-TotalEncountersPlayed = $038E
+TotalEncountersPlayed          = $038E
 ; how many encounters remain until the next bonus screen
 BonusScreenEncounterCountdown  = $038F
 ; how many bonus screens we have had so far
-BonusScreensPlayed      = $038B
+BonusScreensPlayed             = $038B
 
 ; score requirement for the next submarine to appear on the map.
 ; has top 3 bytes of the score, so 1m / 100k / 10k score levels
@@ -679,6 +687,7 @@ MapScreenMainLoop:
         sta ShowStatusBarTextLine         
         lda #$01
         sta NMISpriteHandlingDisabled
+        ; update 4A, not used as far as i can tell.
         sta $4A
         lda #SFXPause
         jsr SoundPlay
@@ -697,6 +706,7 @@ MapScreenMainLoop:
         jmp @WaitForUnpause
 @Unpause:
         lda #$00
+        ; update 4A, not used as far as i can tell.
         sta $4A
         lda #$01
         sta ShowStatusBarTextLine         
@@ -763,7 +773,7 @@ RunEncounterScreen:
         sta CameraX
         lda #$10
         sta CameraX+1
-        jsr PrepareEnemySettings
+        jsr PrepareEncounterPatterns
         jsr EncounterRunCamera
         jsr PPUEnableNMI
         jsr PPUEnableAndWaitFor1Frame
@@ -797,6 +807,7 @@ RunEncounterScreen:
         sta ShowStatusBarTextLine
         lda #$01
         sta NMISpriteHandlingDisabled
+        ; update 4A, not used as far as i can tell.
         sta $4A
         lda #SFXPause
         jsr SoundPlay
@@ -815,6 +826,7 @@ RunEncounterScreen:
         jmp @PauseLoop
 @Unpause:
         lda #$00
+        ; update 4A, not used as far as i can tell.
         sta $4A
         lda #$01
         sta ShowStatusBarTextLine
@@ -5396,103 +5408,122 @@ JawsDamageByPowerLevel:
 
 ; ----------------------------------------------------------------------------
 EncounterRunEnemies:
+        @TempPointer = $44
+        @EnemiesLeftToSpawn = $46
+        ; set flag indicating there were no enemies
         lda EventFlags
-        ora #%00000001
+        ora #EventFlagsEncounterNoEnemies
         sta EventFlags
-        lda EnemyNextPatternTiming
-        ora $0487
-        beq LA157
-        lda EnemyNextPatternTiming
+        ; if countdown is zero, spawn next enemy
+        lda EncounterNextSpawnTimer
+        ora EncounterNextSpawnTimer+1
+        beq @RunEnemies
+        ; otherwise subtract one from countdown
+        lda EncounterNextSpawnTimer
         sec
         sbc #$01
-        sta EnemyNextPatternTiming
-        lda $0487
+        sta EncounterNextSpawnTimer
+        lda EncounterNextSpawnTimer+1
         sbc #$00
-        sta $0487
-LA157:
+        sta EncounterNextSpawnTimer+1
+@RunEnemies:
         lda #<Enemy2Data
         sta WorksetPtr
         lda #>Enemy2Data
         sta WorksetPtr+1
-        lda $0480
-        sta $46
-LA164:
+        lda EncounterEnemiesOnScreen
+        sta @EnemiesLeftToSpawn
+@CheckEntitySlot:
         ldy #$00
         lda (WorksetPtr),y
-        bmi LA1B0
-        lda EnemyNextPatternTiming
-        ora $0487
-        bne LA1C1
-        lda EnemySettingsPtr
-        sta $44
-        lda EnemySettingsPtr + 1
-        sta $45
-        ldy EnemyPatternIndex
-        lda #%00000010
+        bmi @RunActiveEnemy
+        ; enemy slot is available, check if its time to spawn
+        lda EncounterNextSpawnTimer
+        ora EncounterNextSpawnTimer+1
+        bne @CheckNextEnemySlot
+        ; it is time to spawn an enemy, get our encounter pointer
+        lda EncounterPatternsPtr
+        sta @TempPointer
+        lda EncounterPatternsPtr + 1
+        sta @TempPointer + 1
+        ldy EncounterSpawnsIndex
+        ; check so we haven't spawned an enemy already
+        lda #EventFlagsEncounterNoSpawns
         bit EventFlags
-        bne LA1C1
-        lda ($44),y
+        bne @CheckNextEnemySlot
+        lda (@TempPointer),y
+        ; check if we've spawned all the enemies
         cmp #$FF
-        bne LA197
+        bne @SpawnNextEnemy
+        ; if we have, mark the encounter to end and dont spawn.
         lda EventFlags
-        ora #%00000010
+        ora #EventFlagsEncounterNoSpawns
         sta EventFlags
-        jmp LA1C1
-
-; ----------------------------------------------------------------------------
-LA197:
+        jmp @CheckNextEnemySlot
+@SpawnNextEnemy:
+        ; increment spawn counter
         iny
-        sty     EnemyPatternIndex
-        ldy     #$01
-        sta     (WorksetPtr),y
+        sty EncounterSpawnsIndex
+        ; store enemy type from the spawn table
+        ldy #EntityType
+        sta (WorksetPtr),y
         dey
-        lda     #$80
-        sta     (WorksetPtr),y
-        lda     EnemyPatternTiming
-        sta     EnemyNextPatternTiming
-        lda     EnemyPatternCountdown1
-        sta     EnemyPatternCountdown2
-LA1B0:
-        lda     EventFlags
-        and     #($FF ^ %00000001)
-        sta     EventFlags
-        jsr     WorksetLoad
-        jsr     RunEntity
-        jsr     WorksetSave
-LA1C1:
-        lda     WorksetPtr
+        ; mark the entity as active
+        lda #EntityHeaderActive
+        sta (WorksetPtr),y
+        ; and reset timer to next spawn
+        lda EncounterSpawnTimer
+        sta EncounterNextSpawnTimer
+        lda EncounterSpawnTimer+1
+        sta EncounterNextSpawnTimer+1
+@RunActiveEnemy:
+        ; clear flag indicating we found no enemies.
+        lda EventFlags
+        and #($FF ^ EventFlagsEncounterNoEnemies)
+        sta EventFlags
+        ; load the enemy workset, run it, and save
+        jsr WorksetLoad
+        jsr RunEntity
+        jsr WorksetSave
+@CheckNextEnemySlot:
+        ; advance to next workset
+        lda WorksetPtr
         clc
-        adc     #$20
-        sta     WorksetPtr
-        lda     WorksetPtr+1
-        adc     #$00
-        sta     WorksetPtr+1
-        dec     $46
-        bne     LA164
-        lda     #%00000100
-        bit     EventFlags
-        beq     @LA1EA
-        lda     EnemyNextPatternTiming
-        ora     EnemyPatternCountdown2
-        bne     @Exit
-        lda     EventFlags
-        ora     #%01000000
-        sta     EventFlags
+        adc #$20
+        sta WorksetPtr
+        lda WorksetPtr+1
+        adc #$00
+        sta WorksetPtr+1
+        ; check if we can spawn more enemies
+        dec @EnemiesLeftToSpawn
+        bne @CheckEntitySlot
+        ; otherwise mark that the encounter is still active
+        lda #EventFlagsEncounterEnding
+        bit EventFlags
+        beq @CheckForEncounterEnd
+        lda EncounterNextSpawnTimer
+        ora EncounterNextSpawnTimer+1
+        bne @Exit
+        ; if the ending flag was set and timer expired,
+        ; terminate the encounter.
+        lda EventFlags
+        ora #EventFlagsEncounterFinished
+        sta EventFlags
         rts
-
-; ----------------------------------------------------------------------------
-@LA1EA:
-        lda     #%00000011
-        and     EventFlags
-        cmp     #%00000011
-        bne     @Exit
-        lda     EventFlags
-        ora     #%00000100
-        sta     EventFlags
-        lda     #$40
-        sta     EnemyNextPatternTiming
-        lda     #$00
-        sta     EnemyPatternCountdown2
+@CheckForEncounterEnd:
+        ; check if it's time to start ending the encounter
+        lda #(EventFlagsEncounterNoEnemies | EventFlagsEncounterNoSpawns)
+        and EventFlags
+        cmp #(EventFlagsEncounterNoEnemies | EventFlagsEncounterNoSpawns)
+        bne @Exit
+        ; set the ending flag and set a timer to the end
+        lda EventFlags
+        ora #EventFlagsEncounterEnding
+        sta EventFlags
+        lda #$40
+        sta EncounterNextSpawnTimer
+        lda #$00
+        sta EncounterNextSpawnTimer+1
 @Exit:
         rts
 
@@ -5502,7 +5533,7 @@ RunEntity:
         jsr JumpEngine
         .addr RunEntityJellyfish
         .addr RunEntityStingray
-        .addr RunEntityJellyfish2
+        .addr RunEntityHomingJellyfish
         .addr RunEntityBabyshark
         .addr RunEntityStingray
         .addr $0000
@@ -5514,71 +5545,84 @@ RunEntity:
 
 ; ----------------------------------------------------------------------------
 RunEntityJellyfish:
-        bit     Workset + EntityHeader
-        bvs     @EntityIsActive
-        lda     #$00
-        sta     Workset + EntityFlags1F
-        lda     #(EntityHeaderActive | EntityHeader7)
-        sta     Workset + EntityHeader
-        jsr     LA32F
-        lda     #$00
-        sta     Workset + EntityAnimationIndex
-        jmp     LA25C
-@EntityIsActive:
-        jsr     WorksetAnimationAdvance
-        bit     Workset + EntityAnimationIndex
-        bpl     LA243
-        lda     Workset + EntityAnimTimer
-        beq     SpawnEntityCrabOrStar
+        bit Workset + EntityHeader
+        bvs @Main
+        ; initialize enemy settings
+        lda #$00
+        sta Workset + EntityFlags1F
+        lda #(EntityHeaderActive | EntityHeader7)
+        sta Workset + EntityHeader
+        jsr SetJellyfishStartingLocation
+        lda #$00
+        sta Workset + EntityAnimationIndex
+        jmp @SetSpeedAndAnimate
+@Main:
+        jsr WorksetAnimationAdvance
+        bit Workset + EntityAnimationIndex
+        bpl @InNormalMode
+        ; the jellyfish is dead, and we have played
+        ; our death animation. check to spawn a star or crab.
+        lda Workset + EntityAnimTimer
+        beq SpawnEntityCrabOrStar
         rts
-LA243:
-        jsr     WorksetDetectProjectileHit                           ; A243 20 F8 98                  ..
-        jsr     CheckFlagsAndHitDetectAgainstPlayer                           ; A246 20 40 99                  @.
-        bit     Workset + EntityFlags1F                             ; A249 24 3F                    $?
-        bvs     LA269                           ; A24B 70 1C                    p.
-        jsr     WorksetMoveY                           ; A24D 20 1B 98                  ..
-        jsr     EncounterClampWorksetMinimumY                           ; A250 20 F2 99                  ..
-        bcs     WorksetDisableEntity                           ; A253 B0 3B                    .;
-        ldy     #$08                            ; A255 A0 08                    ..
-        jsr     SlowdownYByY                           ; A257 20 BD 98                  ..
-        bcc     SharedRTS                           ; A25A 90 38                    .8
-LA25C:
-        lda     #$00                            ; A25C A9 00                    ..
-        sta     Workset + EntityYSubspeed                            ; A25E 85 32                    .2
-        lda     #$FE                            ; A260 A9 FE                    ..
-        sta     Workset + EntityYSpeed                             ; A262 85 33                    .3
-        lda     #AnimationEncounterJellyfish                            ; A264 A9 38                    .8
-        jmp     WorksetAnimationPlay                           ; A266 4C AD 97                 L..
-
-; ----------------------------------------------------------------------------
-LA269:
-        lda     #$04                            ; A269 A9 04                    ..
-        jsr     AwardPoints                           ; A26B 20 D0 8C                  ..
-        lda     #SFXEncounterEnemyDeath                            ; A26E A9 0E                    ..
-        jsr     SoundPlay                           ; A270 20 CD E2                  ..
-        lda     #$80                            ; A273 A9 80                    ..
-        sta     Workset + EntityAnimationIndex                             ; A275 85 34                    .4
-        lda     #AnimationEncounterBubble                            ; A277 A9 39                    .9
-        jmp     WorksetAnimationPlay                           ; A279 4C AD 97                 L..
+@InNormalMode:
+        ; check if it's time to die.
+        jsr WorksetDetectProjectileHit
+        jsr CheckFlagsAndHitDetectAgainstPlayer
+        bit Workset + EntityFlags1F
+        bvs @HitByProjectile
+        ; otherwise keep moving
+        jsr WorksetMoveY
+        ; until we hit the water surface, in which case we disable.
+        jsr EncounterClampWorksetMinimumY
+        bcs WorksetDisableEntity
+        ; slowdown to simulate a pulsing jellyfish swim
+        ldy #$08
+        jsr SlowdownYByY
+        ; if we've stopped complete it's time to animate
+        bcc SharedRTS
+@SetSpeedAndAnimate:
+        ; set to max y speed
+        lda #$00
+        sta Workset + EntityYSubspeed
+        lda #$FE
+        sta Workset + EntityYSpeed
+        ; and play jellyfish animation
+        lda #AnimationEncounterJellyfish
+        jmp WorksetAnimationPlay
+@HitByProjectile:
+        ; give some points for killing the jelly
+        lda #$04
+        jsr AwardPoints
+        ; play a head animation
+        lda #SFXEncounterEnemyDeath
+        jsr SoundPlay
+        ; mark the animation to end, and play death animation.
+        lda #%10000000
+        sta Workset + EntityAnimationIndex
+        lda #AnimationEncounterBubble
+        jmp WorksetAnimationPlay
 
 ; ----------------------------------------------------------------------------
 SpawnEntityCrabOrStar:
         ; advance the rng to determine powerup spawn type
-        jsr     RNGAdvance
-        and     #$07
+        jsr RNGAdvance
+        and #$07
         tax
-        lda     CrabOrStarRNG,x
+        lda CrabOrStarRNG,x
         ; if we hit a 0 in the spawn table, skip spawning
-        beq     WorksetDisableEntity
-        sta     Workset + EntityType
-        lda     #EntityHeaderActive
-        sta     Workset + EntityHeader
-        jmp     RunEntity
+        beq WorksetDisableEntity
+        sta Workset + EntityType
+        ; otherwise activate and become our powerup type!
+        lda #EntityHeaderActive
+        sta Workset + EntityHeader
+        jmp RunEntity
 WorksetDisableEntity:
-        lda     #$00
-        sta     Workset + EntityHeader
+        lda #$00
+        sta Workset + EntityHeader
 SharedRTS:
         rts
+
 CrabOrStarRNG:
         .byte $00
         .byte $00
@@ -5589,154 +5633,184 @@ CrabOrStarRNG:
         .byte $00
         .byte $09 ; star
 
-; this appears to be a duplicate of the jellyfish code.
-; as far as i can tell it never actually runs.
-RunEntityJellyfish2:
-        bit     Workset + EntityHeader
-        bvs     @EntityIsActive
-        lda     #$00
-        sta     Workset + EntityFlags1F
-        lda     #(EntityHeaderActive | EntityHeader7)
-        sta     Workset + EntityHeader
-        jsr     LA32F
-        lda     #$00
-        sta     Workset + EntityAnimationIndex
-        jmp     @Continue1
-@EntityIsActive:
-        jsr     WorksetAnimationAdvance
-        bit     Workset + EntityAnimationIndex
-        bpl     @LFF90
-        lda     Workset + EntityAnimTimer
-        beq     @SpawnEntityCrabOrStar
+; pretty near duplicate of jellyfish code, except it moves towards the player.
+RunEntityHomingJellyfish:
+        bit Workset + EntityHeader
+        bvs @Main
+        ; initialize enemy settings
+        lda #$00
+        sta Workset + EntityFlags1F
+        lda #(EntityHeaderActive | EntityHeader7)
+        sta Workset + EntityHeader
+        jsr SetJellyfishStartingLocation
+        lda #$00
+        sta Workset + EntityAnimationIndex
+        jmp @SetSpeedAndAnimate
+@Main:
+        jsr WorksetAnimationAdvance
+        bit Workset + EntityAnimationIndex
+        bpl @InNormalMode
+        ; the jellyfish is dead, and we have played
+        ; our death animation. check to spawn a star or crab.
+        lda Workset + EntityAnimTimer
+        beq @SpawnEntityCrabOrStar
         rts
-@LFF90:
-        jsr     WorksetDetectProjectileHit
-        jsr     CheckFlagsAndHitDetectAgainstPlayer
-        bit     Workset + EntityFlags1F
-        bvs     @LFFD4
-        jsr     WorksetMoveX
-        jsr     WorksetMoveY
-        jsr     EncounterClampWorksetMinimumY
-        bcs     @Disable
-        ldy     #$08
-        jsr     SlowdownYByY
-        bcc     @Exit
-@Continue1:
-        lda     #$00
-        sta     Workset + EntityYSubspeed        
-        lda     #$FE
-        sta     Workset + EntityYSpeed        
-        lda     Workset + EntityX
-        cmp     $0682
-        bcs     @LA2DB
-        lda     #$80
-        sta     Workset + EntityXSubspeed
-        lda     #$00
-        sta     Workset + EntityXSpeed       
-        jmp     $A2FD
-@LA2DB:
-        lda     #$80
-        sta     Workset + EntityXSubspeed
-        lda     #$FF
-        sta     Workset + EntityXSpeed        
-        lda     #AnimationEncounterJellyfish
-        jsr     WorksetAnimationPlay
+@InNormalMode:
+        ; check if it's time to die.
+        jsr WorksetDetectProjectileHit
+        jsr CheckFlagsAndHitDetectAgainstPlayer
+        bit Workset + EntityFlags1F
+        bvs @HitByProjectile
+        ; otherwise keep moving
+        jsr WorksetMoveX
+        jsr WorksetMoveY
+        ; until we hit the water surface, in which case we disable.
+        jsr EncounterClampWorksetMinimumY
+        bcs @Disable
+        ; slowdown to simulate a pulsing jellyfish swim
+        ldy #$08
+        jsr SlowdownYByY
+        ; if we've stopped complete it's time to animate
+        bcc @Exit
+@SetSpeedAndAnimate:
+        ; set to max y speed
+        lda #$00
+        sta Workset + EntityYSubspeed        
+        lda #$FE
+        sta Workset + EntityYSpeed  
+        ; check direction to player      
+        lda Workset + EntityX
+        cmp PlayerData + EntityX
+        bcs @FloatLeft
+        ; float to the right if player is to the right
+        lda #$80
+        sta Workset + EntityXSubspeed
+        lda #$00
+        sta Workset + EntityXSpeed       
+        jmp @PlayAnimation
+@FloatLeft:
+        ; float to the left if player is to the left
+        lda #$80
+        sta Workset + EntityXSubspeed
+        lda #$FF
+        sta Workset + EntityXSpeed
+@PlayAnimation:
+        ; play jellyfish animation
+        lda #AnimationEncounterJellyfish
+        jsr WorksetAnimationPlay
         rts
-@LFFD4:
-        lda     #$04
-        jsr     AwardPoints
-        lda     #SFXEncounterEnemyDeath
-        jsr     SoundPlay
-        lda     #$80
-        sta     $34
-        lda     #AnimationEncounterBubble
-        jmp     WorksetAnimationPlay
+@HitByProjectile:
+        ; give some points for killing the jelly
+        lda #$04
+        jsr AwardPoints
+        ; play a head animation
+        lda #SFXEncounterEnemyDeath
+        jsr SoundPlay
+        ; mark the animation to end, and play death animation.
+        lda #%10000000
+        sta Workset + EntityAnimationIndex
+        lda #AnimationEncounterBubble
+        jmp WorksetAnimationPlay
+; duplicate crab / star spawn code.
 @SpawnEntityCrabOrStar:
         ; advance the rng to determine powerup spawn type
-        jsr     RNGAdvance
-        and     #$07
+        jsr RNGAdvance
+        and #$07
         tax
-        lda     CrabOrStarRNG,x
+        lda CrabOrStarRNG,x
         ; if we hit a 0 in the spawn table, skip spawning
-        beq     @Disable
-        sta     Workset + EntityType
-        lda     #EntityHeaderActive
-        sta     Workset + EntityHeader
-        jmp     RunEntity
+        beq @Disable
+        sta Workset + EntityType
+        lda #EntityHeaderActive
+        sta Workset + EntityHeader
+        jmp RunEntity
 @Disable:
-        lda     #$00
-        sta     Workset + EntityHeader
+        lda #$00
+        sta Workset + EntityHeader
 @Exit:
         rts
 
 ; ----------------------------------------------------------------------------
-LA32F:
-        lda     EncounterMaxDepth                           ; A32F AD 3E 03                 .>.
-        clc                                     ; A332 18                       .
-        adc     #$20                            ; A333 69 20                    i 
-        sta     Workset + EntityY                             ; A335 85 24                    .$
-        lda     EncounterMaxDepth+1                           ; A337 AD 3F 03                 .?.
-        adc     #$00                            ; A33A 69 00                    i.
-        sta     Workset + EntityY + 1                             ; A33C 85 25                    .%
-        lda     PlayerData+EntityX                           ; A33E AD 82 06                 ...
-        and     #$F0                            ; A341 29 F0                    ).
-        sta     $12                             ; A343 85 12                    ..
-LA345:
-        jsr     RNGAdvance                           ; A345 20 69 8C                  i.
-        and     #$F0                            ; A348 29 F0                    ).
-        sta     $13                             ; A34A 85 13                    ..
-        ldx     TotalEncountersPlayed                           ; A34C AE 8E 03                 ...
-        cpx     #$08                            ; A34F E0 08                    ..
-        bcs     LA366                           ; A351 B0 13                    ..
-        sec                                     ; A353 38                       8
-        sbc     $12                             ; A354 E5 12                    ..
-        bpl     LA35D                           ; A356 10 05                    ..
-        eor     #$FF                            ; A358 49 FF                    I.
-        clc                                     ; A35A 18                       .
-        adc     #$01                            ; A35B 69 01                    i.
-LA35D:
-        lsr     a                               ; A35D 4A                       J
-        lsr     a                               ; A35E 4A                       J
-        lsr     a                               ; A35F 4A                       J
-        lsr     a                               ; A360 4A                       J
-        cmp     LA371,x                         ; A361 DD 71 A3                 .q.
-        bcc     LA345                           ; A364 90 DF                    ..
-LA366:
-        lda     $13                             ; A366 A5 13                    ..
-        ora     #$08                            ; A368 09 08                    ..
-        sta     Workset + EntityX                             ; A36A 85 22                    ."
-        lda     #$10                            ; A36C A9 10                    ..
-        sta     Workset + EntityX  + 1                            ; A36E 85 23                    .#
-        rts                                     ; A370 60                       `
+SetJellyfishStartingLocation:
+        @TempPlayerHighX = $12
+        @TempRNG = $13
+        ; set starting y coordinate to just under the visible game area
+        lda EncounterMaxDepth
+        clc
+        adc #$20
+        sta Workset + EntityY
+        lda EncounterMaxDepth+1
+        adc #$00
+        sta Workset + EntityY + 1
+        ; store away high bits of player location to use as a safe zone
+        ; where no jellyfish can spawn
+        lda PlayerData + EntityX
+        and #$F0
+        sta @TempPlayerHighX
+@GetNewLocation:
+        ; advance the rng and take high bits to use as X location
+        jsr RNGAdvance
+        and #$F0
+        sta @TempRNG
+        ; check how many encounters the player has played
+        ; the safe zone decreases the more encounters the player finishes
+        ldx TotalEncountersPlayed
+        cpx #$08
+        ; if we've done a lot of encounters, there is no safe zone
+        bcs @SetEntityX
+        sec
+        sbc @TempPlayerHighX
+        ; flip bits if negative bit was set
+        bpl @ComparePosition
+        eor #$FF
+        clc
+        adc #$01
+@ComparePosition:
+        lsr a
+        lsr a
+        lsr a
+        lsr a
+        cmp @SafezoneSize,x
+        ; the location we wanted to spawn in was within safe zone
+        ; keep trying until we find an acceptable spawn location
+        bcc @GetNewLocation
+@SetEntityX:
+        ; set jelly spawn location to the rng value we got
+        lda @TempRNG
+        ora #$08
+        sta Workset + EntityX
+        lda #$10
+        sta Workset + EntityX + 1
+        ; and we are good to go!
+        rts
+@SafezoneSize:
+        .byte $04,$04,$03,$03,$02,$02,$01,$01
 
 ; ----------------------------------------------------------------------------
-LA371:
-        .byte   $04,$04,$03,$03,$02,$02,$01,$01 ; A371 04 04 03 03 02 02 01 01  ........
-; ----------------------------------------------------------------------------
 RunEntityStingray:
-        bit     Workset + EntityHeader                             ; A379 24 20                    $ 
-        bvs     LA3D6                           ; A37B 70 59                    pY
-        lda     #$00                            ; A37D A9 00                    ..
-        sta     Workset + EntityFlags1F                             ; A37F 85 3F                    .?
-        sta     Workset + EntityV19                             ; A381 85 39                    .9
-        sta     Workset + EntityV1A                             ; A383 85 3A                    .:
-        lda     #$02                            ; A385 A9 02                    ..
-        sta     $38                             ; A387 85 38                    .8
-        lda     PlayerData+EntityY                           ; A389 AD 84 06                 ...
-        clc                                     ; A38C 18                       .
-        adc     #$10                            ; A38D 69 10                    i.
-        sta     Workset + EntityY                             ; A38F 85 24                    .$
-        lda     PlayerData+EntityY+1                           ; A391 AD 85 06                 ...
-        adc     #$00                            ; A394 69 00                    i.
-        sta     Workset + EntityY + 1                             ; A396 85 25                    .%
-        jsr     EncounterClampWorksetMaximumY                           ; A398 20 D0 99                  ..
-        lda     #AnimationEncounterStingray                            ; A39B A9 3C                    .<
-        jsr     WorksetAnimationPlay                           ; A39D 20 AD 97                  ..
-        ldx     #$00                            ; A3A0 A2 00                    ..
-        lda     Workset + EntityY                             ; A3A2 A5 24                    .$
-        cmp     #$04                            ; A3A4 C9 04                    ..
-        bne     LA3AA                           ; A3A6 D0 02                    ..
-        .byte   $A2,$04                         ; A3A8 A2 04                    ..
+        bit Workset + EntityHeader
+        bvs RayMain
+        lda #$00
+        sta Workset + EntityFlags1F
+        sta Workset + EntityV19
+        sta Workset + EntityV1A
+        lda #$02
+        sta $38
+        lda PlayerData+EntityY
+        clc
+        adc #$10
+        sta Workset + EntityY
+        lda PlayerData+EntityY+1
+        adc #$00
+        sta Workset + EntityY + 1
+        jsr EncounterClampWorksetMaximumY
+        lda #AnimationEncounterStingray
+        jsr WorksetAnimationPlay
+        ldx #$00
+        lda Workset + EntityY
+        cmp #$04
+        bne LA3AA
+        .byte $A2,$04
 ; ----------------------------------------------------------------------------
 LA3AA:
         stx     Workset + EntityV17                            ; A3AA 86 37                    .7
@@ -5765,7 +5839,7 @@ LA3C9:
         rts                                     ; A3D5 60                       `
 
 ; ----------------------------------------------------------------------------
-LA3D6:
+RayMain:
         jsr     WorksetAnimationAdvance                           ; A3D6 20 BE 97                  ..
         lda     Workset + EntityV1A                             ; A3D9 A5 3A                    .:
         beq     LA3E0                           ; A3DB F0 03                    ..
@@ -6056,30 +6130,31 @@ LA5C8:
 
 ; ----------------------------------------------------------------------------
 RunEntityCrab:
-        bit Workset + EntityHeader                             ; A5D3 24 20                    $ 
-        bvs EncounterCrab                           ; A5D5 70 20                    p 
-        lda PlayerCrabLevel                           ; A5D7 AD 92 03                 ...
-        cmp #$03                            ; A5DA C9 03                    ..
-        bcc LA5E5                           ; A5DC 90 07                    ..
+        bit Workset + EntityHeader
+        bvs @Main
+        lda PlayerCrabLevel
+        cmp #$03
+        bcc @Initialize
+        ; if the player is at max crab level, turn into a star!
         lda #$0A
         sta Workset + EntityType
         jmp RunEntityStar
-
-; ----------------------------------------------------------------------------
-LA5E5:
-        lda     #(EntityHeaderActive | EntityHeader7)                            ; A5E5 A9 C0                    ..
-        sta     Workset + EntityHeader                             ; A5E7 85 20                    . 
-        jsr     WorksetClearSpeed                           ; A5E9 20 ED 98                  ..
-        lda     #$00                            ; A5EC A9 00                    ..
-        sta     $38                             ; A5EE 85 38                    .8
-        sta     Workset + EntityFlags1F                             ; A5F0 85 3F                    .?
-        lda     #AnimationEncounterCrab                            ; A5F2 A9 2C                    .,
-        jmp     WorksetAnimationPlay                           ; A5F4 4C AD 97                 L..
-
-; ----------------------------------------------------------------------------
-EncounterCrab:
+@Initialize:
+        ; set active flag
+        lda #(EntityHeaderActive | EntityHeader7) 
+        sta Workset + EntityHeader
+        ; clear some settings
+        jsr WorksetClearSpeed
+        lda #$00
+        sta Workset + EntityV18
+        sta Workset + EntityFlags1F
+        ; and play the crab animation
+        lda #AnimationEncounterCrab
+        jmp WorksetAnimationPlay
+@Main:
         jsr HitDetectAgainstPlayer
-        bcc LA61A
+        bcc @CrabMovement
+        ; the player is touching the flag, time to award a crab level.
         ; play pickup sound
         lda #SFXEncounterPickup
         jsr SoundPlay
@@ -6090,232 +6165,261 @@ EncounterCrab:
         inc PlayerCrabLevel
         lda PlayerCrabLevel
         cmp #$04
-        bcc @Exit
-        ; make sure we don't go over 4
+        ; our work here is done, disable entity
+        bcc @Disable
+        ; make sure we don't go over 3
         lda #$03
         sta PlayerCrabLevel
-@Exit:
+@Disable:
         lda #$00
-        sta $20
+        sta Workset + EntityHeader
         rts
-
-; ----------------------------------------------------------------------------
-LA61A:
-        lda     Workset + EntityV18
-        bne     LA642
-        lda     #$08
-        ldy     #$01
-        jsr     ApproachYSpeed
-        jsr     WorksetMoveY
-        jsr     EncounterClampWorksetMaximumY
-        bcc     @Exit
-        inc     Workset + EntityV18
-        ; set movement speed to +1
-        ldy     #$01
+@CrabMovement:
+        lda Workset + EntityV18
+        bne @OnWaterFloor
+        ; accelerate toward the bottom of the map
+        lda #$08
+        ldy #$01
+        jsr ApproachYSpeed
+        jsr WorksetMoveY
+        ; and exit unless we've reached the bottom.
+        jsr EncounterClampWorksetMaximumY
+        bcc @Exit
+        ; increment V18, we've reached the bottom of the map.
+        inc Workset + EntityV18
+        ; set crab speed to 1
+        ldy #$01
         ; compare crab position to player x
-        lda     PlayerData+EntityX
-        cmp     Workset + EntityX
-        lda     PlayerData+EntityX+1
-        sbc     Workset + EntityX + 1
-        bcs     @StoreSpeed
+        lda PlayerData + EntityX
+        cmp Workset + EntityX
+        lda PlayerData+EntityX+1
+        sbc Workset + EntityX + 1
+        bcs @StoreSpeed
         ; set crab speed to -1 if player is to the left
-        ldy     #$FF
+        ldy #$FF
 @StoreSpeed:
-        sty     Workset + EntityXSpeed
+        ; we have our new speed!
+        sty Workset + EntityXSpeed
 @Exit:
         rts
-
-; ----------------------------------------------------------------------------
-LA642:
-        jsr     WorksetAnimationAdvance                           ; A642 20 BE 97                  ..
-        jsr     WorksetMoveX                           ; A645 20 FA 97                  ..
-        lda     Workset + EntityX  + 1                            ; A648 A5 23                    .#
-        lda     #$01                            ; A64A A9 01                    ..
-        and     Workset + EntityFlags1F                             ; A64C 25 3F                    %?
-        bne     LA658                           ; A64E D0 08                    ..
-        .byte   $C9,$10,$F0,$04,$A9,$00,$85,$20 ; A650 C9 10 F0 04 A9 00 85 20  ....... 
-; ----------------------------------------------------------------------------
-LA658:
-        rts                                     ; A658 60                       `
+@OnWaterFloor:
+        ; animate crab and move toward player position
+        jsr WorksetAnimationAdvance
+        jsr WorksetMoveX
+        ; load current location
+        lda Workset + EntityX + 1
+        ; and immediately overwrite with 1..
+        lda #$01
+        ; compare against hit detection flag
+        and Workset + EntityFlags1F
+        bne @Exit2
+        ; do pointless check
+        cmp #$10
+        beq @Exit2
+        ; and disable entity!
+        lda #$00
+        sta Workset + EntityHeader
+@Exit2:
+        rts
 
 ; ----------------------------------------------------------------------------
 RunEntityShell:
-        bit     Workset + EntityHeader                             ; A659 24 20                    $ 
-        bvs     LA66D                           ; A65B 70 10                    p.
-        lda     #(EntityHeaderActive | EntityHeader7)                            ; A65D A9 C0                    ..
-        sta     Workset + EntityHeader                             ; A65F 85 20                    . 
-        jsr     WorksetClearSpeed                           ; A661 20 ED 98                  ..
-        lda     #$00                            ; A664 A9 00                    ..
-        sta     $38                             ; A666 85 38                    .8
-        lda     #AnimationEncounterShell                            ; A668 A9 2D                    .-
-        jmp     WorksetAnimationPlay                           ; A66A 4C AD 97                 L..
-
-; ----------------------------------------------------------------------------
-LA66D:
-        jsr     HitDetectAgainstPlayer                           ; A66D 20 61 99                  a.
-        bcc     LA698                           ; A670 90 26                    .&
-        lda     #SFXEncounterPickup                            ; A672 A9 15                    ..
-        jsr     SoundPlay                           ; A674 20 CD E2                  ..
-        lda     #$02                            ; A677 A9 02                    ..
-        jsr     AwardPoints                           ; A679 20 D0 8C                  ..
-        inc     PlayerShellCount                           ; A67C EE 90 03                 ...
-        lda     PlayerShellCount                           ; A67F AD 90 03                 ...
-        cmp     #$64                            ; A682 C9 64                    .d
-        bcc     LA68B                           ; A684 90 05                    ..
-        .byte   $A9,$63,$8D,$90,$03             ; A686 A9 63 8D 90 03           .c...
-; ----------------------------------------------------------------------------
-LA68B:
-        lda     PendingBGUpdates                           ; A68B AD 04 03                 ...
-        ora     #DrawStatusbarShellsFlag                            ; A68E 09 08                    ..
-        sta     PendingBGUpdates                           ; A690 8D 04 03                 ...
-        lda     #$00                            ; A693 A9 00                    ..
-        sta     Workset + EntityHeader                             ; A695 85 20                    . 
-        rts                                     ; A697 60                       `
-
-; ----------------------------------------------------------------------------
-LA698:
-        bit     $38                             ; A698 24 38                    $8
-        bpl     LA6A2                           ; A69A 10 06                    ..
-        dec     Workset + EntityV19                             ; A69C C6 39                    .9
-        bne     LA6BC                           ; A69E D0 1C                    ..
-        .byte   $F0,$F1                         ; A6A0 F0 F1                    ..
-; ----------------------------------------------------------------------------
-LA6A2:
-        jsr     WorksetAnimationAdvance                           ; A6A2 20 BE 97                  ..
-        lda     #$04                            ; A6A5 A9 04                    ..
-        ldy     #$01                            ; A6A7 A0 01                    ..
-        jsr     ApproachYSpeed                           ; A6A9 20 41 98                  A.
-        jsr     WorksetMoveY                           ; A6AC 20 1B 98                  ..
-        jsr     EncounterClampWorksetMaximumY                           ; A6AF 20 D0 99                  ..
-        bcc     LA6BC                           ; A6B2 90 08                    ..
-        lda     #$80                            ; A6B4 A9 80                    ..
-        sta     $38                             ; A6B6 85 38                    .8
-        lda     #$80                            ; A6B8 A9 80                    ..
-        sta     Workset + EntityV19                             ; A6BA 85 39                    .9
-LA6BC:
-        rts                                     ; A6BC 60                       `
+        bit Workset + EntityHeader
+        bvs @Main
+        ; initialize some settings
+        lda #(EntityHeaderActive | EntityHeader7)
+        sta Workset + EntityHeader
+        jsr WorksetClearSpeed
+        lda #$00
+        sta Workset + EntityV18
+        ; play shell animation
+        lda #AnimationEncounterShell
+        jmp WorksetAnimationPlay
+@Main:
+        jsr HitDetectAgainstPlayer
+        bcc @KeepRunning
+        ; if the player has touched the shell, award points and give shells
+        lda #SFXEncounterPickup
+        jsr SoundPlay
+        lda #$02
+        jsr AwardPoints
+        inc PlayerShellCount
+        lda PlayerShellCount
+        cmp #$64
+        bcc @UpdateUIAndDespawn
+        ; max out at 99 shells
+        lda #$63
+        sta PlayerShellCount
+@UpdateUIAndDespawn:
+        ; mark the shell UI to be updated
+        lda PendingBGUpdates
+        ora #DrawStatusbarShellsFlag
+        sta PendingBGUpdates
+        ; and disable the entity
+@Despawn:
+        lda #$00
+        sta Workset + EntityHeader
+        rts
+@KeepRunning:
+        ; keep falling to the ground until landed
+        bit Workset + EntityV18
+        bpl @FallingToGround
+        ; despawn if timer has expired, otherwise wait
+        dec Workset + EntityV19
+        bne @Exit
+        beq @Despawn
+@FallingToGround:
+        jsr WorksetAnimationAdvance
+        ; accelerate toward the ground
+        lda #$04
+        ldy #$01
+        jsr ApproachYSpeed
+        jsr WorksetMoveY
+        ; and check if we've hit the ground
+        jsr EncounterClampWorksetMaximumY
+        bcc @Exit
+        ; mark that we have hit the ground
+        lda #$80
+        sta Workset + EntityV18
+        ; set timer to despawn unless picked up.
+        lda #$80
+        sta Workset + EntityV19
+@Exit:
+        rts
 
 ; ----------------------------------------------------------------------------
 RunEntityStar:
-        bit     Workset + EntityHeader                             ; A6BD 24 20                    $ 
-        bvs     LA6D3                           ; A6BF 70 12                    p.
-        lda     #(EntityHeaderActive | EntityHeader7)                            ; A6C1 A9 C0                    ..
-        sta     Workset + EntityHeader                             ; A6C3 85 20                    . 
-        jsr     WorksetClearSpeed                           ; A6C5 20 ED 98                  ..
-        lda     #$00                            ; A6C8 A9 00                    ..
-        sta     $38                             ; A6CA 85 38                    .8
-        sta     Workset + EntityAnimationIndex                             ; A6CC 85 34                    .4
-        lda     #AnimationEncounterStar                            ; A6CE A9 2E                    ..
-        jmp     WorksetAnimationPlay                           ; A6D0 4C AD 97                 L..
+        bit Workset + EntityHeader
+        bvs @Main
+        ; initialize some settings
+        lda #(EntityHeaderActive | EntityHeader7)
+        sta Workset + EntityHeader
+        jsr WorksetClearSpeed
+        lda #$00
+        sta Workset + EntityV18
+        sta Workset + EntityAnimationIndex
+        lda #AnimationEncounterStar
+        jmp WorksetAnimationPlay
+@Main:
+        bit Workset + EntityAnimationIndex
+        bpl @CheckForPickup
+        jsr WorksetMoveY
+        jsr WorksetAnimationAdvance
+        lda Workset + EntityAnimTimer
+        beq @Despawn
+        rts
+@CheckForPickup:
+        jsr HitDetectAgainstPlayer
+        bcc @NotPickedUp
+        ; player is picking up the star, play a sound
+        lda #SFXEncounterPickup
+        jsr SoundPlay
+        ; then advance the rng and pick out some bits from it
+        jsr RNGAdvance
+        and #$06
+        ; load animation to run and push it to the stack
+        tax
+        lda @StarRNGPoints+1,x
+        pha
+        ; load and award points based on rng
+        lda @StarRNGPoints,x
+        jsr AwardPoints
+        ; mark flag to despawn after animation
+        lda #$80
+        sta Workset + EntityAnimationIndex
+        lda #$00
+        sta Workset + EntityYSubspeed
+        lda #$FF
+        sta Workset + EntityYSpeed
+        ; and play the points animation we loaded earlier
+        pla
+        jmp WorksetAnimationPlay
+@Despawn:
+        lda #$00
+        sta Workset + EntityHeader
+        rts
+@NotPickedUp:
+        jsr WorksetAnimationAdvance
+        ; keep falling to the ground until landed
+        bit Workset + EntityV18
+        bpl @FallingToGround
+        ; despawn if timer has expired, otherwise wait
+        dec Workset + EntityV19
+        bne @Exit
+        beq @Despawn
+@FallingToGround:
+        ; accelerate toward the ground
+        lda #$04
+        ldy #$01
+        jsr ApproachYSpeed
+        jsr WorksetMoveY
+        ; and check if we've hit the ground
+        jsr EncounterClampWorksetMaximumY
+        bcc @Exit
+        ; mark that we have hit the ground
+        lda #$80
+        sta Workset + EntityV18
+        ; set timer to despawn unless picked up.
+        lda #$80
+        sta Workset + EntityV19
+@Exit:
+        rts
 
-; ----------------------------------------------------------------------------
-LA6D3:
-        bit     Workset + EntityAnimationIndex                             ; A6D3 24 34                    $4
-        bpl     LA6E2                           ; A6D5 10 0B                    ..
-        jsr     WorksetMoveY                           ; A6D7 20 1B 98                  ..
-        jsr     WorksetAnimationAdvance                           ; A6DA 20 BE 97                  ..
-        lda     Workset + EntityAnimTimer                             ; A6DD A5 2B                    .+
-        beq     LA70C                           ; A6DF F0 2B                    .+
-        rts                                     ; A6E1 60                       `
+; table of points to award + animation to run
+@StarRNGPoints:
+        .byte $0A,AnimationEncounter500Points
+        .byte $0A,AnimationEncounter500Points
+        .byte $0C,AnimationEncounter1000Points
+        .byte $0E,AnimationEncounter2000Points
 
-; ----------------------------------------------------------------------------
-LA6E2:
-        jsr     HitDetectAgainstPlayer                           ; A6E2 20 61 99                  a.
-        bcc     LA711                           ; A6E5 90 2A                    .*
-        lda     #SFXEncounterPickup                            ; A6E7 A9 15                    ..
-        jsr     SoundPlay                           ; A6E9 20 CD E2                  ..
-        jsr     RNGAdvance                           ; A6EC 20 69 8C                  i.
-        and     #$06                            ; A6EF 29 06                    ).
-        tax                                     ; A6F1 AA                       .
-        lda     LA737,x                         ; A6F2 BD 37 A7                 .7.
-        pha                                     ; A6F5 48                       H
-        lda     LA736,x                         ; A6F6 BD 36 A7                 .6.
-        jsr     AwardPoints                           ; A6F9 20 D0 8C                  ..
-        lda     #$80                            ; A6FC A9 80                    ..
-        sta     Workset + EntityAnimationIndex                             ; A6FE 85 34                    .4
-        lda     #$00                            ; A700 A9 00                    ..
-        sta     Workset + EntityYSubspeed                            ; A702 85 32                    .2
-        lda     #$FF                            ; A704 A9 FF                    ..
-        sta     Workset + EntityYSpeed                             ; A706 85 33                    .3
-        pla                                     ; A708 68                       h
-        jmp     WorksetAnimationPlay                           ; A709 4C AD 97                 L..
-
-; ----------------------------------------------------------------------------
-LA70C:
-        lda     #$00                            ; A70C A9 00                    ..
-        sta     Workset + EntityHeader                             ; A70E 85 20                    . 
-        rts                                     ; A710 60                       `
-
-; ----------------------------------------------------------------------------
-LA711:
-        jsr     WorksetAnimationAdvance                           ; A711 20 BE 97                  ..
-        bit     $38                             ; A714 24 38                    $8
-        bpl     LA71E                           ; A716 10 06                    ..
-        dec     Workset + EntityV19                             ; A718 C6 39                    .9
-        bne     LA735                           ; A71A D0 19                    ..
-        beq     LA70C                           ; A71C F0 EE                    ..
-LA71E:
-        lda     #$04                            ; A71E A9 04                    ..
-        ldy     #$01                            ; A720 A0 01                    ..
-        jsr     ApproachYSpeed                           ; A722 20 41 98                  A.
-        jsr     WorksetMoveY                           ; A725 20 1B 98                  ..
-        jsr     EncounterClampWorksetMaximumY                           ; A728 20 D0 99                  ..
-        bcc     LA735                           ; A72B 90 08                    ..
-        lda     #$80                            ; A72D A9 80                    ..
-        sta     $38                             ; A72F 85 38                    .8
-        lda     #$80                            ; A731 A9 80                    ..
-        sta     Workset + EntityV19                             ; A733 85 39                    .9
-LA735:
-        rts                                     ; A735 60                       `
-
-; ----------------------------------------------------------------------------
-LA736:
-        .byte   $0A                             ; A736 0A                       .
-LA737:
-        .byte   $35,$0A,$35,$0C,$36,$0E,$37     ; A737 35 0A 35 0C 36 0E 37     5.5.6.7
 ; ----------------------------------------------------------------------------
 InitJawsStashedLocation:
-        lda     #$18                            ; A73E A9 18                    ..
-        sta     JawsStashedX                           ; A740 8D 48 03                 .H.
-        lda     #$0C                            ; A743 A9 0C                    ..
-        sta     JawsStashedY                           ; A745 8D 49 03                 .I.
-        rts                                     ; A748 60                       `
+        ; jaws starting position on the map
+        lda #$18
+        sta JawsStashedX
+        lda #$0C
+        sta JawsStashedY
+        rts
 
 ; ----------------------------------------------------------------------------
-PrepareEnemySettings:
+PrepareEncounterPatterns:
         @TempPointer = $44
         lda TotalEncountersPlayed
         asl a
         tax
-        lda EnemySettings,x
+        lda EncounterPatterns,x
         sta @TempPointer
-        lda EnemySettings+1,x
+        lda EncounterPatterns+1,x
         sta @TempPointer+1
         ldy #$00
+        ; load how many simultaneous enemies to spawn
         lda (@TempPointer),y
         iny
+        ; if we're spawning more than 3 at a time
         cmp #$03
-        bcc @LA76A
+        bcc @SetupPatterns
+        ; and jaws is joining the encounter
         ldx EncounterJawsActive
         cpx #$02
-        bcs @LA76A
+        bcs @SetupPatterns
+        ; then reduce down to 3
         lda #$03
-@LA76A:
-        sta $0480
+@SetupPatterns:
+        sta EncounterEnemiesOnScreen
         lda (@TempPointer),y
         iny
-        sta EnemyPatternTiming
-        sta EnemyNextPatternTiming
+        sta EncounterSpawnTimer
+        sta EncounterNextSpawnTimer
         lda (@TempPointer),y
         iny
-        sta EnemySettingsPtr
+        sta EncounterPatternsPtr
         lda (@TempPointer),y
-        sta EnemySettingsPtr + 1
+        sta EncounterPatternsPtr + 1
         lda #$00
-        sta EnemyPatternIndex
+        sta EncounterSpawnsIndex
         lda #$00
-        sta EnemyPatternCountdown1
-        sta EnemyPatternCountdown2
+        sta EncounterSpawnTimer+1
+        sta EncounterNextSpawnTimer+1
         rts
 
 ; ----------------------------------------------------------------------------
@@ -7095,49 +7199,51 @@ DrawBGMapLeft2:
 ; ----------------------------------------------------------------------------
 EncounterLoadSettings:
         @TempPointer = $44
-        jsr PPUDisableNMI                           ; AC82 20 EA 8B                  ..
-        jsr PPUDisableRendering                           ; AC85 20 B6 8B                  ..
+        ; disable ppu while loading the encounter
+        jsr PPUDisableNMI
+        jsr PPUDisableRendering
         lda #CHREncounterAndIntroScreen
-        sta ActiveCHR                           ; AC8A 8D 07 03                 ...
-        lda #$00                            ; AC8D A9 00                    ..
-        sta WaterAnimationTimer                           ; AC8F 8D 1A 03                 ...
-        sta WaterAnimationFrame                           ; AC92 8D 1B 03                 ...
-        lda CurrentMapPositionFlags                           ; AC95 AD 40 03                 .@.
-        asl a                               ; AC98 0A                       .
-        tax                                 ; AC99 AA                       .
-        lda EncounterTypeSettings,x                         ; AC9A BD 08 CD                 ...
-        sta @TempPointer                             ; AC9D 85 44                    .D
-        lda EncounterTypeSettings+1,x                         ; AC9F BD 09 CD                 ...
-        sta @TempPointer+1                             ; ACA2 85 45                    .E
-        jsr ClearScreenAndSprites                           ; ACA4 20 12 8E                  ..
-        jsr DrawStatusLine                           ; ACA7 20 8F A7                  ..
-        jsr DrawStatusLine_PowerLabel                           ; ACAA 20 D3 87                  ..
-        lda #$01                            ; ACAD A9 01                    ..
-        sta ShowStatusBarTextLine                           ; ACAF 8D 05 03                 ...
-        sta NMISpriteHandlingDisabled                           ; ACB2 8D 02 03                 ...
-        ldy #$00                            ; ACB5 A0 00                    ..
-        lda (@TempPointer),y                         ; ACB7 B1 44                    .D
-        jsr LoadEncounterBackground                           ; ACB9 20 E6 AC                  ..
-        ldy #$01                            ; ACBC A0 01                    ..
-        lda (@TempPointer),y                         ; ACBE B1 44                    .D
-        jsr DrawRomGraphics                           ; ACC0 20 69 8D                  i.
-        ldy #$02                            ; ACC3 A0 02                    ..
-        lda (@TempPointer),y                         ; ACC5 B1 44                    .D
-        iny                                 ; ACC7 C8                       .
-        sta WaterHeight                           ; ACC8 8D 3C 03                 .<.
-        lda (@TempPointer),y                         ; ACCB B1 44                    .D
-        iny                                 ; ACCD C8                       .
-        sta WaterHeight+1                           ; ACCE 8D 3D 03                 .=.
-        lda (@TempPointer),y                         ; ACD1 B1 44                    .D
-        iny                                 ; ACD3 C8                       .
-        sta EncounterMaxDepth                           ; ACD4 8D 3E 03                 .>.
-        lda (@TempPointer),y                         ; ACD7 B1 44                    .D
-        iny                                 ; ACD9 C8                       .
-        sta EncounterMaxDepth+1                           ; ACDA 8D 3F 03                 .?.
-        lda (@TempPointer),y                         ; ACDD B1 44                    .D
-        jsr StoreActivePaletteAndWaitFor1Frame                           ; ACDF 20 BD 8E                  ..
-        jsr PPUEnableNMI                           ; ACE2 20 DE 8B                  ..
-        rts                                     ; ACE5 60                       `
+        sta ActiveCHR
+        lda #$00
+        sta WaterAnimationTimer
+        sta WaterAnimationFrame
+        lda CurrentMapPositionFlags
+        asl a
+        tax
+        lda EncounterTypeSettings,x
+        sta @TempPointer
+        lda EncounterTypeSettings+1,x
+        sta @TempPointer+1
+        jsr ClearScreenAndSprites
+        jsr DrawStatusLine
+        jsr DrawStatusLine_PowerLabel
+        lda #$01
+        sta ShowStatusBarTextLine
+        sta NMISpriteHandlingDisabled
+        ldy #$00
+        lda (@TempPointer),y
+        jsr LoadEncounterBackground
+        ldy #$01
+        lda (@TempPointer),y
+        jsr DrawRomGraphics
+        ldy #$02
+        lda (@TempPointer),y
+        iny
+        sta WaterHeight
+        lda (@TempPointer),y
+        iny
+        sta WaterHeight+1
+        lda (@TempPointer),y
+        iny
+        sta EncounterMaxDepth
+        lda (@TempPointer),y
+        iny
+        sta EncounterMaxDepth+1
+        lda (@TempPointer),y
+        jsr StoreActivePaletteAndWaitFor1Frame
+        ; settings loaded, enable ppu and get out of here!
+        jsr PPUEnableNMI
+        rts
 
 LoadEncounterBackground:
         @TempPointer          = $00
@@ -9178,138 +9284,152 @@ SpritesetPortBoat:
 .byte $28,$F8,$9B,$00
 .byte $80
 
-EnemySettings:
-  .addr @EnemySettings00Data
-  .addr @EnemySettings01Data
-  .addr @EnemySettings02Data
-  .addr @EnemySettings03Data
-  .addr @EnemySettings04Data
-  .addr @EnemySettings05Data
-  .addr @EnemySettings06Data
-  .addr @EnemySettings07Data
-  .addr @EnemySettings08Data
-  .addr @EnemySettings09Data
-  .addr @EnemySettings0AData
-  .addr @EnemySettings0BData
-  .addr @EnemySettings0CData
-  .addr @EnemySettings0DData
-  .addr @EnemySettings0EData
-  .addr @EnemySettings0FData
-  .addr @EnemySettings10Data
-  .addr @EnemySettings11Data
-  .addr @EnemySettings12Data
-  .addr @EnemySettings13Data
-  .addr @EnemySettings14Data
-  .addr @EnemySettings15Data
-  .addr @EnemySettings16Data
-  .addr @EnemySettings17Data
-  .addr @EnemySettings18Data
-  .addr @EnemySettings19Data
-  .addr @EnemySettings1AData
-  .addr @EnemySettings1BData
-  .addr @EnemySettings1CData
-  .addr @EnemySettings1DData
-  .addr @EnemySettings1EData
-  .addr @EnemySettings1FData
+; table of encounter patterns, loaded based on how many encounters the player has finished.
+EncounterPatterns:
+        .addr @EncounterPatterns00Data
+        .addr @EncounterPatterns01Data
+        .addr @EncounterPatterns02Data
+        .addr @EncounterPatterns03Data
+        .addr @EncounterPatterns04Data
+        .addr @EncounterPatterns05Data
+        .addr @EncounterPatterns06Data
+        .addr @EncounterPatterns07Data
+        .addr @EncounterPatterns08Data
+        .addr @EncounterPatterns09Data
+        .addr @EncounterPatterns0AData
+        .addr @EncounterPatterns0BData
+        .addr @EncounterPatterns0CData
+        .addr @EncounterPatterns0DData
+        .addr @EncounterPatterns0EData
+        .addr @EncounterPatterns0FData
+        .addr @EncounterPatterns10Data
+        .addr @EncounterPatterns11Data
+        .addr @EncounterPatterns12Data
+        .addr @EncounterPatterns13Data
+        .addr @EncounterPatterns14Data
+        .addr @EncounterPatterns15Data
+        .addr @EncounterPatterns16Data
+        .addr @EncounterPatterns17Data
+        .addr @EncounterPatterns18Data
+        .addr @EncounterPatterns19Data
+        .addr @EncounterPatterns1AData
+        .addr @EncounterPatterns1BData
+        .addr @EncounterPatterns1CData
+        .addr @EncounterPatterns1DData
+        .addr @EncounterPatterns1EData
+        .addr @EncounterPatterns1FData
 
-@EnemySettings00Data:
+; 3 parameters per encounter:
+;  - how many enemies to have on screen at once
+;  - countdown between each spawn
+;  - pointer to each a table of enemies to spawn
+@EncounterPatterns00Data:
 .byte $02, $40
-.addr @EnemyPattern00Data
-@EnemySettings01Data:
+.addr @EncounterSpawns00Data
+@EncounterPatterns01Data:
 .byte $02, $40
-.addr @EnemyPattern01Data
-@EnemySettings02Data:
+.addr @EncounterSpawns01Data
+@EncounterPatterns02Data:
 .byte $03, $30
-.addr @EnemyPattern00Data
-@EnemySettings03Data:
+.addr @EncounterSpawns00Data
+@EncounterPatterns03Data:
 .byte $03, $30
-.addr @EnemyPattern01Data
-@EnemySettings04Data:
+.addr @EncounterSpawns01Data
+@EncounterPatterns04Data:
 .byte $03, $20
-.addr @EnemyPattern02Data
-@EnemySettings05Data:
+.addr @EncounterSpawns02Data
+@EncounterPatterns05Data:
 .byte $03, $20
-.addr @EnemyPattern03Data
-@EnemySettings06Data:
+.addr @EncounterSpawns03Data
+@EncounterPatterns06Data:
 .byte $04, $20
-.addr @EnemyPattern00Data
-@EnemySettings07Data:
+.addr @EncounterSpawns00Data
+@EncounterPatterns07Data:
 .byte $04, $20
-.addr @EnemyPattern01Data
-@EnemySettings08Data:
+.addr @EncounterSpawns01Data
+@EncounterPatterns08Data:
 .byte $04, $10
-.addr @EnemyPattern02Data
-@EnemySettings09Data:
+.addr @EncounterSpawns02Data
+@EncounterPatterns09Data:
 .byte $04, $10
-.addr @EnemyPattern03Data
-@EnemySettings0AData:
+.addr @EncounterSpawns03Data
+@EncounterPatterns0AData:
 .byte $03, $10
-.addr @EnemyPattern04Data
-@EnemySettings0BData:
+.addr @EncounterSpawns04Data
+@EncounterPatterns0BData:
 .byte $03, $10
-.addr @EnemyPattern05Data
-@EnemySettings0CData:
+.addr @EncounterSpawns05Data
+@EncounterPatterns0CData:
 .byte $04, $10
-.addr @EnemyPattern05Data
-@EnemySettings0DData:
+.addr @EncounterSpawns05Data
+@EncounterPatterns0DData:
 .byte $02, $10
-.addr @EnemyPattern06Data
-@EnemySettings0EData:
+.addr @EncounterSpawns06Data
+@EncounterPatterns0EData:
 .byte $02, $10
-.addr @EnemyPattern07Data
-@EnemySettings0FData:
+.addr @EncounterSpawns07Data
+@EncounterPatterns0FData:
 .byte $02, $10
-.addr @EnemyPattern08Data
-@EnemySettings10Data:
+.addr @EncounterSpawns08Data
+@EncounterPatterns10Data:
 .byte $03, $08
-.addr @EnemyPattern05Data
-@EnemySettings11Data:
+.addr @EncounterSpawns05Data
+@EncounterPatterns11Data:
 .byte $03, $08
-.addr @EnemyPattern06Data
-@EnemySettings12Data:
+.addr @EncounterSpawns06Data
+@EncounterPatterns12Data:
 .byte $03, $08
-.addr @EnemyPattern07Data
-@EnemySettings13Data:
+.addr @EncounterSpawns07Data
+@EncounterPatterns13Data:
 .byte $03, $08
-.addr @EnemyPattern08Data
-@EnemySettings14Data:
+.addr @EncounterSpawns08Data
+@EncounterPatterns14Data:
 .byte $03, $08
-.addr @EnemyPattern09Data
-@EnemySettings15Data:
+.addr @EncounterSpawns09Data
+@EncounterPatterns15Data:
 .byte $03, $08
-.addr @EnemyPattern0AData
-@EnemySettings16Data:
+.addr @EncounterSpawns0AData
+@EncounterPatterns16Data:
 .byte $03, $08
-.addr @EnemyPattern0BData
-@EnemySettings17Data:
+.addr @EncounterSpawns0BData
+@EncounterPatterns17Data:
 .byte $03, $08
-.addr @EnemyPattern0CData
-@EnemySettings18Data:
+.addr @EncounterSpawns0CData
+@EncounterPatterns18Data:
 .byte $04, $04
-.addr @EnemyPattern05Data
-@EnemySettings19Data:
+.addr @EncounterSpawns05Data
+@EncounterPatterns19Data:
 .byte $04, $04
-.addr @EnemyPattern06Data
-@EnemySettings1AData:
+.addr @EncounterSpawns06Data
+@EncounterPatterns1AData:
 .byte $04, $04
-.addr @EnemyPattern07Data
-@EnemySettings1BData:
+.addr @EncounterSpawns07Data
+@EncounterPatterns1BData:
 .byte $04, $04
-.addr @EnemyPattern08Data
-@EnemySettings1CData:
+.addr @EncounterSpawns08Data
+@EncounterPatterns1CData:
 .byte $04, $04
-.addr @EnemyPattern09Data
-@EnemySettings1DData:
+.addr @EncounterSpawns09Data
+@EncounterPatterns1DData:
 .byte $04, $04
-.addr @EnemyPattern0AData
-@EnemySettings1EData:
+.addr @EncounterSpawns0AData
+@EncounterPatterns1EData:
 .byte $04, $04
-.addr @EnemyPattern0BData
-@EnemySettings1FData:
+.addr @EncounterSpawns0BData
+@EncounterPatterns1FData:
 .byte $04, $04
-.addr @EnemyPattern0CData
+.addr @EncounterSpawns0CData
 
-@EnemyPattern00Data:
+
+; tables of enemies to spawn.
+; each encounter is terminated by $FF.
+; the numbers indicate what kind of enemy to spawn.
+;  0 - jellyfish
+;  1 - stingray
+;  2 - homing stingray
+;  3 - baby shark
+;  4 - stingray
+@EncounterSpawns00Data:
 .byte $00,$01,$00,$01
 .byte $00,$01,$00,$01
 .byte $00,$01,$00,$01
@@ -9317,7 +9437,7 @@ EnemySettings:
 .byte $00,$01,$00,$01
 .byte $00,$01,$00,$01
 .byte $FF
-@EnemyPattern01Data:
+@EncounterSpawns01Data:
 .byte $01,$01,$00,$01
 .byte $01,$00,$01,$01
 .byte $00,$01,$01,$00
@@ -9325,7 +9445,7 @@ EnemySettings:
 .byte $01,$00,$01,$01
 .byte $00,$01,$01,$03
 .byte $FF
-@EnemyPattern02Data:
+@EncounterSpawns02Data:
 .byte $00,$00,$00,$00
 .byte $00,$00,$00,$00
 .byte $00,$00,$00,$01
@@ -9335,7 +9455,7 @@ EnemySettings:
 .byte $01,$01,$01,$00
 .byte $01,$01,$01,$03
 .byte $FF
-@EnemyPattern03Data:
+@EncounterSpawns03Data:
 .byte $00,$01,$02,$00
 .byte $01,$02,$00,$01
 .byte $02,$03,$00,$01
@@ -9345,7 +9465,7 @@ EnemySettings:
 .byte $01,$02,$00,$01
 .byte $02,$00,$01,$03
 .byte $FF
-@EnemyPattern04Data:
+@EncounterSpawns04Data:
 .byte $01,$01,$01,$01
 .byte $01,$01,$01,$01
 .byte $01,$01,$01,$03
@@ -9357,7 +9477,7 @@ EnemySettings:
 .byte $01,$01,$01,$03
 .byte $01,$01,$01,$03
 .byte $FF
-@EnemyPattern05Data:
+@EncounterSpawns05Data:
 .byte $02,$02,$02,$02
 .byte $02,$02,$02,$02
 .byte $02,$02,$02,$02
@@ -9367,13 +9487,13 @@ EnemySettings:
 .byte $02,$02,$02,$02
 .byte $02,$02,$02,$02
 .byte $FF
-@EnemyPattern06Data:
+@EncounterSpawns06Data:
 .byte $03,$03,$03,$03
 .byte $03,$03,$03,$03
 .byte $03,$03,$03,$03
 .byte $03,$03,$03,$03
 .byte $FF
-@EnemyPattern07Data:
+@EncounterSpawns07Data:
 .byte $02,$02,$02,$03
 .byte $02,$02,$02,$03
 .byte $02,$02,$02,$03
@@ -9383,7 +9503,7 @@ EnemySettings:
 .byte $02,$02,$02,$03
 .byte $02,$02,$02,$03
 .byte $FF
-@EnemyPattern08Data:
+@EncounterSpawns08Data:
 .byte $00,$01,$02,$03
 .byte $00,$01,$02,$03
 .byte $00,$01,$02,$03
@@ -9393,7 +9513,7 @@ EnemySettings:
 .byte $00,$01,$02,$03
 .byte $00,$01,$02,$03
 .byte $FF
-@EnemyPattern09Data:
+@EncounterSpawns09Data:
 .byte $00,$01,$00,$01
 .byte $00,$01,$00,$03
 .byte $00,$01,$00,$01
@@ -9403,7 +9523,7 @@ EnemySettings:
 .byte $00,$01,$00,$01
 .byte $00,$01,$00,$03
 .byte $FF
-@EnemyPattern0AData:
+@EncounterSpawns0AData:
 .byte $00,$01,$02,$03
 .byte $04,$00,$01,$02
 .byte $03,$04,$00,$01
@@ -9413,7 +9533,7 @@ EnemySettings:
 .byte $04,$00,$01,$02
 .byte $03,$04,$00,$01
 .byte $FF
-@EnemyPattern0BData:
+@EncounterSpawns0BData:
 .byte $04,$04,$04,$04
 .byte $04,$04,$04,$03
 .byte $04,$04,$04,$04
@@ -9423,7 +9543,7 @@ EnemySettings:
 .byte $04,$04,$04,$04
 .byte $04,$04,$04,$03
 .byte $FF
-@EnemyPattern0CData:
+@EncounterSpawns0CData:
 .byte $04,$02,$04,$03
 .byte $04,$02,$04,$03
 .byte $04,$02,$04,$03
@@ -9470,242 +9590,242 @@ RomGraphicsFacingDirectionsPerEntityType:
 .addr @RomGraphicsIntroScreen
 
 @RomGraphicsTitleScreen:
-.byte $00, $20, $FF
-.byte $FF, $20, $10, $02, $FF
-.byte $01, $D7, $20, $A5, $B5, $FF
-.byte $0E, $01, $01, $FF
-.byte $05, $62, $01, $61, $A2, $A0, $02, $B2, $A4, $D0, $01, $01, $D3, $FF
-.byte $0D, $01, $01, $FF
-.byte $05, $72, $01, $71, $B2, $01, $E0, $01, $B4, $01, $01, $E2, $E3, $22, $23, $FF
-.byte $0B, $01, $01, $FF
-.byte $05, $82, $01, $81, $01, $01, $F0, $01, $C4, $01, $01, $F2, $F3, $FF
-.byte $0A, $60, $90, $91, $01, $01, $02, $68, $69, $6A, $6B, $92, $01, $01, $01, $01, $01, $65, $D4, $D5, $01, $01, $C5, $FF
-.byte $0A, $70, $01, $A1, $01, $A3, $02, $78, $79, $7A, $7B, $02, $62, $01, $63, $64, $01, $75, $E4, $E5, $F5, $01, $01, $FF
-.byte $0A, $80, $B0, $01, $01, $B3, $02, $88, $89, $8A, $8B, $02, $72, $01, $73, $74, $01, $85, $F4, $01, $01, $01, $66, $FF
-.byte $0B, $C0, $C1, $C2, $C3, $02, $98, $99, $9A, $9B, $02, $93, $94, $83, $84, $94, $95, $B1, $D1, $D2, $E1, $F1, $FF
-.byte $0B, $86, $87, $A6, $A7, $02, $A8, $A9, $AA, $AB, $02, $8C, $8D, $8E, $8F, $02, $02, $02, $02, $02, $02, $02, $02, $02, $02, $FF
-.byte $08, $96, $97, $B6, $B7, $02, $B8, $B9, $BA, $BB, $02, $9C, $9D, $9E, $9F, $FF
-.byte $0D, $5C, $5D, $5D, $5F, $5C, $5D, $5E, $5F, $6C, $6D, $6E, $6F, $7C, $7D, $7E, $7F, $5C, $5D, $5E, $5F, $5C, $5D, $5E, $5F, $5C, $5D, $5E, $5F, $5C, $5D, $5E, $5F, $04, $05, $06, $07, $04, $05, $06, $07, $04, $05, $06, $07, $04, $05, $06, $07, $04, $05, $06, $07, $04, $05, $06, $07, $04, $05, $06, $07, $04, $05, $06, $07, $14, $15, $16, $17, $14, $15, $16, $17, $14, $15, $16, $17, $14, $15, $16, $17, $14, $15, $16, $17, $14, $15, $16, $17, $14, $15, $16, $17, $14, $15, $16, $17, $FF
-.byte $01, $86, $22, $40, $31, $39, $38, $37, $20, $4C, $4A, $4E, $20, $54, $4F, $59, $53, $2C, $4C, $54, $44, $2E, $FF
-.byte $13, $54, $4D, $26, $40, $31, $39, $38, $37, $FF
-.byte $0F, $55, $4E, $49, $56, $45, $52, $53, $41, $4C, $20, $43, $49, $54, $59, $20, $53, $54, $55, $44, $49, $4F, $53, $2C, $49, $4E, $43, $2E, $FF
-.byte $08, $41, $4C, $4C, $20, $52, $49, $47, $48, $54, $53, $20, $52, $45, $53, $45, $52, $56, $45, $44, $2E, $FF
-.byte $09, $4C, $49, $43, $45, $4E, $53, $45, $44, $20, $42, $59, $20, $4D, $45, $52, $43, $48, $41, $4E, $44, $49, $53, $49, $4E, $47, $FF
-.byte $07, $43, $4F, $52, $50, $4F, $52, $41, $54, $49, $4F, $4E, $20, $4F, $46, $20, $41, $4D, $45, $52, $49, $43, $41, $2C, $49, $4E, $43, $2E, $FF
-.byte $06, $4C, $49, $43, $45, $4E, $53, $45, $44, $20, $42, $59, $20, $4E, $49, $4E, $54, $45, $4E, $44, $4F, $20, $4F, $46, $FF
-.byte $0F, $41, $4D, $45, $52, $49, $43, $41, $2C, $49, $4E, $43, $2E, $FF
-.byte $01, $C0, $23, $FF
-.byte $FF, $12, $01, $AA, $FF
-.byte $01, $D2, $23, $6A, $9A, $AA, $AA, $AA, $AA, $AA, $0A, $46, $19, $0A, $AA, $AA, $AA, $FF
-.byte $FF, $20, $01, $00, $FF
+.byte $00,$20,$FF
+.byte $FF,$20,$10,$02,$FF
+.byte $01,$D7,$20,$A5,$B5,$FF
+.byte $0E,$01,$01,$FF
+.byte $05,$62,$01,$61,$A2,$A0,$02,$B2,$A4,$D0,$01,$01,$D3,$FF
+.byte $0D,$01,$01,$FF
+.byte $05,$72,$01,$71,$B2,$01,$E0,$01,$B4,$01,$01,$E2,$E3,$22,$23,$FF
+.byte $0B,$01,$01,$FF
+.byte $05,$82,$01,$81,$01,$01,$F0,$01,$C4,$01,$01,$F2,$F3,$FF
+.byte $0A,$60,$90,$91,$01,$01,$02,$68,$69,$6A,$6B,$92,$01,$01,$01,$01,$01,$65,$D4,$D5,$01,$01,$C5,$FF
+.byte $0A,$70,$01,$A1,$01,$A3,$02,$78,$79,$7A,$7B,$02,$62,$01,$63,$64,$01,$75,$E4,$E5,$F5,$01,$01,$FF
+.byte $0A,$80,$B0,$01,$01,$B3,$02,$88,$89,$8A,$8B,$02,$72,$01,$73,$74,$01,$85,$F4,$01,$01,$01,$66,$FF
+.byte $0B,$C0,$C1,$C2,$C3,$02,$98,$99,$9A,$9B,$02,$93,$94,$83,$84,$94,$95,$B1,$D1,$D2,$E1,$F1,$FF
+.byte $0B,$86,$87,$A6,$A7,$02,$A8,$A9,$AA,$AB,$02,$8C,$8D,$8E,$8F,$02,$02,$02,$02,$02,$02,$02,$02,$02,$02,$FF
+.byte $08,$96,$97,$B6,$B7,$02,$B8,$B9,$BA,$BB,$02,$9C,$9D,$9E,$9F,$FF
+.byte $0D,$5C,$5D,$5D,$5F,$5C,$5D,$5E,$5F,$6C,$6D,$6E,$6F,$7C,$7D,$7E,$7F,$5C,$5D,$5E,$5F,$5C,$5D,$5E,$5F,$5C,$5D,$5E,$5F,$5C,$5D,$5E,$5F,$04,$05,$06,$07,$04,$05,$06,$07,$04,$05,$06,$07,$04,$05,$06,$07,$04,$05,$06,$07,$04,$05,$06,$07,$04,$05,$06,$07,$04,$05,$06,$07,$14,$15,$16,$17,$14,$15,$16,$17,$14,$15,$16,$17,$14,$15,$16,$17,$14,$15,$16,$17,$14,$15,$16,$17,$14,$15,$16,$17,$14,$15,$16,$17,$FF
+.byte $01,$86,$22,$40,$31,$39,$38,$37,$20,$4C,$4A,$4E,$20,$54,$4F,$59,$53,$2C,$4C,$54,$44,$2E,$FF
+.byte $13,$54,$4D,$26,$40,$31,$39,$38,$37,$FF
+.byte $0F,$55,$4E,$49,$56,$45,$52,$53,$41,$4C,$20,$43,$49,$54,$59,$20,$53,$54,$55,$44,$49,$4F,$53,$2C,$49,$4E,$43,$2E,$FF
+.byte $08,$41,$4C,$4C,$20,$52,$49,$47,$48,$54,$53,$20,$52,$45,$53,$45,$52,$56,$45,$44,$2E,$FF
+.byte $09,$4C,$49,$43,$45,$4E,$53,$45,$44,$20,$42,$59,$20,$4D,$45,$52,$43,$48,$41,$4E,$44,$49,$53,$49,$4E,$47,$FF
+.byte $07,$43,$4F,$52,$50,$4F,$52,$41,$54,$49,$4F,$4E,$20,$4F,$46,$20,$41,$4D,$45,$52,$49,$43,$41,$2C,$49,$4E,$43,$2E,$FF
+.byte $06,$4C,$49,$43,$45,$4E,$53,$45,$44,$20,$42,$59,$20,$4E,$49,$4E,$54,$45,$4E,$44,$4F,$20,$4F,$46,$FF
+.byte $0F,$41,$4D,$45,$52,$49,$43,$41,$2C,$49,$4E,$43,$2E,$FF
+.byte $01,$C0,$23,$FF
+.byte $FF,$12,$01,$AA,$FF
+.byte $01,$D2,$23,$6A,$9A,$AA,$AA,$AA,$AA,$AA,$0A,$46,$19,$0A,$AA,$AA,$AA,$FF
+.byte $FF,$20,$01,$00,$FF
 .byte $00
 @RomGraphicsStatusLineText:
-.byte $00, $2B, $FF
-.byte $FF, $20, $06, $20, $FF
-.byte $01, $F0, $2B, $FF
-.byte $FF, $10, $01, $00, $FF
-.byte $01, $61, $2B, $53, $43, $4F, $52, $45, $FF
-.byte $03, $10, $11, $12, $13, $10, $FF
-.byte $06, $4A, $41, $57, $53, $2F, $50, $4F, $57, $45, $52, $FF
+.byte $00,$2B,$FF
+.byte $FF,$20,$06,$20,$FF
+.byte $01,$F0,$2B,$FF
+.byte $FF,$10,$01,$00,$FF
+.byte $01,$61,$2B,$53,$43,$4F,$52,$45,$FF
+.byte $03,$10,$11,$12,$13,$10,$FF
+.byte $06,$4A,$41,$57,$53,$2F,$50,$4F,$57,$45,$52,$FF
 .byte $00
 @RomGraphicsEncounterShallow:
-.byte $C8, $23, $FF
-.byte $FF, $18, $01, $FF
-.byte $FF, $01, $E0, $23, $55, $55, $55, $55, $55, $55, $55, $55, $6A, $AA, $AA, $9A, $AA, $AA, $AA, $AA, $A6, $AA, $A9, $A9, $AA, $AA, $A6, $A9, $FF
+.byte $C8,$23,$FF
+.byte $FF,$18,$01,$FF
+.byte $FF,$01,$E0,$23,$55,$55,$55,$55,$55,$55,$55,$55,$6A,$AA,$AA,$9A,$AA,$AA,$AA,$AA,$A6,$AA,$A9,$A9,$AA,$AA,$A6,$A9,$FF
 .byte $00
 @RomGraphicsEncounterDeep:
-.byte $C8, $23, $FF
-.byte $FF, $10, $01, $FF
-.byte $FF, $01, $D8, $23, $5F, $5F, $5F, $5F, $5F, $5F, $5F, $5F, $FF
-.byte $FF, $18, $01, $55, $FF
-.byte $01, $F8, $23, $05, $05, $05, $05, $05, $05, $05, $05, $FF
-.byte $01, $C0, $2B, $55, $55, $55, $55, $55, $55, $55, $55, $AA, $AA, $AA, $AA, $AA, $AA, $AA, $AA, $FF
-.byte $FF, $08, $01, $0A, $FF
+.byte $C8,$23,$FF
+.byte $FF,$10,$01,$FF
+.byte $FF,$01,$D8,$23,$5F,$5F,$5F,$5F,$5F,$5F,$5F,$5F,$FF
+.byte $FF,$18,$01,$55,$FF
+.byte $01,$F8,$23,$05,$05,$05,$05,$05,$05,$05,$05,$FF
+.byte $01,$C0,$2B,$55,$55,$55,$55,$55,$55,$55,$55,$AA,$AA,$AA,$AA,$AA,$AA,$AA,$AA,$FF
+.byte $FF,$08,$01,$0A,$FF
 .byte $00
 @RomGraphicsFinaleScreen:
-.byte $00, $20, $FF
-.byte $FF, $20, $1A, $02, $FF
-.byte $FF, $20, $04, $00, $FF
-.byte $01, $40, $20, $0E, $0F, $FF
-.byte $04, $0A, $0B, $0C, $0D, $0E, $0F, $FF
-.byte $10, $0A, $0B, $0C, $0D, $1E, $1F, $FF
-.byte $04, $1A, $1B, $1C, $1D, $1E, $1F, $02, $24, $25, $26, $27, $02, $0A, $0B, $0C, $0D, $0E, $0F, $25, $26, $27, $02, $1A, $1B, $1C, $1D, $74, $02, $24, $25, $26, $27, $FF
-.byte $05, $74, $02, $34, $35, $36, $37, $02, $1A, $1B, $1C, $1D, $1E, $1F, $35, $36, $37, $FF
-.byte $04, $74, $02, $02, $34, $35, $36, $37, $74, $75, $02, $17, $18, $19, $FF
-.byte $03, $17, $18, $19, $FF
-.byte $03, $74, $02, $02, $74, $75, $02, $17, $18, $19, $02, $02, $74, $75, $02, $02, $74, $75, $FF
-.byte $05, $74, $74, $75, $FF
-.byte $04, $74, $75, $02, $02, $17, $18, $19, $FF
-.byte $03, $74, $75, $FF
-.byte $30, $01, $01, $01, $01, $FF
-.byte $02, $01, $01, $01, $01, $01, $01, $FF
-.byte $14, $04, $05, $09, $01, $FF
-.byte $02, $04, $05, $06, $07, $08, $09, $FF
-.byte $06, $10, $11, $12, $13, $10, $11, $12, $13, $10, $11, $12, $13, $10, $11, $12, $13, $10, $11, $12, $13, $10, $11, $12, $13, $10, $11, $12, $13, $10, $11, $12, $13, $20, $21, $22, $23, $20, $21, $22, $23, $20, $21, $22, $23, $20, $21, $22, $23, $20, $21, $22, $23, $20, $21, $22, $23, $20, $21, $22, $23, $20, $21, $22, $23, $30, $31, $32, $33, $30, $31, $32, $33, $30, $31, $32, $33, $30, $31, $32, $33, $30, $31, $32, $33, $30, $31, $32, $33, $30, $31, $32, $33, $30, $31, $32, $33, $40, $41, $42, $43, $44, $44, $40, $41, $42, $43, $44, $44, $40, $41, $42, $43, $44, $44, $40, $41, $42, $43, $44, $44, $40, $41, $42, $43, $44, $44, $40, $41, $54, $54, $54, $54, $45, $46, $54, $54, $54, $54, $45, $46, $54, $54, $54, $54, $45, $46, $54, $54, $54, $54, $45, $46, $54, $54, $54, $54, $45, $46, $54, $54, $51, $52, $54, $54, $54, $54, $54, $54, $51, $52, $54, $54, $54, $54, $53, $50, $51, $52, $54, $54, $54, $54, $54, $54, $51, $52, $54, $54, $54, $54, $54, $54, $16, $16, $16, $16, $14, $15, $16, $16, $16, $16, $14, $15, $16, $16, $16, $16, $16, $16, $16, $16, $14, $15, $16, $16, $16, $16, $14, $15, $16, $16, $16, $16, $55, $55, $55, $55, $55, $55, $60, $61, $62, $63, $55, $55, $55, $55, $55, $55, $55, $55, $55, $55, $55, $55, $60, $61, $62, $63, $55, $55, $55, $55, $55, $55, $60, $61, $62, $63, $55, $55, $55, $55, $55, $55, $55, $55, $60, $61, $62, $63, $55, $55, $55, $55, $55, $55, $55, $55, $55, $55, $60, $61, $62, $63, $55, $55, $16, $16, $16, $16, $16, $16, $64, $65, $16, $16, $16, $16, $16, $16, $16, $16, $16, $16, $64, $65, $16, $16, $16, $16, $16, $16, $64, $65, $16, $16, $16, $16, $FF
-.byte $20, $73, $73, $70, $71, $72, $73, $73, $73, $73, $73, $73, $73, $70, $71, $72, $73, $73, $73, $73, $73, $73, $73, $70, $71, $72, $73, $73, $73, $73, $73, $73, $73, $FF
-.byte $01, $C0, $23, $FF
-.byte $FF, $10, $01, $00, $FF
-.byte $01, $D0, $23, $F0, $F0, $F0, $F8, $F2, $FA, $F2, $F0, $FF
-.byte $FF, $28, $01, $FF
-.byte $FF, $00
+.byte $00,$20,$FF
+.byte $FF,$20,$1A,$02,$FF
+.byte $FF,$20,$04,$00,$FF
+.byte $01,$40,$20,$0E,$0F,$FF
+.byte $04,$0A,$0B,$0C,$0D,$0E,$0F,$FF
+.byte $10,$0A,$0B,$0C,$0D,$1E,$1F,$FF
+.byte $04,$1A,$1B,$1C,$1D,$1E,$1F,$02,$24,$25,$26,$27,$02,$0A,$0B,$0C,$0D,$0E,$0F,$25,$26,$27,$02,$1A,$1B,$1C,$1D,$74,$02,$24,$25,$26,$27,$FF
+.byte $05,$74,$02,$34,$35,$36,$37,$02,$1A,$1B,$1C,$1D,$1E,$1F,$35,$36,$37,$FF
+.byte $04,$74,$02,$02,$34,$35,$36,$37,$74,$75,$02,$17,$18,$19,$FF
+.byte $03,$17,$18,$19,$FF
+.byte $03,$74,$02,$02,$74,$75,$02,$17,$18,$19,$02,$02,$74,$75,$02,$02,$74,$75,$FF
+.byte $05,$74,$74,$75,$FF
+.byte $04,$74,$75,$02,$02,$17,$18,$19,$FF
+.byte $03,$74,$75,$FF
+.byte $30,$01,$01,$01,$01,$FF
+.byte $02,$01,$01,$01,$01,$01,$01,$FF
+.byte $14,$04,$05,$09,$01,$FF
+.byte $02,$04,$05,$06,$07,$08,$09,$FF
+.byte $06,$10,$11,$12,$13,$10,$11,$12,$13,$10,$11,$12,$13,$10,$11,$12,$13,$10,$11,$12,$13,$10,$11,$12,$13,$10,$11,$12,$13,$10,$11,$12,$13,$20,$21,$22,$23,$20,$21,$22,$23,$20,$21,$22,$23,$20,$21,$22,$23,$20,$21,$22,$23,$20,$21,$22,$23,$20,$21,$22,$23,$20,$21,$22,$23,$30,$31,$32,$33,$30,$31,$32,$33,$30,$31,$32,$33,$30,$31,$32,$33,$30,$31,$32,$33,$30,$31,$32,$33,$30,$31,$32,$33,$30,$31,$32,$33,$40,$41,$42,$43,$44,$44,$40,$41,$42,$43,$44,$44,$40,$41,$42,$43,$44,$44,$40,$41,$42,$43,$44,$44,$40,$41,$42,$43,$44,$44,$40,$41,$54,$54,$54,$54,$45,$46,$54,$54,$54,$54,$45,$46,$54,$54,$54,$54,$45,$46,$54,$54,$54,$54,$45,$46,$54,$54,$54,$54,$45,$46,$54,$54,$51,$52,$54,$54,$54,$54,$54,$54,$51,$52,$54,$54,$54,$54,$53,$50,$51,$52,$54,$54,$54,$54,$54,$54,$51,$52,$54,$54,$54,$54,$54,$54,$16,$16,$16,$16,$14,$15,$16,$16,$16,$16,$14,$15,$16,$16,$16,$16,$16,$16,$16,$16,$14,$15,$16,$16,$16,$16,$14,$15,$16,$16,$16,$16,$55,$55,$55,$55,$55,$55,$60,$61,$62,$63,$55,$55,$55,$55,$55,$55,$55,$55,$55,$55,$55,$55,$60,$61,$62,$63,$55,$55,$55,$55,$55,$55,$60,$61,$62,$63,$55,$55,$55,$55,$55,$55,$55,$55,$60,$61,$62,$63,$55,$55,$55,$55,$55,$55,$55,$55,$55,$55,$60,$61,$62,$63,$55,$55,$16,$16,$16,$16,$16,$16,$64,$65,$16,$16,$16,$16,$16,$16,$16,$16,$16,$16,$64,$65,$16,$16,$16,$16,$16,$16,$64,$65,$16,$16,$16,$16,$FF
+.byte $20,$73,$73,$70,$71,$72,$73,$73,$73,$73,$73,$73,$73,$70,$71,$72,$73,$73,$73,$73,$73,$73,$73,$70,$71,$72,$73,$73,$73,$73,$73,$73,$73,$FF
+.byte $01,$C0,$23,$FF
+.byte $FF,$10,$01,$00,$FF
+.byte $01,$D0,$23,$F0,$F0,$F0,$F8,$F2,$FA,$F2,$F0,$FF
+.byte $FF,$28,$01,$FF
+.byte $FF,$00
 @RomGraphicsBonusScreenHitsLabel:
-.byte $6F, $2B, $48, $49, $54, $53, $FF
-.byte $01, $91, $2B, $30, $30, $FF
+.byte $6F,$2B,$48,$49,$54,$53,$FF
+.byte $01,$91,$2B,$30,$30,$FF
 .byte $00
 @RomGraphicsOutroScreen:
-.byte $00, $20, $FF
-.byte $FF, $20, $0A, $02, $FF
-.byte $FF, $20, $14, $3C, $FF
-.byte $01, $40, $20, $0E, $0F, $FF
-.byte $04, $0A, $0B, $0C, $0D, $0E, $0F, $FF
-.byte $10, $0A, $0B, $0C, $0D, $1E, $1F, $FF
-.byte $04, $1A, $1B, $1C, $1D, $1E, $1F, $02, $24, $25, $26, $27, $02, $0A, $0B, $0C, $0D, $0E, $0F, $25, $26, $27, $02, $1A, $1B, $1C, $1D, $74, $02, $24, $25, $26, $27, $FF
-.byte $05, $74, $02, $34, $35, $36, $37, $02, $1A, $1B, $1C, $1D, $1E, $1F, $35, $36, $37, $FF
-.byte $04, $74, $02, $02, $34, $35, $36, $37, $74, $75, $02, $17, $18, $19, $FF
-.byte $03, $17, $18, $19, $FF
-.byte $03, $74, $02, $02, $74, $75, $02, $17, $18, $19, $02, $02, $74, $75, $02, $02, $74, $75, $FF
-.byte $05, $74, $74, $75, $FF
-.byte $04, $74, $75, $02, $02, $17, $18, $19, $FF
-.byte $03, $74, $75, $FF
-.byte $22, $47, $48, $49, $4A, $4B, $4C, $FF
-.byte $1A, $3C, $3C, $3C, $3C, $3C, $4D, $2E, $2F, $28, $29, $2A, $2B, $FF
-.byte $19, $3D, $3E, $3F, $38, $39, $3A, $3B, $10, $11, $12, $13, $10, $11, $12, $13, $10, $11, $12, $13, $10, $11, $12, $13, $10, $11, $12, $13, $3C, $56, $57, $58, $59, $21, $22, $23, $20, $21, $22, $23, $20, $21, $22, $23, $20, $21, $22, $23, $20, $21, $22, $23, $20, $21, $22, $23, $20, $21, $22, $23, $3C, $66, $67, $33, $30, $31, $32, $33, $30, $31, $32, $33, $30, $31, $32, $33, $30, $31, $32, $33, $30, $31, $32, $33, $30, $31, $32, $33, $30, $31, $32, $33, $3C, $76, $42, $43, $44, $44, $40, $41, $42, $43, $44, $44, $40, $41, $42, $43, $44, $44, $40, $41, $42, $43, $44, $44, $40, $41, $42, $43, $44, $44, $40, $41, $3C, $3C, $77, $54, $45, $46, $54, $54, $54, $54, $45, $46, $54, $54, $54, $54, $45, $46, $54, $54, $54, $54, $45, $46, $54, $54, $54, $54, $45, $46, $54, $54, $3C, $3C, $87, $54, $54, $54, $54, $54, $51, $52, $54, $54, $54, $54, $53, $50, $51, $52, $54, $54, $54, $54, $54, $54, $51, $52, $54, $54, $54, $54, $54, $54, $3C, $3C, $68, $16, $14, $15, $16, $16, $16, $16, $14, $15, $16, $16, $16, $16, $16, $16, $16, $16, $14, $15, $16, $16, $16, $16, $14, $15, $16, $16, $16, $16, $3C, $3C, $78, $79, $55, $55, $60, $61, $62, $63, $55, $55, $55, $55, $55, $55, $55, $55, $55, $55, $55, $55, $55, $60, $61, $62, $63, $55, $55, $55, $55, $55, $FF
-.byte $03, $89, $55, $55, $55, $55, $55, $55, $55, $55, $60, $61, $62, $63, $55, $55, $55, $55, $55, $55, $55, $55, $55, $55, $60, $61, $62, $63, $55, $55, $FF
-.byte $03, $5A, $16, $16, $64, $65, $16, $16, $16, $16, $16, $16, $16, $16, $16, $16, $64, $65, $16, $16, $16, $16, $16, $16, $64, $65, $16, $16, $16, $16, $FF
-.byte $03, $6A, $69, $02, $02, $02, $02, $02, $02, $02, $02, $02, $02, $02, $02, $02, $02, $02, $02, $02, $02, $02, $02, $02, $02, $02, $02, $02, $02, $02, $FF
-.byte $05, $7A, $8B, $73, $73, $73, $73, $73, $70, $71, $72, $73, $73, $73, $73, $73, $73, $73, $70, $71, $72, $73, $73, $73, $73, $73, $73, $73, $FF
-.byte $07, $5B, $FF
-.byte $FF, $18, $02, $02, $7B, $8B, $02, $84, $85, $84, $85, $02, $6C, $6D, $6E, $6F, $80, $55, $55, $55, $55, $55, $55, $55, $55, $55, $55, $55, $FF
-.byte $09, $5C, $5D, $92, $93, $94, $95, $02, $7C, $7D, $7E, $7F, $81, $02, $02, $02, $02, $02, $02, $02, $02, $02, $02, $02, $FF
-.byte $0E, $7B, $8B, $02, $8D, $8E, $8F, $02, $02, $02, $02, $02, $02, $02, $02, $02, $02, $02, $02, $FF
-.byte $0F, $5C, $82, $83, $5F, $02, $6C, $6D, $6E, $6F, $80, $02, $02, $02, $02, $02, $02, $02, $FF
-.byte $13, $68, $7C, $7D, $7E, $7F, $81, $16, $16, $16, $16, $16, $16, $16, $FF
-.byte $13, $6A, $02, $8D, $8E, $8F, $02, $02, $02, $02, $02, $02, $02, $02, $FF
-.byte $01, $E7, $22, $6B, $FF
-.byte $01, $C0, $23, $FF
-.byte $FF, $10, $01, $00, $FF
-.byte $01, $D0, $23, $FF
-.byte $FF, $08, $01, $F0, $FF
-.byte $01, $D8, $23, $FF
-.byte $FF, $28, $01, $FF, $FF
+.byte $00,$20,$FF
+.byte $FF,$20,$0A,$02,$FF
+.byte $FF,$20,$14,$3C,$FF
+.byte $01,$40,$20,$0E,$0F,$FF
+.byte $04,$0A,$0B,$0C,$0D,$0E,$0F,$FF
+.byte $10,$0A,$0B,$0C,$0D,$1E,$1F,$FF
+.byte $04,$1A,$1B,$1C,$1D,$1E,$1F,$02,$24,$25,$26,$27,$02,$0A,$0B,$0C,$0D,$0E,$0F,$25,$26,$27,$02,$1A,$1B,$1C,$1D,$74,$02,$24,$25,$26,$27,$FF
+.byte $05,$74,$02,$34,$35,$36,$37,$02,$1A,$1B,$1C,$1D,$1E,$1F,$35,$36,$37,$FF
+.byte $04,$74,$02,$02,$34,$35,$36,$37,$74,$75,$02,$17,$18,$19,$FF
+.byte $03,$17,$18,$19,$FF
+.byte $03,$74,$02,$02,$74,$75,$02,$17,$18,$19,$02,$02,$74,$75,$02,$02,$74,$75,$FF
+.byte $05,$74,$74,$75,$FF
+.byte $04,$74,$75,$02,$02,$17,$18,$19,$FF
+.byte $03,$74,$75,$FF
+.byte $22,$47,$48,$49,$4A,$4B,$4C,$FF
+.byte $1A,$3C,$3C,$3C,$3C,$3C,$4D,$2E,$2F,$28,$29,$2A,$2B,$FF
+.byte $19,$3D,$3E,$3F,$38,$39,$3A,$3B,$10,$11,$12,$13,$10,$11,$12,$13,$10,$11,$12,$13,$10,$11,$12,$13,$10,$11,$12,$13,$3C,$56,$57,$58,$59,$21,$22,$23,$20,$21,$22,$23,$20,$21,$22,$23,$20,$21,$22,$23,$20,$21,$22,$23,$20,$21,$22,$23,$20,$21,$22,$23,$3C,$66,$67,$33,$30,$31,$32,$33,$30,$31,$32,$33,$30,$31,$32,$33,$30,$31,$32,$33,$30,$31,$32,$33,$30,$31,$32,$33,$30,$31,$32,$33,$3C,$76,$42,$43,$44,$44,$40,$41,$42,$43,$44,$44,$40,$41,$42,$43,$44,$44,$40,$41,$42,$43,$44,$44,$40,$41,$42,$43,$44,$44,$40,$41,$3C,$3C,$77,$54,$45,$46,$54,$54,$54,$54,$45,$46,$54,$54,$54,$54,$45,$46,$54,$54,$54,$54,$45,$46,$54,$54,$54,$54,$45,$46,$54,$54,$3C,$3C,$87,$54,$54,$54,$54,$54,$51,$52,$54,$54,$54,$54,$53,$50,$51,$52,$54,$54,$54,$54,$54,$54,$51,$52,$54,$54,$54,$54,$54,$54,$3C,$3C,$68,$16,$14,$15,$16,$16,$16,$16,$14,$15,$16,$16,$16,$16,$16,$16,$16,$16,$14,$15,$16,$16,$16,$16,$14,$15,$16,$16,$16,$16,$3C,$3C,$78,$79,$55,$55,$60,$61,$62,$63,$55,$55,$55,$55,$55,$55,$55,$55,$55,$55,$55,$55,$55,$60,$61,$62,$63,$55,$55,$55,$55,$55,$FF
+.byte $03,$89,$55,$55,$55,$55,$55,$55,$55,$55,$60,$61,$62,$63,$55,$55,$55,$55,$55,$55,$55,$55,$55,$55,$60,$61,$62,$63,$55,$55,$FF
+.byte $03,$5A,$16,$16,$64,$65,$16,$16,$16,$16,$16,$16,$16,$16,$16,$16,$64,$65,$16,$16,$16,$16,$16,$16,$64,$65,$16,$16,$16,$16,$FF
+.byte $03,$6A,$69,$02,$02,$02,$02,$02,$02,$02,$02,$02,$02,$02,$02,$02,$02,$02,$02,$02,$02,$02,$02,$02,$02,$02,$02,$02,$02,$02,$FF
+.byte $05,$7A,$8B,$73,$73,$73,$73,$73,$70,$71,$72,$73,$73,$73,$73,$73,$73,$73,$70,$71,$72,$73,$73,$73,$73,$73,$73,$73,$FF
+.byte $07,$5B,$FF
+.byte $FF,$18,$02,$02,$7B,$8B,$02,$84,$85,$84,$85,$02,$6C,$6D,$6E,$6F,$80,$55,$55,$55,$55,$55,$55,$55,$55,$55,$55,$55,$FF
+.byte $09,$5C,$5D,$92,$93,$94,$95,$02,$7C,$7D,$7E,$7F,$81,$02,$02,$02,$02,$02,$02,$02,$02,$02,$02,$02,$FF
+.byte $0E,$7B,$8B,$02,$8D,$8E,$8F,$02,$02,$02,$02,$02,$02,$02,$02,$02,$02,$02,$02,$FF
+.byte $0F,$5C,$82,$83,$5F,$02,$6C,$6D,$6E,$6F,$80,$02,$02,$02,$02,$02,$02,$02,$FF
+.byte $13,$68,$7C,$7D,$7E,$7F,$81,$16,$16,$16,$16,$16,$16,$16,$FF
+.byte $13,$6A,$02,$8D,$8E,$8F,$02,$02,$02,$02,$02,$02,$02,$02,$FF
+.byte $01,$E7,$22,$6B,$FF
+.byte $01,$C0,$23,$FF
+.byte $FF,$10,$01,$00,$FF
+.byte $01,$D0,$23,$FF
+.byte $FF,$08,$01,$F0,$FF
+.byte $01,$D8,$23,$FF
+.byte $FF,$28,$01,$FF,$FF
 .byte $00
 @RomGraphicsGameOverScreen:
-.byte $8B, $21, $47, $41, $4D, $45, $20, $20, $4F, $56, $45, $52, $FF
-.byte $01, $20, $23, $FF
-.byte $FF, $20, $01, $01, $FF
+.byte $8B,$21,$47,$41,$4D,$45,$20,$20,$4F,$56,$45,$52,$FF
+.byte $01,$20,$23,$FF
+.byte $FF,$20,$01,$01,$FF
 .byte $00
 @RomGraphicsGotTrackerScreen:
-.byte $A5, $20, $59, $4F, $55, $20, $43, $41, $4E, $20, $4E, $4F, $57, $20, $54, $52, $41, $43, $4B, $20, $4A, $41, $57, $53, $FF
-.byte $2D, $57, $49, $54, $48, $20, $54, $48, $45, $20, $52, $45, $43, $45, $49, $56, $45, $52, $2E, $FF
-.byte $6F, $2A, $CE, $CE, $CE, $CE, $CE, $CE, $CE, $CE, $CE, $CE, $CE, $CE, $CF, $FF
-.byte $12, $FF
-.byte $FF, $01, $09, $3A, $DB, $FF
-.byte $01, $8A, $21, $FF
-.byte $FF, $0C, $09, $01, $FF
-.byte $FF, $0C, $01, $76, $FF
-.byte $01, $96, $21, $FF
-.byte $FF, $01, $09, $67, $77, $FF
-.byte $01, $B1, $21, $C7, $FF
-.byte $1A, $F9, $C6, $FF
-.byte $03, $D7, $D8, $D9, $DA, $FF
-.byte $18, $D6, $C6, $01, $E6, $E7, $E8, $E9, $EA, $EB, $FF
-.byte $18, $CC, $CD, $F6, $F7, $F8, $01, $FA, $FB, $FF
-.byte $18, $DC, $DD, $C8, $C9, $CA, $01, $DE, $DF, $FF
-.byte $18, $AC, $AD, $AE, $AF, $EC, $ED, $EE, $EF, $FF
-.byte $18, $BC, $BD, $BE, $BF, $FC, $FD, $FE, $CB, $FF
-.byte $01, $20, $23, $FF
-.byte $FF, $20, $01, $01, $FF
-.byte $01, $C0, $23, $FF
-.byte $FF, $10, $01, $00, $FF
-.byte $01, $D0, $23, $50, $50, $50, $50, $50, $50, $50, $50, $55, $55, $55, $F5, $55, $55, $55, $55, $55, $55, $55, $59, $FF
-.byte $FF, $0C, $01, $55, $FF
+.byte $A5,$20,$59,$4F,$55,$20,$43,$41,$4E,$20,$4E,$4F,$57,$20,$54,$52,$41,$43,$4B,$20,$4A,$41,$57,$53,$FF
+.byte $2D,$57,$49,$54,$48,$20,$54,$48,$45,$20,$52,$45,$43,$45,$49,$56,$45,$52,$2E,$FF
+.byte $6F,$2A,$CE,$CE,$CE,$CE,$CE,$CE,$CE,$CE,$CE,$CE,$CE,$CE,$CF,$FF
+.byte $12,$FF
+.byte $FF,$01,$09,$3A,$DB,$FF
+.byte $01,$8A,$21,$FF
+.byte $FF,$0C,$09,$01,$FF
+.byte $FF,$0C,$01,$76,$FF
+.byte $01,$96,$21,$FF
+.byte $FF,$01,$09,$67,$77,$FF
+.byte $01,$B1,$21,$C7,$FF
+.byte $1A,$F9,$C6,$FF
+.byte $03,$D7,$D8,$D9,$DA,$FF
+.byte $18,$D6,$C6,$01,$E6,$E7,$E8,$E9,$EA,$EB,$FF
+.byte $18,$CC,$CD,$F6,$F7,$F8,$01,$FA,$FB,$FF
+.byte $18,$DC,$DD,$C8,$C9,$CA,$01,$DE,$DF,$FF
+.byte $18,$AC,$AD,$AE,$AF,$EC,$ED,$EE,$EF,$FF
+.byte $18,$BC,$BD,$BE,$BF,$FC,$FD,$FE,$CB,$FF
+.byte $01,$20,$23,$FF
+.byte $FF,$20,$01,$01,$FF
+.byte $01,$C0,$23,$FF
+.byte $FF,$10,$01,$00,$FF
+.byte $01,$D0,$23,$50,$50,$50,$50,$50,$50,$50,$50,$55,$55,$55,$F5,$55,$55,$55,$55,$55,$55,$55,$59,$FF
+.byte $FF,$0C,$01,$55,$FF
 .byte $00
 @RomGraphicsBonusStartScreen:
-.byte $8A, $21, $42, $4F, $4E, $55, $53, $20, $53, $43, $45, $4E, $45, $21, $FF
-.byte $01, $20, $23, $FF
-.byte $FF, $20, $01, $01, $FF
+.byte $8A,$21,$42,$4F,$4E,$55,$53,$20,$53,$43,$45,$4E,$45,$21,$FF
+.byte $01,$20,$23,$FF
+.byte $FF,$20,$01,$01,$FF
 .byte $00
 @RomGraphicsBonusEndScreen:
-.byte $06, $21, $42, $4F, $4E, $55, $53, $20, $53, $43, $45, $4E, $45, $20, $52, $45, $53, $55, $4C, $54, $53, $2E, $FF
-.byte $01, $20, $23, $FF
-.byte $FF, $20, $01, $01, $FF
+.byte $06,$21,$42,$4F,$4E,$55,$53,$20,$53,$43,$45,$4E,$45,$20,$52,$45,$53,$55,$4C,$54,$53,$2E,$FF
+.byte $01,$20,$23,$FF
+.byte $FF,$20,$01,$01,$FF
 .byte $00
 @RomGraphicsStatusPowerLabel:
-.byte $6F, $2B, $18, $19, $1A, $FF
+.byte $6F,$2B,$18,$19,$1A,$FF
 .byte $00
 @RomGraphicsTrackerIcon:
-.byte $6F, $2B, $0B, $0C, $FF
-.byte $1E, $1B, $1C, $FF
+.byte $6F,$2B,$0B,$0C,$FF
+.byte $1E,$1B,$1C,$FF
 .byte $00
 @RomGraphicsPortScreen:
-.byte $20, $20, $FF
-.byte $FF, $20, $1D, $07, $FF
-.byte $01, $5D, $20, $09, $0A, $0B, $FF
-.byte $0A, $09, $0F, $07, $36, $38, $39, $3A, $3B, $FF
-.byte $13, $09, $0A, $0F, $FF
-.byte $04, $36, $37, $38, $39, $39, $3A, $3B, $0F, $FF
-.byte $10, $36, $38, $39, $3A, $3B, $FF
-.byte $07, $09, $0A, $0B, $0C, $0D, $0E, $0F, $FF
-.byte $17, $36, $37, $38, $39, $3A, $3B, $FF
-.byte $06, $36, $37, $3B, $FF
-.byte $05, $09, $0F, $FF
-.byte $06, $36, $37, $3B, $FF
-.byte $05, $36, $37, $38, $39, $3A, $3B, $0F, $FF
-.byte $1C, $36, $37, $3B, $FF
-.byte $0E, $36, $37, $37, $3B, $FF
-.byte $06, $09, $0A, $0E, $0F, $FF
-.byte $09, $46, $47, $49, $47, $47, $48, $49, $4A, $4A, $FF
-.byte $03, $46, $47, $49, $4A, $FF
-.byte $0B, $46, $47, $49, $4A, $FF
-.byte $08, $46, $47, $49, $4A, $FF
-.byte $04, $46, $47, $48, $49, $4A, $FF
-.byte $2F, $6E, $6F, $9D, $6E, $6F, $9D, $6E, $6F, $07, $9D, $6E, $6F, $FF
-.byte $14, $7E, $7F, $9E, $7E, $7F, $9E, $7E, $7F, $07, $9E, $7E, $7F, $FF
-.byte $03, $19, $1A, $1B, $1C, $1D, $1E, $1F, $1C, $1D, $1D, $1F, $1C, $1D, $1D, $1C, $1D, $1D, $8E, $8F, $9F, $8E, $8F, $9F, $8E, $8F, $07, $9F, $8E, $8F, $FF
-.byte $03, $29, $2A, $2B, $2C, $2D, $2E, $2F, $2C, $2D, $2E, $2F, $2C, $2D, $2E, $2C, $2D, $2E, $FF
-.byte $FF, $0C, $01, $3D, $FF
-.byte $FF, $0C, $01, $4D, $AC, $07, $AC, $AD, $AC, $07, $AC, $AC, $07, $AD, $AC, $AD, $5E, $FF
-.byte $01, $0C, $22, $3E, $FF
-.byte $FF, $13, $01, $3F, $FF
-.byte $01, $2C, $22, $4E, $FF
-.byte $FF, $13, $01, $4F, $FF
-.byte $FF, $13, $01, $5F, $FF
-.byte $01, $64, $22, $AC, $07, $AD, $FF
-.byte $03, $AC, $07, $AD, $07, $07, $AC, $AD, $AC, $07, $AC, $07, $07, $AC, $07, $07, $AC, $AD, $07, $07, $AC, $AD, $AD, $07, $07, $AC, $07, $BE, $07, $07, $AC, $FF
-.byte $03, $AC, $07, $07, $AD, $07, $07, $AD, $AC, $07, $07, $AC, $07, $AD, $07, $AC, $07, $BE, $07, $AD, $AC, $07, $07, $BC, $BD, $07, $07, $BC, $BD, $07, $BF, $BE, $07, $07, $BC, $BD, $07, $07, $BE, $07, $BC, $BD, $07, $BE, $07, $BC, $BD, $07, $07, $BE, $BF, $07, $07, $BC, $BD, $FF
-.byte $09, $BF, $FF
-.byte $06, $BC, $BD, $FF
-.byte $10, $AE, $AF, $07, $07, $BC, $BD, $FF
-.byte $03, $AE, $AF, $FF
-.byte $08, $AE, $AF, $07, $07, $BC, $BD, $FF
-.byte $0D, $AE, $AF, $FF
-.byte $07, $AE, $AF, $FF
-.byte $04, $AE, $AF, $07, $07, $AE, $AF, $FF
-.byte $01, $C0, $23, $FF
-.byte $FF, $18, $01, $FF
-.byte $FF, $01, $D8, $23, $FF
-.byte $FF, $08, $01, $55, $FF
-.byte $01, $E0, $23, $FF
-.byte $FF, $20, $01, $AA, $FF
+.byte $20,$20,$FF
+.byte $FF,$20,$1D,$07,$FF
+.byte $01,$5D,$20,$09,$0A,$0B,$FF
+.byte $0A,$09,$0F,$07,$36,$38,$39,$3A,$3B,$FF
+.byte $13,$09,$0A,$0F,$FF
+.byte $04,$36,$37,$38,$39,$39,$3A,$3B,$0F,$FF
+.byte $10,$36,$38,$39,$3A,$3B,$FF
+.byte $07,$09,$0A,$0B,$0C,$0D,$0E,$0F,$FF
+.byte $17,$36,$37,$38,$39,$3A,$3B,$FF
+.byte $06,$36,$37,$3B,$FF
+.byte $05,$09,$0F,$FF
+.byte $06,$36,$37,$3B,$FF
+.byte $05,$36,$37,$38,$39,$3A,$3B,$0F,$FF
+.byte $1C,$36,$37,$3B,$FF
+.byte $0E,$36,$37,$37,$3B,$FF
+.byte $06,$09,$0A,$0E,$0F,$FF
+.byte $09,$46,$47,$49,$47,$47,$48,$49,$4A,$4A,$FF
+.byte $03,$46,$47,$49,$4A,$FF
+.byte $0B,$46,$47,$49,$4A,$FF
+.byte $08,$46,$47,$49,$4A,$FF
+.byte $04,$46,$47,$48,$49,$4A,$FF
+.byte $2F,$6E,$6F,$9D,$6E,$6F,$9D,$6E,$6F,$07,$9D,$6E,$6F,$FF
+.byte $14,$7E,$7F,$9E,$7E,$7F,$9E,$7E,$7F,$07,$9E,$7E,$7F,$FF
+.byte $03,$19,$1A,$1B,$1C,$1D,$1E,$1F,$1C,$1D,$1D,$1F,$1C,$1D,$1D,$1C,$1D,$1D,$8E,$8F,$9F,$8E,$8F,$9F,$8E,$8F,$07,$9F,$8E,$8F,$FF
+.byte $03,$29,$2A,$2B,$2C,$2D,$2E,$2F,$2C,$2D,$2E,$2F,$2C,$2D,$2E,$2C,$2D,$2E,$FF
+.byte $FF,$0C,$01,$3D,$FF
+.byte $FF,$0C,$01,$4D,$AC,$07,$AC,$AD,$AC,$07,$AC,$AC,$07,$AD,$AC,$AD,$5E,$FF
+.byte $01,$0C,$22,$3E,$FF
+.byte $FF,$13,$01,$3F,$FF
+.byte $01,$2C,$22,$4E,$FF
+.byte $FF,$13,$01,$4F,$FF
+.byte $FF,$13,$01,$5F,$FF
+.byte $01,$64,$22,$AC,$07,$AD,$FF
+.byte $03,$AC,$07,$AD,$07,$07,$AC,$AD,$AC,$07,$AC,$07,$07,$AC,$07,$07,$AC,$AD,$07,$07,$AC,$AD,$AD,$07,$07,$AC,$07,$BE,$07,$07,$AC,$FF
+.byte $03,$AC,$07,$07,$AD,$07,$07,$AD,$AC,$07,$07,$AC,$07,$AD,$07,$AC,$07,$BE,$07,$AD,$AC,$07,$07,$BC,$BD,$07,$07,$BC,$BD,$07,$BF,$BE,$07,$07,$BC,$BD,$07,$07,$BE,$07,$BC,$BD,$07,$BE,$07,$BC,$BD,$07,$07,$BE,$BF,$07,$07,$BC,$BD,$FF
+.byte $09,$BF,$FF
+.byte $06,$BC,$BD,$FF
+.byte $10,$AE,$AF,$07,$07,$BC,$BD,$FF
+.byte $03,$AE,$AF,$FF
+.byte $08,$AE,$AF,$07,$07,$BC,$BD,$FF
+.byte $0D,$AE,$AF,$FF
+.byte $07,$AE,$AF,$FF
+.byte $04,$AE,$AF,$07,$07,$AE,$AF,$FF
+.byte $01,$C0,$23,$FF
+.byte $FF,$18,$01,$FF
+.byte $FF,$01,$D8,$23,$FF
+.byte $FF,$08,$01,$55,$FF
+.byte $01,$E0,$23,$FF
+.byte $FF,$20,$01,$AA,$FF
 .byte $00
 @RomGraphicsIntroScreen:
-.byte $AB, $20, $76, $74, $15, $00, $13, $74, $70, $73, $0F, $6A, $FF
-.byte $53, $89, $8A, $8B, $03, $03, $80, $81, $90, $91, $02, $03, $03, $03, $03, $03, $03, $FF
-.byte $10, $03, $03, $03, $03, $82, $83, $84, $85, $86, $87, $03, $88, $89, $8A, $8B, $03, $FF
-.byte $10, $03, $03, $98, $99, $92, $03, $94, $95, $96, $97, $03, $98, $99, $9A, $9B, $03, $FF
-.byte $10, $03, $03, $03, $03, $A2, $A3, $A4, $A5, $A6, $A7, $A8, $03, $03, $03, $03, $03, $FF
-.byte $10, $03, $03, $B0, $B1, $B2, $B3, $B4, $B5, $B6, $B7, $B8, $B9, $03, $03, $98, $99, $FF
-.byte $10, $03, $03, $C0, $C1, $C2, $C3, $C4, $C5, $C6, $C7, $C8, $C9, $03, $03, $03, $03, $FF
-.byte $10, $DA, $DB, $D0, $D1, $D2, $D3, $D4, $D5, $D6, $D7, $D8, $D9, $DA, $DB, $DA, $DB, $FF
-.byte $10, $03, $03, $E0, $E1, $E2, $E3, $E4, $E5, $E6, $E7, $E8, $E9, $EA, $03, $03, $03, $FF
-.byte $10, $03, $03, $03, $F1, $F2, $F3, $F4, $F5, $F6, $F7, $03, $03, $03, $03, $03, $03, $FF
-.byte $53, $7B, $78, $17, $74, $14, $6B, $FF
-.byte $37, $77, $78, $3B, $14, $72, $06, $13, $74, $6B, $FF
-.byte $01, $20, $23, $FF
-.byte $FF, $20, $01, $01, $FF
-.byte $01, $D2, $23, $AA, $22, $88, $AA, $FF
-.byte $04, $5A, $DA, $FA, $5A, $FF
-.byte $04, $05, $0D, $0F, $05, $FF
+.byte $AB,$20,$76,$74,$15,$00,$13,$74,$70,$73,$0F,$6A,$FF
+.byte $53,$89,$8A,$8B,$03,$03,$80,$81,$90,$91,$02,$03,$03,$03,$03,$03,$03,$FF
+.byte $10,$03,$03,$03,$03,$82,$83,$84,$85,$86,$87,$03,$88,$89,$8A,$8B,$03,$FF
+.byte $10,$03,$03,$98,$99,$92,$03,$94,$95,$96,$97,$03,$98,$99,$9A,$9B,$03,$FF
+.byte $10,$03,$03,$03,$03,$A2,$A3,$A4,$A5,$A6,$A7,$A8,$03,$03,$03,$03,$03,$FF
+.byte $10,$03,$03,$B0,$B1,$B2,$B3,$B4,$B5,$B6,$B7,$B8,$B9,$03,$03,$98,$99,$FF
+.byte $10,$03,$03,$C0,$C1,$C2,$C3,$C4,$C5,$C6,$C7,$C8,$C9,$03,$03,$03,$03,$FF
+.byte $10,$DA,$DB,$D0,$D1,$D2,$D3,$D4,$D5,$D6,$D7,$D8,$D9,$DA,$DB,$DA,$DB,$FF
+.byte $10,$03,$03,$E0,$E1,$E2,$E3,$E4,$E5,$E6,$E7,$E8,$E9,$EA,$03,$03,$03,$FF
+.byte $10,$03,$03,$03,$F1,$F2,$F3,$F4,$F5,$F6,$F7,$03,$03,$03,$03,$03,$03,$FF
+.byte $53,$7B,$78,$17,$74,$14,$6B,$FF
+.byte $37,$77,$78,$3B,$14,$72,$06,$13,$74,$6B,$FF
+.byte $01,$20,$23,$FF
+.byte $FF,$20,$01,$01,$FF
+.byte $01,$D2,$23,$AA,$22,$88,$AA,$FF
+.byte $04,$5A,$DA,$FA,$5A,$FF
+.byte $04,$05,$0D,$0F,$05,$FF
 .byte $00
 
 ;
@@ -9907,14 +10027,6 @@ PaletteIntroScreenData:
 .byte $0F,$00,$00,$00
 .byte $0F,$00,$00,$00
 
-
-BonusScreenEncounterPtr = $50
-BonusScreenV1 = $52
-BonusScreenV2 = $53
-BonusNumberOfEnemiesHit = $54
-BonusScreenV4 = $55
-
-
 RunBonusScreen:
         @DelayFrames = $12
         ; clear out state
@@ -9996,13 +10108,13 @@ RunBonusScreen:
         adc BonusScreensPlayed
         asl a
         adc #<BonusScreenEncounterSettings
-        sta BonusScreenEncounterPtr
+        sta BonusEncounterPtr
         lda #$00
         adc #>BonusScreenEncounterSettings
-        sta BonusScreenEncounterPtr+1
+        sta BonusEncounterPtr+1
         lda #$00
-        sta BonusScreenV1
-        sta BonusScreenV2
+        sta BonusEncounterOffset
+        sta BonusCurrentWave
         sta BonusNumberOfEnemiesHit
         jsr PPUEnableNMI
         jsr PPUEnableAndWaitFor1Frame
@@ -10016,17 +10128,17 @@ RunBonusScreen:
         jsr AdvanceWaterAnimation
         jsr SetNextPendingBGUpdate
         jsr RefreshPPUState
-        bit BonusScreenV2
+        bit BonusCurrentWave
         bpl @RunBonusScreen
         bvs @RunBonusScreenEnding
         lda #$78
-        sta BonusScreenV1
+        sta BonusEncounterOffset
         lda #$C0
-        sta BonusScreenV2
+        sta BonusCurrentWave
         jmp @RunBonusScreen
 @RunBonusScreenEnding:
         ; check if we have more waves to spawn
-        dec BonusScreenV1
+        dec BonusEncounterOffset
         bne @RunBonusScreen
         ; otherwise it's time to show the ending screen
         ; so clear out ppu
@@ -10089,6 +10201,7 @@ RunBonusScreen:
         ; then delay for a while again..
         lda #$78
         jsr WaitForAFramesAndRefreshPPU
+
         ; copy "bonus shells collected" text to vram
         jsr CopyToVRAMBuffer
         .addr CopyTextBonusShellsCollected
@@ -10421,69 +10534,75 @@ BonusRunJellyfish:
         beq @AllEnemiesDead
         rts
 @AllEnemiesDead:
-        ; todo - document the next wave spawn.
-        lda BonusScreenV2                             ; D2AB A5 53                    .S
-        bmi LD2B7                           ; D2AD 30 08                    0.
-        cmp #$06                            ; D2AF C9 06                    ..
-        bcc LD2B8                           ; D2B1 90 05                    ..
-        lda #$80                            ; D2B3 A9 80                    ..
-        sta BonusScreenV2                             ; D2B5 85 53                    .S
-LD2B7:
-        rts                                 ; D2B7 60                       `
+        lda BonusCurrentWave
+        ; if high bit is set, we're done with the waves, exit.
+        bmi @DoneWithBonusScreen
+        ; if we are below 6 there are still more waves to go!
+        cmp #$06
+        bcc @StartNextWave
+        ; otherwise we are at the end. mark bonus stage as complete.
+        lda #$80
+        sta BonusCurrentWave
+@DoneWithBonusScreen:
+        rts
 
-; ----------------------------------------------------------------------------
-LD2B8:
-        ldy     BonusScreenV1                             ; D2B8 A4 52                    .R
-        lda     (BonusScreenEncounterPtr),y                         ; D2BA B1 50                    .P
-        iny                                     ; D2BC C8                       .
-        sty     BonusScreenV1                             ; D2BD 84 52                    .R
-        sta     $44                             ; D2BF 85 44                    .D
-        asl     a                               ; D2C1 0A                       .
-        adc     $44                             ; D2C2 65 44                    eD
-        asl     a                               ; D2C4 0A                       .
-        adc     #$12                            ; D2C5 69 12                    i.
-        sta     $44                             ; D2C7 85 44                    .D
-        lda     #$00                            ; D2C9 A9 00                    ..
-        adc     #$D5                            ; D2CB 69 D5                    i.
-        sta     $45                             ; D2CD 85 45                    .E
-        ldy     #$00                            ; D2CF A0 00                    ..
-        lda     ($44),y                         ; D2D1 B1 44                    .D
-        iny                                     ; D2D3 C8                       .
-        sta     $12                             ; D2D4 85 12                    ..
-        ldx     #$00                            ; D2D6 A2 00                    ..
-        lda     #$40                            ; D2D8 A9 40                    .@
-        sta     $00                             ; D2DA 85 00                    ..
-        lda     #$00                            ; D2DC A9 00                    ..
-        sta     $01                             ; D2DE 85 01                    ..
-        lda     #$05                            ; D2E0 A9 05                    ..
-        sta     $46                             ; D2E2 85 46                    .F
-LD2E4:
-        lda     #$80                            ; D2E4 A9 80                    ..
-        sta     JawsData,x                         ; D2E6 9D 00 07                 ...
-        lda     ($44),y                         ; D2E9 B1 44                    .D
-        sta     $0714,x                         ; D2EB 9D 14 07                 ...
-        iny                                     ; D2EE C8                       .
-        lda     $12                             ; D2EF A5 12                    ..
-        sta     $0715,x                         ; D2F1 9D 15 07                 ...
-        lda     #$10                            ; D2F4 A9 10                    ..
-        clc                                     ; D2F6 18                       .
-        adc     $00                             ; D2F7 65 00                    e.
-        sta     $00                             ; D2F9 85 00                    ..
-        sta     $0716,x                         ; D2FB 9D 16 07                 ...
-        lda     $01                             ; D2FE A5 01                    ..
-        adc     $01                             ; D300 65 01                    e.
-        sta     $01                             ; D302 85 01                    ..
-        sta     $0717,x                         ; D304 9D 17 07                 ...
-        txa                                     ; D307 8A                       .
-        clc                                     ; D308 18                       .
-        adc     #$20                            ; D309 69 20                    i 
-        tax                                     ; D30B AA                       .
-        dec     $46                             ; D30C C6 46                    .F
-        bne     LD2E4                           ; D30E D0 D4                    ..
-        inc     BonusScreenV2                             ; D310 E6 53                    .S
-        lda     #$00                            ; D312 A9 00                    ..
-        sta     BonusScreenV4                             ; D314 85 55                    .U
-        rts                                     ; D316 60                       `
+; TODO.. this.. :(
+@StartNextWave:
+        @NextWavePtr = $44
+        @EnemiesToSpawn = $46
+        ldy BonusEncounterOffset
+        lda (BonusEncounterPtr),y
+        iny
+        sty BonusEncounterOffset
+        sta $44
+        asl a
+        adc $44
+        asl a
+        adc #<BonusEncounterWaveSpawn
+        sta @NextWavePtr
+        lda #$00
+        adc #>BonusEncounterWaveSpawn
+        sta @NextWavePtr+1
+        ldy #$00
+        lda (@NextWavePtr),y
+        iny
+        sta $12
+        ldx #$00
+        lda #$40
+        sta $00
+        lda #$00
+        sta $01
+        lda #$05
+        sta @EnemiesToSpawn
+@SpawnNextEnemy:
+        lda #EntityHeaderActive
+        sta Enemy1Data + EntityHeader,x
+        
+        lda (@NextWavePtr),y
+        sta Enemy1Data + EntityAnimationIndex,x
+        iny
+        lda $12
+        sta Enemy1Data + EntityActiveAnimationIndex,x
+        lda #$10
+        clc
+        adc $00
+        sta $00
+        sta Enemy1Data + EntityV16,x
+        lda $01
+        adc $01
+        sta $01
+        sta Enemy1Data + EntityV17,x
+        ; advance to next enemy
+        txa
+        clc
+        adc #$20
+        tax
+        dec @EnemiesToSpawn
+        bne @SpawnNextEnemy
+        inc BonusCurrentWave
+        lda #$00
+        sta BonusScreenV4
+        rts
 
 ; ----------------------------------------------------------------------------
 BonusRunSingleJellyfish:
@@ -10491,7 +10610,8 @@ BonusRunSingleJellyfish:
         bvs @AlreadyInitialized
         lda #(EntityHeaderActive | EntityHeader7)
         sta Workset + EntityHeader
-        lda $34
+        ; get jellyfish offset into starting position table.
+        lda Workset + EntityAnimationIndex
         and #$1F
         asl a
         asl a
@@ -10499,7 +10619,7 @@ BonusRunSingleJellyfish:
         lda BonusJellyfishStartingPositions,x
         sta Workset + EntityX
         lda BonusJellyfishStartingPositions+1,x
-        sta Workset + EntityX  + 1
+        sta Workset + EntityX + 1
         lda BonusJellyfishStartingPositions+2,x
         sta Workset + EntityY
         lda BonusJellyfishStartingPositions+3,x
@@ -10508,7 +10628,7 @@ BonusRunSingleJellyfish:
         asl a
         tax
         lda LD616,x
-        sta $38
+        sta Workset + EntityV18
         lda LD617,x
         sta Workset + EntityV19
         lda #$00
@@ -10760,67 +10880,79 @@ LD4DD:
         .byte   $04,$04,$06,$08,$0A
         
 BonusScreenEncounterSettings:
-        .byte   $00,$01,$00 ; D4DD 04 04 06 08 0A 00 01 00  ........
-        .byte   $01,$02,$03,$04,$05,$04,$05,$06 ; D4E5 01 02 03 04 05 04 05 06  ........
-        .byte   $07,$08,$09,$08,$09,$0A,$0B,$0C ; D4ED 07 08 09 08 09 0A 0B 0C  ........
-        .byte   $0D,$0C,$0D,$0E,$0F,$10,$11,$10 ; D4F5 0D 0C 0D 0E 0F 10 11 10  ........
-        .byte   $11,$12,$13,$14,$15,$14,$15,$16 ; D4FD 11 12 13 14 15 14 15 16  ........
-        .byte   $17,$18,$19,$18,$19,$1A,$1B,$1C ; D505 17 18 19 18 19 1A 1B 1C  ........
-        .byte   $1D,$1C,$1D,$1E,$1F,$00,$00,$00 ; D50D 1D 1C 1D 1E 1F 00 00 00  ........
-        .byte   $00,$00,$00,$00,$81,$81,$81,$81 ; D515 00 00 00 00 81 81 81 81  ........
-        .byte   $81,$01,$00,$00,$00,$00,$00,$01 ; D51D 81 01 00 00 00 00 00 01  ........
-        .byte   $81,$81,$81,$81,$81,$02,$02,$02 ; D525 81 81 81 81 81 02 02 02  ........
-        .byte   $02,$02,$02,$02,$83,$83,$83,$83 ; D52D 02 02 02 02 83 83 83 83  ........
-        .byte   $83,$03,$04,$04,$04,$04,$04,$03 ; D535 83 03 04 04 04 04 04 03  ........
-        .byte   $85,$85,$85,$85,$85,$04,$0C,$0D ; D53D 85 85 85 85 85 04 0C 0D  ........
-        .byte   $0E,$0F,$10,$04,$90,$8F,$8E,$8D ; D545 0E 0F 10 04 90 8F 8E 8D  ........
-        .byte   $8C,$05,$00,$00,$00,$00,$00,$05 ; D54D 8C 05 00 00 00 00 00 05  ........
-        .byte   $81,$81,$81,$81,$81,$06,$0E,$8E ; D555 81 81 81 81 81 06 0E 8E  ........
-        .byte   $0E,$8E,$0E,$06,$8E,$0E,$8E,$0E ; D55D 0E 8E 0E 06 8E 0E 8E 0E  ........
-        .byte   $8E,$07,$02,$02,$02,$02,$02,$07 ; D565 8E 07 02 02 02 02 02 07  ........
-        .byte   $83,$83,$83,$83,$83,$08,$06,$06 ; D56D 83 83 83 83 83 08 06 06  ........
-        .byte   $06,$06,$06,$08,$87,$87,$87,$87 ; D575 06 06 06 08 87 87 87 87  ........
-        .byte   $87,$09,$08,$08,$08,$08,$08,$09 ; D57D 87 09 08 08 08 08 08 09  ........
-        .byte   $89,$89,$89,$89,$89,$0A,$0C,$0D ; D585 89 89 89 89 89 0A 0C 0D  ........
-        .byte   $0E,$0F,$10,$0A,$90,$8F,$8E,$8D ; D58D 0E 0F 10 0A 90 8F 8E 8D  ........
-        .byte   $8C,$0B,$0A,$0A,$0A,$0A,$0A,$0B ; D595 8C 0B 0A 0A 0A 0A 0A 0B  ........
-        .byte   $8B,$8B,$8B,$8B,$8B,$0C,$0A,$0A ; D59D 8B 8B 8B 8B 8B 0C 0A 0A  ........
-        .byte   $0A,$0A,$0A,$0C,$8B,$8B,$8B,$8B ; D5A5 0A 0A 0A 0C 8B 8B 8B 8B  ........
-        .byte   $8B,$0D,$0A,$0A,$0A,$0A,$0A,$0D ; D5AD 8B 0D 0A 0A 0A 0A 0A 0D  ........
-        .byte   $8B,$8B,$8B,$8B,$8B,$0E,$0A,$0A ; D5B5 8B 8B 8B 8B 8B 0E 0A 0A  ........
-        .byte   $0A,$0A,$0A,$0E,$8B,$8B,$8B,$8B ; D5BD 0A 0A 0A 0E 8B 8B 8B 8B  ........
-        .byte   $8B,$0F,$0A,$0A,$0A,$0A,$0A,$0F ; D5C5 8B 0F 0A 0A 0A 0A 0A 0F  ........
-        .byte   $8B,$8B,$8B,$8B,$8B             ; D5CD 8B 8B 8B 8B 8B           .....
+        .byte $00,$01,$00,$01,$02,$03
+        .byte $04,$05,$04,$05,$06,$07
+        .byte $08,$09,$08,$09,$0A,$0B
+        .byte $0C,$0D,$0C,$0D,$0E,$0F
+        .byte $10,$11,$10,$11,$12,$13
+        .byte $14,$15,$14,$15,$16,$17
+        .byte $18,$19,$18,$19,$1A,$1B
+        .byte $1C,$1D,$1C,$1D,$1E,$1F
 
+; spawn indexes from BonusJellyfishStartingPositions.
+; every wave has one row. first byte is a flag, does something.
+; the rest are indices for BonusJellyfishStartingPositions, with high bit set to spawn
+; the jellyfish on the right side of the screen.
+BonusEncounterWaveSpawn:
+        .byte $00,@L|$00,@L|$00,@L|$00,@L|$00,@L|$00
+        .byte $00,@R|$01,@R|$01,@R|$01,@R|$01,@R|$01
+        .byte $01,@L|$00,@L|$00,@L|$00,@L|$00,@L|$00
+        .byte $01,@R|$01,@R|$01,@R|$01,@R|$01,@R|$01
+        .byte $02,@L|$02,@L|$02,@L|$02,@L|$02,@L|$02
+        .byte $02,@R|$03,@R|$03,@R|$03,@R|$03,@R|$03
+        .byte $03,@L|$04,@L|$04,@L|$04,@L|$04,@L|$04
+        .byte $03,@R|$05,@R|$05,@R|$05,@R|$05,@R|$05
+        .byte $04,@L|$0C,@L|$0D,@L|$0E,@L|$0F,@L|$10
+        .byte $04,@R|$10,@R|$0F,@R|$0E,@R|$0D,@R|$0C
+        .byte $05,@L|$00,@L|$00,@L|$00,@L|$00,@L|$00
+        .byte $05,@R|$01,@R|$01,@R|$01,@R|$01,@R|$01
+        .byte $06,@L|$0E,@R|$0E,@L|$0E,@R|$0E,@L|$0E
+        .byte $06,@R|$0E,@L|$0E,@R|$0E,@L|$0E,@R|$0E
+        .byte $07,@L|$02,@L|$02,@L|$02,@L|$02,@L|$02
+        .byte $07,@R|$03,@R|$03,@R|$03,@R|$03,@R|$03
+        .byte $08,@L|$06,@L|$06,@L|$06,@L|$06,@L|$06
+        .byte $08,@R|$07,@R|$07,@R|$07,@R|$07,@R|$07
+        .byte $09,@L|$08,@L|$08,@L|$08,@L|$08,@L|$08
+        .byte $09,@R|$09,@R|$09,@R|$09,@R|$09,@R|$09
+        .byte $0A,@L|$0C,@L|$0D,@L|$0E,@L|$0F,@L|$10
+        .byte $0A,@R|$10,@R|$0F,@R|$0E,@R|$0D,@R|$0C
+        .byte $0B,@L|$0A,@L|$0A,@L|$0A,@L|$0A,@L|$0A
+        .byte $0B,@R|$0B,@R|$0B,@R|$0B,@R|$0B,@R|$0B
+        .byte $0C,@L|$0A,@L|$0A,@L|$0A,@L|$0A,@L|$0A
+        .byte $0C,@R|$0B,@R|$0B,@R|$0B,@R|$0B,@R|$0B
+        .byte $0D,@L|$0A,@L|$0A,@L|$0A,@L|$0A,@L|$0A
+        .byte $0D,@R|$0B,@R|$0B,@R|$0B,@R|$0B,@R|$0B
+        .byte $0E,@L|$0A,@L|$0A,@L|$0A,@L|$0A,@L|$0A
+        .byte $0E,@R|$0B,@R|$0B,@R|$0B,@R|$0B,@R|$0B
+        .byte $0F,@L|$0A,@L|$0A,@L|$0A,@L|$0A,@L|$0A
+        .byte $0F,@R|$0B,@R|$0B,@R|$0B,@R|$0B,@R|$0B
 
+; left spawn
+@L = %00000000
+; right spawn
+@R = %10000000
 
-
-
-
-
-;
 ; Used for setting starting positions of the bonus stage jellyfish
 ;
 ; Each spawn position has 2 16-bit values, X then Y coordinates.
-;
 BonusJellyfishStartingPositions:
-        .word $1020, $00D8
-        .word $10E0, $00D8
-        .word $0FE0, $00D8
-        .word $1120, $00D8
-        .word $1020, $00E8
-        .word $10E0, $00E8
-        .word $1000, $00D8
-        .word $1100, $00D8
-        .word $0FF0, $00E8
-        .word $1110, $00E8
-        .word $0FF0, $0058
-        .word $1110, $0058
-        .word $1030, $00D8
-        .word $1058, $00D8
-        .word $1080, $00D8
-        .word $10A8, $00D8
-        .word $10D0, $00D8
+        .word $1020, $00D8 ; 00
+        .word $10E0, $00D8 ; 01
+        .word $0FE0, $00D8 ; 02
+        .word $1120, $00D8 ; 03
+        .word $1020, $00E8 ; 04
+        .word $10E0, $00E8 ; 05
+        .word $1000, $00D8 ; 06
+        .word $1100, $00D8 ; 07
+        .word $0FF0, $00E8 ; 08
+        .word $1110, $00E8 ; 09
+        .word $0FF0, $0058 ; 0A
+        .word $1110, $0058 ; 0B
+        .word $1030, $00D8 ; 0C
+        .word $1058, $00D8 ; 0D
+        .word $1080, $00D8 ; 0E
+        .word $10A8, $00D8 ; 0F
+        .word $10D0, $00D8 ; 10
 
 
 ; probably bonus stage jellyfish animations
@@ -10871,12 +11003,10 @@ LD617:
         .byte   $18,$40,$00                     ; D75F 18 40 00                 .@.
 
 
-
+; ----------------------------------------------------------------------------
 ; offset into sprite memory where the boat sprites are located
 FinaleBoatSpriteOffset = SPR*8
 FinaleJawsSpriteOffset = SPR*46
-
-; ----------------------------------------------------------------------------
 EnterFinaleScreen:
         ; this is where we give up and just hardcode the crap out of everything.
         ; clear screen and sound
