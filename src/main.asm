@@ -137,6 +137,12 @@ VRAMBufferOffset      = $0101
 VRAMBuffer            = $0102
 
 
+; updated by hit detection
+HitDetectYDirection   = $15
+HitDetectXDistance    = $1A
+HitDetectYDistance    = $1C
+
+
 
 EntityData            = $0680 ; 680 - 87F
 PlayerData            = EntityData
@@ -4108,77 +4114,74 @@ HitDetectAgainstPlayer:
         sta @TempPlayerPointer+1
 HitDetect:
         @TempTargetPointer = $42
-        @TempXDistance     = $1A
-        @TempYDistance     = $1C
-        @TempUnused        = $15 ; seems to be unused? maybe a caller uses it?
         ldy #$02
         lda #$00
-        sta @TempUnused
+        sta HitDetectYDirection
         ; diff x coordinate low bytes
         lda (@TempTargetPointer),y
         sec
         sbc Workset + EntityX
         iny
-        sta @TempXDistance
+        sta HitDetectXDistance
         ; diff x coordinate high bytes
         lda (@TempTargetPointer),y
         sbc Workset + EntityX  + 1
         iny
-        sta @TempXDistance+1
+        sta HitDetectXDistance+1
         ; branch if positive distance
         bcs @CompareY
-        inc @TempUnused
+        inc HitDetectYDirection
         ; convert to positive distance
         eor #$FF
-        sta @TempXDistance+1
-        lda @TempXDistance
+        sta HitDetectXDistance+1
+        lda HitDetectXDistance
         eor #$FF
-        sta @TempXDistance
+        sta HitDetectXDistance
         ; and add 1
-        inc @TempXDistance
+        inc HitDetectXDistance
         bne @CompareY
-        inc @TempXDistance+1
+        inc HitDetectXDistance+1
 @CompareY:
         ; diff y coordinate low bytes
         lda (@TempTargetPointer),y
         sec
         sbc Workset + EntityY
         iny
-        sta @TempYDistance
+        sta HitDetectYDistance
         ; diff y coordinate high bytes
         lda (@TempTargetPointer),y
         sbc Workset + EntityY + 1
-        sta @TempYDistance+1
+        sta HitDetectYDistance+1
         bcs @CombineDistances
-        inc @TempUnused
-        inc @TempUnused
+        inc HitDetectYDirection
+        inc HitDetectYDirection
         ; convert to positive distance
         eor #$FF
-        sta @TempYDistance+1
-        lda @TempYDistance
+        sta HitDetectYDistance+1
+        lda HitDetectYDistance
         eor #$FF
-        sta @TempYDistance
+        sta HitDetectYDistance
         ; and add 1
-        inc @TempYDistance
+        inc HitDetectYDistance
         bne @CombineDistances
-        inc @TempYDistance+1
+        inc HitDetectYDistance+1
 @CombineDistances:
         clc
-        lda @TempXDistance+1
-        ora @TempYDistance+1
+        lda HitDetectXDistance+1
+        ora HitDetectYDistance+1
         bne @Exit
         ldy #EntityBBoxW
         lda (@TempTargetPointer),y
         ; check if within X bounding box
         adc Workset + EntityBBoxW
-        cmp @TempXDistance
+        cmp HitDetectXDistance
         bcc @Exit
         ; or if within Y bounding box
         iny
         lda (@TempTargetPointer),y
         clc
         adc Workset + EntityBBoxH
-        cmp @TempYDistance
+        cmp HitDetectYDistance
 @Exit:
         rts
 
@@ -4899,17 +4902,15 @@ MapRunJaws:
 ; and store that as the tracker distance which is used to
 ; ping the sonar tracker!
 @UpdateJawsTrackerDistance:
-        @TempPlayerXDistanceB = $1A
-        @TempPlayerYDistanceB = $1C
         @TempPlayerXDistance  = $16
         @TempPlayerYDistance  = $18
-        lda @TempPlayerXDistanceB
+        lda HitDetectXDistance
         sta @TempPlayerXDistance
-        lda @TempPlayerXDistanceB+1
+        lda HitDetectXDistance+1
         sta @TempPlayerXDistance+1
-        lda @TempPlayerYDistanceB
+        lda HitDetectYDistance
         sta @TempPlayerYDistance
-        lda @TempPlayerYDistanceB+1
+        lda HitDetectYDistance+1
         sta @TempPlayerYDistance+1
         ldx #$04
 @FindHighBitsOfDistance:
@@ -5095,15 +5096,15 @@ L9F1F:
 
 ; ----------------------------------------------------------------------------
 L9F27:
-        lda     $1A                             ; 9F27 A5 1A                    ..
+        lda     HitDetectXDistance                            ; 9F27 A5 1A                    ..
         sta     $16                             ; 9F29 85 16                    ..
-        lda     $1B                             ; 9F2B A5 1B                    ..
+        lda     HitDetectXDistance+1                            ; 9F2B A5 1B                    ..
         sta     $17                             ; 9F2D 85 17                    ..
-        lda     $1C                             ; 9F2F A5 1C                    ..
+        lda     HitDetectYDistance                             ; 9F2F A5 1C                    ..
         sta     $18                             ; 9F31 85 18                    ..
-        lda     $1D                             ; 9F33 A5 1D                    ..
+        lda     HitDetectYDistance+1                             ; 9F33 A5 1D                    ..
         sta     $19                             ; 9F35 85 19                    ..
-        lda     $15                             ; 9F37 A5 15                    ..
+        lda     HitDetectYDirection                             ; 9F37 A5 15                    ..
         sta     $12                             ; 9F39 85 12                    ..
         lda     $16                             ; 9F3B A5 16                    ..
         cmp     $18                             ; 9F3D C5 18                    ..
@@ -5353,13 +5354,13 @@ LA0EE:
         lda     #$00                            ; A0EE A9 00                    ..
         sta     Workset + EntityYSubspeed                            ; A0F0 85 32                    .2
         sta     Workset + EntityYSpeed                             ; A0F2 85 33                    .3
-        lda     $1D                             ; A0F4 A5 1D                    ..
+        lda     HitDetectYDistance+1                             ; A0F4 A5 1D                    ..
         bne     LA117                           ; A0F6 D0 1F                    ..
-        lda     $1C                             ; A0F8 A5 1C                    ..
+        lda     HitDetectYDistance                             ; A0F8 A5 1C                    ..
         cmp     #$08                            ; A0FA C9 08                    ..
         bcc     LA117                           ; A0FC 90 19                    ..
         lda     #$02                            ; A0FE A9 02                    ..
-        bit     $15                             ; A100 24 15                    $.
+        bit     HitDetectYDirection                             ; A100 24 15                    $.
         bne     LA10F                           ; A102 D0 0B                    ..
         lda     #$80                            ; A104 A9 80                    ..
         sta     Workset + EntityYSubspeed                            ; A106 85 32                    .2
@@ -5789,13 +5790,15 @@ SetJellyfishStartingLocation:
 ; ----------------------------------------------------------------------------
 RunEntityStingray:
         bit Workset + EntityHeader
-        bvs RayMain
+        bvs @Main
+        ; clear out a bunch of flags
         lda #$00
         sta Workset + EntityFlags1F
         sta Workset + EntityV19
         sta Workset + EntityV1A
-        lda #$02
-        sta $38
+        lda #%00000010
+        sta Workset + EntityV18
+        ; place outselves a little offset from player height
         lda PlayerData+EntityY
         clc
         adc #$10
@@ -5804,329 +5807,352 @@ RunEntityStingray:
         adc #$00
         sta Workset + EntityY + 1
         jsr EncounterClampWorksetMaximumY
+        ; play stingray animation
         lda #AnimationEncounterStingray
         jsr WorksetAnimationPlay
+        ; set starting speed based on spawn height
         ldx #$00
         lda Workset + EntityY
         cmp #$04
-        bne LA3AA
-        .byte $A2,$04
-; ----------------------------------------------------------------------------
-LA3AA:
-        stx     Workset + EntityV17                            ; A3AA 86 37                    .7
-        lda     PlayerData+EntityX                           ; A3AC AD 82 06                 ...
-        bmi     LA3BF                           ; A3AF 30 0E                    0.
-        lda     #(EntityHeaderActive | EntityHeader7 | EntityHeaderFacingLeft)                            ; A3B1 A9 D0                    ..
-        sta     Workset + EntityHeader                             ; A3B3 85 20                    . 
-        inx                                     ; A3B5 E8                       .
-        inx                                     ; A3B6 E8                       .
-        lda     #$10                            ; A3B7 A9 10                    ..
-        sta     Workset + EntityX                             ; A3B9 85 22                    ."
-        lda     #$11                            ; A3BB A9 11                    ..
-        bne     LA3C9                           ; A3BD D0 0A                    ..
-LA3BF:
-        lda     #(EntityHeaderActive | EntityHeader7)                            ; A3BF A9 C0                    ..
-        sta     Workset + EntityHeader                             ; A3C1 85 20                    . 
-        lda     #$F0                            ; A3C3 A9 F0                    ..
-        sta     Workset + EntityX                             ; A3C5 85 22                    ."
-        lda     #$0F                            ; A3C7 A9 0F                    ..
-LA3C9:
-        sta     Workset + EntityX  + 1                            ; A3C9 85 23                    .#
-        lda     LA491,x                         ; A3CB BD 91 A4                 ...
-        sta     Workset + EntityXSubspeed                             ; A3CE 85 30                    .0
-        lda     LA492,x                         ; A3D0 BD 92 A4                 ...
-        sta     Workset + EntityXSpeed                             ; A3D3 85 31                    .1
-        rts                                     ; A3D5 60                       `
+        bne @ContinueSpawn
+        ldx #$04
+@ContinueSpawn:
+        stx Workset + EntityV17
+        ; check which side of screen the player is on, we want to start
+        ; on the opposite end of the screen.
+        lda PlayerData+EntityX
+        bmi @SpawnFromLeft
+        ; if the player is on the left side, we spawn to the far right
+        lda #(EntityHeaderActive | EntityHeader7 | EntityHeaderFacingLeft)
+        sta Workset + EntityHeader
+        ; shift x to get left facing speed
+        inx
+        inx
+        lda #$10
+        sta Workset + EntityX
+        lda #$11
+        bne @SetupSpeed
+@SpawnFromLeft:
+        ; if the player is on the right side, we spawn to the far left
+        lda #(EntityHeaderActive | EntityHeader7)
+        sta Workset + EntityHeader
+        lda #$F0
+        sta Workset + EntityX
+        lda #$0F
+@SetupSpeed:
+        sta Workset + EntityX  + 1
+        lda @StingraySpeeds,x
+        sta Workset + EntityXSubspeed
+        lda @StingraySpeeds+1,x
+        sta Workset + EntityXSpeed
+        rts
+@Main:
+        jsr WorksetAnimationAdvance
+        lda Workset + EntityV1A
+        beq @StillAlive
+        jmp @ProcessDeath
+@StillAlive:
+        lda Workset + EntityV19
+        beq @RunStandardEnemyLogic
+        dec Workset + EntityV19
+        rts
+@RunStandardEnemyLogic:
+        ; run hit detection
+        jsr WorksetDetectProjectileHit
+        jsr CheckFlagsAndHitDetectAgainstPlayer
+        bit Workset + EntityFlags1F
+        bvs @ProcessHit
+        ; move enemy
+        jsr WorksetMoveX
+        ; check if we're offscreen and trigger re-enter
+        lda #EntityHeaderFacingLeft
+        bit Workset + EntityHeader
+        bne @ReEnterFromLeft
+        lda Workset + EntityX  + 1
+        cmp #$11
+        bcc @Exit2
+        lda Workset + EntityX
+        cmp #$10
+        bcs @ReEnterFromRight
+@Exit2:
+        rts
+@ReEnterFromRight:
+        lda #(EntityHeaderActive | EntityHeader7 | EntityHeaderFacingLeft)
+        sta Workset + EntityHeader
+        ldx Workset + EntityV17
+        lda @StingraySpeeds+2,x
+        sta Workset + EntityXSubspeed
+        lda @StingraySpeeds+3,x
+        sta Workset + EntityXSpeed
+        bne @ReEnterFinish
+@ReEnterFromLeft:
+        lda Workset + EntityX  + 1
+        cmp #$10
+        bcs @Exit
+        lda Workset + EntityX
+        cmp #$EF
+        bcs @Exit
+        lda #(EntityHeaderActive | EntityHeader7)
+        sta Workset + EntityHeader
+        ldx Workset + EntityV17
+        lda @StingraySpeeds,x
+        sta Workset + EntityXSubspeed
+        lda @StingraySpeeds+1,x
+        sta Workset + EntityXSpeed
+@ReEnterFinish:
+        lda Workset + EntityY
+        sec
+        sbc #$20
+        sta Workset + EntityY
+        lda Workset + EntityY + 1
+        sbc #$00
+        sta Workset + EntityY + 1
+        ; despawn if we ended up outside the map
+        ; otherwise continue
+        jsr EncounterClampWorksetMinimumY
+        bcc @Exit
+        bcs @Disable
+@ProcessHit:
+        dec Workset + EntityV18
+        beq @RunDeathAnimation
+        ; hit but still alive.
+        ; set iframes and give the player some points
+        lda #$00
+        jsr AwardPoints
+        lda #$08
+        sta Workset + EntityV19
+        jmp @Exit
+@RunDeathAnimation:
+        ; we're out of hitpoints, give some more points
+        lda #$06
+        jsr AwardPoints
+        ; play our death sound
+        lda #SFXEncounterEnemyDeath
+        jsr SoundPlay
+        ; mark death and play death animation
+        lda #$80
+        sta Workset + EntityV1A
+        lda #AnimationEncounterStingrayDeath
+        jmp WorksetAnimationPlay
+@ProcessDeath:
+        lda Workset + EntityAnimTimer
+        bne @Exit
+        ; advance rng to determine drop type
+        jsr RNGAdvance
+        and #$07
+        tax
+        ; check drop type from reward table
+        lda @RewardRNG,x
+        beq @Disable
+        ; and if we found one, spawn it in!
+        sta Workset + EntityType
+        lda #EntityHeaderActive
+        sta Workset + EntityHeader
+        jmp RunEntity
+@Disable:
+        lda #$00
+        sta Workset + EntityHeader
+@Exit:
+        rts
+@RewardRNG:
+        .byte $00
+        .byte $08 ; crab
+        .byte $00
+        .byte $09 ; star
+        .byte $00
+        .byte $0A ; shell
+        .byte $00
+        .byte $09 ; star
+@StingraySpeeds:
+        .byte $00,$01 ; slow stingray heading right
+        .byte $00,$FF ; slow stingray heading left
+        .byte $00,$02 ; fast stingray heading right
+        .byte $00,$FE ; fast stingray heading left
 
-; ----------------------------------------------------------------------------
-RayMain:
-        jsr     WorksetAnimationAdvance                           ; A3D6 20 BE 97                  ..
-        lda     Workset + EntityV1A                             ; A3D9 A5 3A                    .:
-        beq     LA3E0                           ; A3DB F0 03                    ..
-        jmp     LA46C                           ; A3DD 4C 6C A4                 Ll.
-
-; ----------------------------------------------------------------------------
-LA3E0:
-        lda     Workset + EntityV19                             ; A3E0 A5 39                    .9
-        beq     LA3E7                           ; A3E2 F0 03                    ..
-        dec     Workset + EntityV19                             ; A3E4 C6 39                    .9
-        rts                                     ; A3E6 60                       `
-
-; ----------------------------------------------------------------------------
-LA3E7:
-        jsr     WorksetDetectProjectileHit                           ; A3E7 20 F8 98                  ..
-        jsr     CheckFlagsAndHitDetectAgainstPlayer                           ; A3EA 20 40 99                  @.
-        bit     Workset + EntityFlags1F                             ; A3ED 24 3F                    $?
-        bvs     LA449                           ; A3EF 70 58                    pX
-        jsr     WorksetMoveX                           ; A3F1 20 FA 97                  ..
-        lda     #EntityHeaderFacingLeft                            ; A3F4 A9 10                    ..
-        bit     Workset + EntityHeader                             ; A3F6 24 20                    $ 
-        bne     LA419                           ; A3F8 D0 1F                    ..
-        lda     Workset + EntityX  + 1                            ; A3FA A5 23                    .#
-        cmp     #$11                            ; A3FC C9 11                    ..
-        bcc     LA406                           ; A3FE 90 06                    ..
-        lda     Workset + EntityX                             ; A400 A5 22                    ."
-        cmp     #$10                            ; A402 C9 10                    ..
-        bcs     LA407                           ; A404 B0 01                    ..
-LA406:
-        rts                                     ; A406 60                       `
-
-; ----------------------------------------------------------------------------
-LA407:
-        lda     #(EntityHeaderActive | EntityHeader7 | EntityHeaderFacingLeft)                            ; A407 A9 D0                    ..
-        sta     Workset + EntityHeader                             ; A409 85 20                    . 
-        ldx     Workset + EntityV17                            ; A40B A6 37                    .7
-        lda     LA493,x                         ; A40D BD 93 A4                 ...
-        sta     Workset + EntityXSubspeed                             ; A410 85 30                    .0
-        lda     LA494,x                         ; A412 BD 94 A4                 ...
-        sta     Workset + EntityXSpeed                             ; A415 85 31                    .1
-        bne     LA435                           ; A417 D0 1C                    ..
-LA419:
-        lda     Workset + EntityX  + 1                            ; A419 A5 23                    .#
-        cmp     #$10                            ; A41B C9 10                    ..
-        bcs     LA488                           ; A41D B0 69                    .i
-        lda     Workset + EntityX                             ; A41F A5 22                    ."
-        cmp     #$EF                            ; A421 C9 EF                    ..
-        bcs     LA488                           ; A423 B0 63                    .c
-        lda     #(EntityHeaderActive | EntityHeader7)                            ; A425 A9 C0                    ..
-        sta     Workset + EntityHeader                             ; A427 85 20                    . 
-        ldx     Workset + EntityV17                            ; A429 A6 37                    .7
-        lda     LA491,x                         ; A42B BD 91 A4                 ...
-        sta     Workset + EntityXSubspeed                             ; A42E 85 30                    .0
-        lda     LA492,x                         ; A430 BD 92 A4                 ...
-        sta     Workset + EntityXSpeed                             ; A433 85 31                    .1
-LA435:
-        lda     Workset + EntityY                             ; A435 A5 24                    .$
-        sec                                     ; A437 38                       8
-        sbc     #$20                            ; A438 E9 20                    . 
-        sta     Workset + EntityY                             ; A43A 85 24                    .$
-        lda     Workset + EntityY + 1                             ; A43C A5 25                    .%
-        sbc     #$00                            ; A43E E9 00                    ..
-        sta     Workset + EntityY + 1                             ; A440 85 25                    .%
-        jsr     EncounterClampWorksetMinimumY                           ; A442 20 F2 99                  ..
-        bcc     LA488                           ; A445 90 41                    .A
-        bcs     LA484                           ; A447 B0 3B                    .;
-LA449:
-        dec     $38                             ; A449 C6 38                    .8
-        beq     LA459                           ; A44B F0 0C                    ..
-        lda     #$00                            ; A44D A9 00                    ..
-        jsr     AwardPoints                           ; A44F 20 D0 8C                  ..
-        lda     #$08                            ; A452 A9 08                    ..
-        sta     Workset + EntityV19                             ; A454 85 39                    .9
-        jmp     LA488                           ; A456 4C 88 A4                 L..
-
-; ----------------------------------------------------------------------------
-LA459:
-        lda     #$06                            ; A459 A9 06                    ..
-        jsr     AwardPoints                           ; A45B 20 D0 8C                  ..
-        lda     #SFXEncounterEnemyDeath                            ; A45E A9 0E                    ..
-        jsr     SoundPlay                           ; A460 20 CD E2                  ..
-        lda     #$80                            ; A463 A9 80                    ..
-        sta     Workset + EntityV1A                             ; A465 85 3A                    .:
-        lda     #AnimationEncounterStingrayDeath                            ; A467 A9 0E                    ..
-        jmp     WorksetAnimationPlay                           ; A469 4C AD 97                 L..
-
-; ----------------------------------------------------------------------------
-LA46C:
-        lda     Workset + EntityAnimTimer                             ; A46C A5 2B                    .+
-        bne     LA488                           ; A46E D0 18                    ..
-        jsr     RNGAdvance                           ; A470 20 69 8C                  i.
-        and     #$07                            ; A473 29 07                    ).
-        tax                                     ; A475 AA                       .
-        lda     LA489,x                         ; A476 BD 89 A4                 ...
-        beq     LA484                           ; A479 F0 09                    ..
-        sta     Workset + EntityType                             ; A47B 85 21                    .!
-        lda     #EntityHeaderActive                           ; A47D A9 80                    ..
-        sta     Workset + EntityHeader                             ; A47F 85 20                    . 
-        jmp     RunEntity                           ; A481 4C 06 A2                 L..
-
-; ----------------------------------------------------------------------------
-LA484:
-        lda     #$00                            ; A484 A9 00                    ..
-        sta     Workset + EntityHeader                             ; A486 85 20                    . 
-LA488:
-        rts                                     ; A488 60                       `
-
-; ----------------------------------------------------------------------------
-LA489:
-        .byte   $00,$08,$00,$09,$00,$0A,$00,$09 ; A489 00 08 00 09 00 0A 00 09  ........
-LA491:
-        .byte   $00                             ; A491 00                       .
-LA492:
-        .byte   $01                             ; A492 01                       .
-LA493:
-        .byte   $00                             ; A493 00                       .
-LA494:
-        .byte   $FF,$00,$02,$00,$FE             ; A494 FF 00 02 00 FE           .....
 ; ----------------------------------------------------------------------------
 RunEntityBabyshark:
-        bit     Workset + EntityHeader                             ; A499 24 20                    $ 
-        bvs     LA4F9                           ; A49B 70 5C                    p\
-        lda     PlayerData+EntityY                           ; A49D AD 84 06                 ...
-        sta     Workset + EntityY                             ; A4A0 85 24                    .$
-        lda     PlayerData+EntityY+1                           ; A4A2 AD 85 06                 ...
-        sta     Workset + EntityY + 1                             ; A4A5 85 25                    .%
-        lda     #$05                            ; A4A7 A9 05                    ..
-        sta     Workset + EntityActiveAnimationIndex                             ; A4A9 85 35                    .5
-        lda     #$00                            ; A4AB A9 00                    ..
-        sta     Workset + EntityV16                            ; A4AD 85 36                    .6
-        sta     $38                             ; A4AF 85 38                    .8
-        sta     Workset + EntityV19                             ; A4B1 85 39                    .9
-        jsr     RNGAdvance                           ; A4B3 20 69 8C                  i.
-        and     #$07                            ; A4B6 29 07                    ).
-        adc     #$07                            ; A4B8 69 07                    i.
-        sta     Workset + EntityV17                            ; A4BA 85 37                    .7
-        lda     #AnimationEncounterBabyshark                            ; A4BC A9 1F                    ..
-        jsr     WorksetAnimationPlay                           ; A4BE 20 AD 97                  ..
-        lda     PlayerData+EntityX+1                           ; A4C1 AD 83 06                 ...
-        cmp     #$10                            ; A4C4 C9 10                    ..
-        bcc     LA4CF                           ; A4C6 90 07                    ..
-        bne     LA4E4                           ; A4C8 D0 1A                    ..
-        lda     PlayerData+EntityX                           ; A4CA AD 82 06                 ...
-        bpl     LA4E4                           ; A4CD 10 15                    ..
-LA4CF:
-        lda     #(EntityHeaderActive | EntityHeader7)                            ; A4CF A9 C0                    ..
-        sta     Workset + EntityHeader                             ; A4D1 85 20                    . 
-        lda     #$E0                            ; A4D3 A9 E0                    ..
-        sta     Workset + EntityX                             ; A4D5 85 22                    ."
-        lda     #$0F                            ; A4D7 A9 0F                    ..
-        sta     Workset + EntityX  + 1                            ; A4D9 85 23                    .#
-        lda     #$00                            ; A4DB A9 00                    ..
-        sta     Workset + EntityXSubspeed                             ; A4DD 85 30                    .0
-        lda     #$01                            ; A4DF A9 01                    ..
-        sta     Workset + EntityXSpeed                             ; A4E1 85 31                    .1
-        rts                                     ; A4E3 60                       `
-
-; ----------------------------------------------------------------------------
-LA4E4:
-        .byte   $A9,$D0,$85,$20,$A9,$20,$85,$22 ; A4E4 A9 D0 85 20 A9 20 85 22  ... . ."
-        .byte   $A9,$11,$85,$23,$A9,$00,$85,$30 ; A4EC A9 11 85 23 A9 00 85 30  ...#...0
-        .byte   $A9,$FF,$85,$31,$60             ; A4F4 A9 FF 85 31 60           ...1`
-; ----------------------------------------------------------------------------
-LA4F9:
-        lda     Workset + EntityV19                             ; A4F9 A5 39                    .9
-        beq     LA500                           ; A4FB F0 03                    ..
-        jmp     LA5C0                           ; A4FD 4C C0 A5                 L..
-
-; ----------------------------------------------------------------------------
-LA500:
-        lda     $38                             ; A500 A5 38                    .8
-        beq     LA523                           ; A502 F0 1F                    ..
-        clc                                     ; A504 18                       .
-        lda     Workset + EntityXSpeed                             ; A505 A5 31                    .1
-        bpl     LA50A                           ; A507 10 01                    ..
-        .byte   $38                             ; A509 38                       8
-; ----------------------------------------------------------------------------
-LA50A:
-        ror     Workset + EntityXSpeed                             ; A50A 66 31                    f1
-        ror     Workset + EntityXSubspeed                             ; A50C 66 30                    f0
-        jsr     WorksetMoveX                           ; A50E 20 FA 97                  ..
-        asl     Workset + EntityXSubspeed                             ; A511 06 30                    .0
-        rol     Workset + EntityXSpeed                             ; A513 26 31                    &1
-        jsr     WorksetAnimationAdvance                           ; A515 20 BE 97                  ..
-        jsr     WorksetAnimationAdvance                           ; A518 20 BE 97                  ..
-        jsr     WorksetAnimationAdvance                           ; A51B 20 BE 97                  ..
-        dec     $38                             ; A51E C6 38                    .8
-        jmp     LA526                           ; A520 4C 26 A5                 L&.
-
-; ----------------------------------------------------------------------------
-LA523:
-        jsr     WorksetMoveX                           ; A523 20 FA 97                  ..
-LA526:
-        jsr     WorksetMoveY                           ; A526 20 1B 98                  ..
-        jsr     EncounterClampWorksetMinimumY                           ; A529 20 F2 99                  ..
-        jsr     EncounterClampWorksetMaximumY                           ; A52C 20 D0 99                  ..
-        bit     Workset + EntityV16                            ; A52F 24 36                    $6
-        bmi     LA53F                           ; A531 30 0C                    0.
-        lda     #$01                            ; A533 A9 01                    ..
-        bit     Workset + EntityFlags1F                             ; A535 24 3F                    $?
-        bne     LA53A                           ; A537 D0 01                    ..
-        rts                                     ; A539 60                       `
-
-; ----------------------------------------------------------------------------
-LA53A:
-        lda     #$80                            ; A53A A9 80                    ..
-        sta     Workset + EntityV16                            ; A53C 85 36                    .6
-        rts                                     ; A53E 60                       `
-
-; ----------------------------------------------------------------------------
-LA53F:
-        lda     #$01                            ; A53F A9 01                    ..
-        bit     Workset + EntityFlags1F                             ; A541 24 3F                    $?
-        bne     LA56A                           ; A543 D0 25                    .%
-        .byte   $C6,$35,$D0,$05,$A9,$00,$85,$20 ; A545 C6 35 D0 05 A9 00 85 20  .5..... 
-        .byte   $60,$A9,$00,$85,$36,$A5,$20,$49 ; A54D 60 A9 00 85 36 A5 20 49  `...6. I
-        .byte   $10,$85,$20,$A5,$30,$49,$FF,$18 ; A555 10 85 20 A5 30 49 FF 18  .. .0I..
-        .byte   $69,$01,$85,$30,$A5,$31,$49,$FF ; A55D 69 01 85 30 A5 31 49 FF  i..0.1I.
-        .byte   $69,$00,$85,$31,$60             ; A565 69 00 85 31 60           i..1`
-; ----------------------------------------------------------------------------
-LA56A:
-        jsr     WorksetAnimationAdvance                           ; A56A 20 BE 97                  ..
-        jsr     WorksetDetectProjectileHit                           ; A56D 20 F8 98                  ..
-        jsr     CheckFlagsAndHitDetectAgainstPlayer                           ; A570 20 40 99                  @.
-        bit     Workset + EntityFlags1F                             ; A573 24 3F                    $?
-        bvc     LA597                           ; A575 50 20                    P 
-        lda     #SFXEncounterEnemyDeath                            ; A577 A9 0E                    ..
-        jsr     SoundPlay                           ; A579 20 CD E2                  ..
-        dec     Workset + EntityV17                            ; A57C C6 37                    .7
-        bne     LA58E                           ; A57E D0 0E                    ..
-        lda     #$0A                            ; A580 A9 0A                    ..
-        jsr     AwardPoints                           ; A582 20 D0 8C                  ..
-        lda     #$80                            ; A585 A9 80                    ..
-        sta     Workset + EntityV19                             ; A587 85 39                    .9
-        lda     #AnimationEncounterBabysharkDeath                            ; A589 A9 0F                    ..
-        jmp     WorksetAnimationPlay                           ; A58B 4C AD 97                 L..
-
-; ----------------------------------------------------------------------------
-LA58E:
-        lda     #$00                            ; A58E A9 00                    ..
-        jsr     AwardPoints                           ; A590 20 D0 8C                  ..
-        lda     #$08                            ; A593 A9 08                    ..
-        sta     $38                             ; A595 85 38                    .8
-LA597:
-        lda     $1D                             ; A597 A5 1D                    ..
-        bne     LA5A8                           ; A599 D0 0D                    ..
-        lda     $1C                             ; A59B A5 1C                    ..
-        cmp     #$04                            ; A59D C9 04                    ..
-        bcs     LA5A8                           ; A59F B0 07                    ..
-        lda     #$00                            ; A5A1 A9 00                    ..
-        sta     Workset + EntityYSubspeed                            ; A5A3 85 32                    .2
-        sta     Workset + EntityYSpeed                             ; A5A5 85 33                    .3
-        rts                                     ; A5A7 60                       `
-
-; ----------------------------------------------------------------------------
-LA5A8:
-        lda     #$02                            ; A5A8 A9 02                    ..
-        bit     $15                             ; A5AA 24 15                    $.
-        bne     LA5B7                           ; A5AC D0 09                    ..
-        lda     #$80                            ; A5AE A9 80                    ..
-        sta     Workset + EntityYSubspeed                            ; A5B0 85 32                    .2
-        lda     #$00                            ; A5B2 A9 00                    ..
-        sta     Workset + EntityYSpeed                             ; A5B4 85 33                    .3
-        rts                                     ; A5B6 60                       `
-
-; ----------------------------------------------------------------------------
-LA5B7:
+        bit Workset + EntityHeader
+        bvs @Main
+        ; spawn at same height as player
+        lda PlayerData+EntityY
+        sta Workset + EntityY
+        lda PlayerData+EntityY+1
+        sta Workset + EntityY + 1
+        ; set some initial state
+        lda #$05
+        sta Workset + EntityActiveAnimationIndex
+        lda #$00
+        sta Workset + EntityV16
+        sta Workset + EntityV18
+        sta Workset + EntityV19
+        jsr RNGAdvance
+        and #$07
+        adc #$07
+        sta Workset + EntityV17
+        ; play animation
+        lda #AnimationEncounterBabyshark
+        jsr WorksetAnimationPlay
+        ; spawn side based on player location
+        lda PlayerData+EntityX+1
+        cmp #$10
+        bcc @SpawnFromLeft
+        bne @SpawnFromRight
+        lda PlayerData+EntityX
+        bpl @SpawnFromRight
+@SpawnFromLeft:
+        ; spawn on the far left of the screeen
+        lda #(EntityHeaderActive | EntityHeader7)
+        sta Workset + EntityHeader
+        lda #$E0
+        sta Workset + EntityX
+        lda #$0F
+        sta Workset + EntityX+1
+        lda #$00
+        sta Workset + EntityXSubspeed
+        lda #$01
+        sta Workset + EntityXSpeed
+        rts
+@SpawnFromRight:
+        ; spawn on the far right of the screeen
+        lda #(EntityHeaderActive | EntityHeader7 | EntityHeaderFacingLeft)
+        sta Workset + EntityHeader
+        lda #$20
+        sta Workset + EntityX
+        lda #$11
+        sta Workset + EntityX+1
+        lda #$00
+        sta Workset + EntityXSubspeed
+        lda #$FF
+        sta Workset + EntityXSpeed
+        rts
+@Main:
+        lda Workset + EntityV19
+        beq @StillAlive
+        jmp @DelayUntilDeathAnimationComplete
+@StillAlive:
+        lda Workset + EntityV18
+        beq @FastMovement
+        ; if V18 is set we are taking damage.
+        ; we want to slow down movement speed.
+        clc
+        lda Workset + EntityXSpeed
+        bpl @SlowMovement
+        sec
+@SlowMovement:
+        ror Workset + EntityXSpeed
+        ror Workset + EntityXSubspeed
+        jsr WorksetMoveX
+        asl Workset + EntityXSubspeed
+        rol Workset + EntityXSpeed
+        jsr WorksetAnimationAdvance
+        jsr WorksetAnimationAdvance
+        jsr WorksetAnimationAdvance
+        dec Workset + EntityV18
+        jmp @MoveY
+@FastMovement:
+        jsr WorksetMoveX
+@MoveY:
+        ; move y and keep babyshark inside the stage
+        jsr WorksetMoveY
+        jsr EncounterClampWorksetMinimumY
+        jsr EncounterClampWorksetMaximumY
+        bit Workset + EntityV16
+        bmi @KeepRunning
+        lda #$01
+        bit Workset + EntityFlags1F
+        bne @SetV16
+        rts
+@SetV16:
+        lda #$80
+        sta Workset + EntityV16
+        rts
+@KeepRunning:
+        lda #$01
+        bit Workset + EntityFlags1F
+        bne @RunStandardEnemyLogic
+        dec Workset + EntityActiveAnimationIndex
+        bne @FlipDirection
+        lda #$00
+        sta Workset + EntityHeader
+        rts
+@FlipDirection:
+        lda #$00
+        sta Workset + EntityV16
+        lda Workset + EntityHeader
+        eor #EntityHeaderFacingLeft
+        sta Workset + EntityHeader
+        lda Workset + EntityXSubspeed
+        eor #$FF
+        clc
+        adc #$01
+        sta Workset + EntityXSubspeed
+        lda Workset + EntityXSpeed
+        eor #$FF
+        adc #$00
+        sta Workset + EntityXSpeed
+        rts
+@RunStandardEnemyLogic:
+        jsr WorksetAnimationAdvance
+        jsr WorksetDetectProjectileHit
+        jsr CheckFlagsAndHitDetectAgainstPlayer
+        bit Workset + EntityFlags1F
+        bvc @UpdateSpeeds
+        ; we seem to have been shot, play a sound effect and lower hp
+        lda #SFXEncounterEnemyDeath
+        jsr SoundPlay
+        dec Workset + EntityV17
+        bne @ProcessHit
+        ; babyshark is dead, give points, mark for removal and play animation
+        lda #$0A
+        jsr AwardPoints
+        lda #$80
+        sta Workset + EntityV19
+        lda #AnimationEncounterBabysharkDeath
+        jmp WorksetAnimationPlay
+@ProcessHit:
+        ; award points and set timer
+        lda #$00
+        jsr AwardPoints
+        lda #$08
+        sta Workset + EntityV18
+@UpdateSpeeds:
+        ; chase after player
+        lda HitDetectYDistance+1
+        bne @MoveDownward
+        lda HitDetectYDistance
+        cmp #$04
+        bcs @MoveDownward
+        ; on level with player, clear y speed
+        lda #$00
+        sta Workset + EntityYSubspeed
+        sta Workset + EntityYSpeed
+        rts
+@MoveDownward:
+        lda #$02
+        bit HitDetectYDirection
+        bne @MoveUpward
+        lda #$80
+        sta Workset + EntityYSubspeed
+        lda #$00
+        sta Workset + EntityYSpeed
+        rts
+@MoveUpward:
         lda #$80
         sta Workset + EntityYSubspeed        
         lda #$FF
         sta Workset + EntityYSpeed        
         rts 
-
-; ----------------------------------------------------------------------------
-LA5C0:
-        jsr     WorksetAnimationAdvance                           ; A5C0 20 BE 97                  ..
-        lda     Workset + EntityAnimTimer                             ; A5C3 A5 2B                    .+
-        beq     LA5C8                           ; A5C5 F0 01                    ..
-        rts                                     ; A5C7 60                       `
-
-; ----------------------------------------------------------------------------
-LA5C8:
-        lda     #EntityHeaderActive                            ; A5C8 A9 80                    ..
-        sta     Workset + EntityHeader                             ; A5CA 85 20                    . 
-        lda     #$09                            ; A5CC A9 09                    ..
-        sta     Workset + EntityType                             ; A5CE 85 21                    .!
-        jmp     RunEntity                           ; A5D0 4C 06 A2                 L..
+@DelayUntilDeathAnimationComplete:
+        jsr WorksetAnimationAdvance
+        lda Workset + EntityAnimTimer
+        beq @ProcessDeath
+        rts
+@ProcessDeath:
+        lda #EntityHeaderActive
+        sta Workset + EntityHeader
+        lda #$09 ; spawn a star
+        sta Workset + EntityType
+        jmp RunEntity
 
 ; ----------------------------------------------------------------------------
 RunEntityCrab:
@@ -7166,34 +7192,34 @@ DrawBGDataPage3:
 
 ; ----------------------------------------------------------------------------
 DrawBGMapRight1:
-        jsr     DrawBGDataPage1
-        jsr     DrawBGDataPage3
+        jsr DrawBGDataPage1
+        jsr DrawBGDataPage3
         ; continue to DrawBGMapRight2
-        lda     #$02
-        sta     NextBGUpdate
+        lda #$02
+        sta NextBGUpdate
         rts
 
 ; ----------------------------------------------------------------------------
 DrawBGMapRight2:
-        jsr     DrawBGDataPage2
-        lda     #$00
-        sta     NextBGUpdate
+        jsr DrawBGDataPage2
+        lda #$00
+        sta NextBGUpdate
         rts
 
 ; ----------------------------------------------------------------------------
 DrawBGMapLeft1:
-        jsr     DrawBGDataPage2
-        jsr     DrawBGDataPage3
+        jsr DrawBGDataPage2
+        jsr DrawBGDataPage3
         ; continue to DrawBGMapLeft2
-        lda     #$04
-        sta     NextBGUpdate
+        lda #$04
+        sta NextBGUpdate
         rts
 
 ; ----------------------------------------------------------------------------
 DrawBGMapLeft2:
-        jsr     DrawBGDataPage1
-        lda     #$00
-        sta     NextBGUpdate
+        jsr DrawBGDataPage1
+        lda #$00
+        sta NextBGUpdate
         rts
 
 ; ----------------------------------------------------------------------------
@@ -10638,9 +10664,9 @@ BonusRunSingleJellyfish:
         lda #AnimationEncounterJellyfishDeath
         jmp WorksetAnimationPlay
 @AlreadyInitialized:
-        bit     Workset + EntityInvincibilityFrames                             ; D355 24 3D                    $=
-        bpl     LD35C                           ; D357 10 03                    ..
-        jmp     LD4B8                           ; D359 4C B8 D4                 L..
+        bit Workset + EntityInvincibilityFrames                             ; D355 24 3D                    $=
+        bpl LD35C                           ; D357 10 03                    ..
+        jmp LD4B8                           ; D359 4C B8 D4                 L..
 
 ; ----------------------------------------------------------------------------
 LD35C:
