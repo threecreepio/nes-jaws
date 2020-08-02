@@ -116,9 +116,9 @@ MapSubmarineX         = $034E
 MapSubmarineY         = $034F
 MapScrollX            = $0328
 MapScrollY            = $032A
-; there seems to be a duplicate of the scroll position
-; stored here. not quite sure why.
-MapScrollXCopy        = $032C
+; current scroll position, if this is different from mapscrollx it
+; will trigger loading in new tiles from the worldmap.
+MapScrollCurrentX     = $032C
 
 
 ActivePalette         = $046F
@@ -185,17 +185,24 @@ PlayerStrobeCount     = $0393
 PortPowerupPrice   = $034C
 
 
-BGDataPage1           = $0400
-BGDataPage2           = $0430
-BGDataPage3           = $0460
-BGDataDrawOffset      = $046D
+VisibleMapStripe1           = $0400
+VisibleMapStripe2           = $0430
+VisibleMapAttributes           = $0460
+DrawVisibleMapDataPPUPosition      = $046D
+DrawVisibleMapAttrPPUPosition      = $046E
+
+; BGLoadedSlices has a list of 16 indices of loaded map data.
+; Each number will be the X position of the map that is loaded into BGData at that offset.
+BGLoadedSlices        = $0470
+
+
+
 
 FinaleParallax1       = $0400
-UnusedParallaxOffset       = $0460
+UnusedParallaxOffset  = $0460
+FinalePlayerPosition  = $0460
 
-FinalePlayerPosition  = $460
-
-StatusbarPPULocation= $48 ; 16 bit
+StatusbarPPULocation  = $48 ; 16 bit
 
 Sprite                = $0200
 SpritePosY            = Sprite + 0
@@ -3604,8 +3611,8 @@ MapRunCamera:
         adc #$0F
         iny
 @Done:
-        sta     SCROLL_Y
-        sty     UseHighPPUNametables
+        sta SCROLL_Y
+        sty UseHighPPUNametables
         rts
 
 ; ----------------------------------------------------------------------------
@@ -6923,234 +6930,272 @@ MapUpdateScroll:
         beq @CheckIfUpdateIsNeeded
         rts
 @CheckIfUpdateIsNeeded:
-        ; check if our copies of the scroll positions are different
-        ; from the requested positions..
-        lda MapScrollXCopy+1
+        ; check if mapscrollx has been changed since last draw.
+        lda MapScrollCurrentX+1
         cmp MapScrollX+1
         bne @UpdateNeeded
-        lda MapScrollXCopy
+        lda MapScrollCurrentX
         cmp MapScrollX
         bne @UpdateNeeded
         ; camera has not moved, we don't need to do anything.
         rts
 @UpdateNeeded:
         ; okay the camera has moved. we need to do some work..
-        bcs LAA7A
+        bcs @ScrollLeft
+        ; next bgupdate to run, this will draw new map data to the right.
         ldy #$01
+        ; get which map slice index we should load into
         lda MapScrollX
         clc
         adc #$F0
         tax
+        ; skip if we are trying to load data outside of the map bounds
         lda MapScrollX+1
         adc #$00
         cmp #$02
-        bcc LAA8B
+        bcc @LoadNewMapDataIfNeeded
         rts
-
-; ----------------------------------------------------------------------------
-LAA7A:
+@ScrollLeft:
+        ; next bgupdate to run, this will draw new map data to the left.
         ldy #$03
+        ; get which map slice index we should load into
         lda MapScrollX
         sec
         sbc #$00
         tax
+        ; skip if we are trying to load data outside of the map bounds
         lda MapScrollX+1
         sbc #$00
-        bpl LAA8B
+        bpl @LoadNewMapDataIfNeeded
         rts
-; ----------------------------------------------------------------------------
-LAA8B:
-        lsr     a                               ; AA8B 4A                       J
-        txa                                     ; AA8C 8A                       .
-        ror     a                               ; AA8D 6A                       j
-        lsr     a                               ; AA8E 4A                       J
-        lsr     a                               ; AA8F 4A                       J
-        lsr     a                               ; AA90 4A                       J
-        sta     $00                             ; AA91 85 00                    ..
-        and     #$0F                            ; AA93 29 0F                    ).
-        tax                                     ; AA95 AA                       .
-        lda     $00                             ; AA96 A5 00                    ..
-        cmp     $0470,x                         ; AA98 DD 70 04                 .p.
-        beq     LAAA6                           ; AA9B F0 09                    ..
-        sty     NextBGUpdate                           ; AA9D 8C 03 03                 ...
-        jsr     LAAF0                           ; AAA0 20 F0 AA                  ..
-        jsr     LAB50                           ; AAA3 20 50 AB                  P.
-LAAA6:
-        lda     MapScrollX                           ; AAA6 AD 28 03                 .(.
-        sta     MapScrollXCopy                           ; AAA9 8D 2C 03                 .,.
-        lda     MapScrollX+1                           ; AAAC AD 29 03                 .).
-        sta     MapScrollXCopy+1                           ; AAAF 8D 2D 03                 .-.
-        rts                                     ; AAB2 60                       `
+@LoadNewMapDataIfNeeded:
+        lsr a
+        ; get map slice index
+        txa
+        ror a
+        lsr a
+        lsr a
+        lsr a
+        sta $00
+        and #$0F
+        tax
+        lda $00
+        ; if that slice is already loaded in where we expect,
+        ; we do not need to reload it
+        cmp BGLoadedSlices,x
+        beq @ScrollAlreadyCorrect
+        ; otherwise mark the bg to be updated
+        sty NextBGUpdate
+        ; and load in our new data
+        jsr LoadVisibleMapStripes
+        jsr LoadVisibleMapAttributeData
+        ; then update the cached map scroll position
+@ScrollAlreadyCorrect:
+        lda MapScrollX
+        sta MapScrollCurrentX
+        lda MapScrollX+1
+        sta MapScrollCurrentX+1
+        rts
 
 ; ----------------------------------------------------------------------------
-MapSetStartingScroll:
-        lda     MapScrollX+1                           ; AAB3 AD 29 03                 .).
-        sta     $01                             ; AAB6 85 01                    ..
-        sta     MapScrollXCopy+1                           ; AAB8 8D 2D 03                 .-.
-        lda     MapScrollX                           ; AABB AD 28 03                 .(.
-        sta     MapScrollXCopy                           ; AABE 8D 2C 03                 .,.
-        lsr     $01                             ; AAC1 46 01                    F.
-        ror     a                               ; AAC3 6A                       j
-        lsr     a                               ; AAC4 4A                       J
-        lsr     a                               ; AAC5 4A                       J
-        lsr     a                               ; AAC6 4A                       J
-        sta     $00                             ; AAC7 85 00                    ..
-        pha                                     ; AAC9 48                       H
-        lda     #$10                            ; AACA A9 10                    ..
-        sta     $01                             ; AACC 85 01                    ..
-LAACE:
-        jsr     LAAF0                           ; AACE 20 F0 AA                  ..
-        jsr     DrawBGDataPage1And2                           ; AAD1 20 9A AB                  ..
-        inc     $00                             ; AAD4 E6 00                    ..
-        dec     $01                             ; AAD6 C6 01                    ..
-        bne     LAACE                           ; AAD8 D0 F4                    ..
-        pla                                     ; AADA 68                       h
-        sta     $00                             ; AADB 85 00                    ..
-        lda     #$08                            ; AADD A9 08                    ..
-        sta     $08                             ; AADF 85 08                    ..
-LAAE1:
-        jsr     LAB50                           ; AAE1 20 50 AB                  P.
-        jsr     DrawBGDataPage3
-        inc     $00                             ; AAE7 E6 00                    ..
-        inc     $00                             ; AAE9 E6 00                    ..
-        dec     $01                             ; AAEB C6 01                    ..
-        bne     LAAE1                           ; AAED D0 F2                    ..
-        rts                                     ; AAEF 60                       `
+MapSetStartingScroll:   
+        @StripeToLoad      = $00
+        @MapRowsLeftToDraw = $01
+        ; determine how many lines of map data to draw
+        lda MapScrollX+1
+        sta $01
+        sta MapScrollCurrentX+1
+        lda MapScrollX
+        sta MapScrollCurrentX
+        lsr $01
+        ; find starting stripe to load
+        ror a
+        lsr a
+        lsr a
+        lsr a
+        sta @StripeToLoad
+        pha
+        lda #$10
+        sta @MapRowsLeftToDraw
+        ; 
+@DrawNextLine:
+        jsr LoadVisibleMapStripes
+        jsr DrawVisibleMapStripe1And2
+        inc @StripeToLoad
+        dec @MapRowsLeftToDraw
+        bne @DrawNextLine
+        pla
+        sta @StripeToLoad
+        ; update $08, unused?
+        lda #$08
+        sta $08
+@LoadBGAttributes:
+        jsr LoadVisibleMapAttributeData
+        jsr DrawVisibleMapAttributes
+        inc @StripeToLoad
+        inc @StripeToLoad
+        dec @MapRowsLeftToDraw
+        bne @LoadBGAttributes
+        rts
 
 ; ----------------------------------------------------------------------------
-LAAF0:
-        lda     $00                             ; AAF0 A5 00                    ..
-        and     #$0F                            ; AAF2 29 0F                    ).
-        tax                                     ; AAF4 AA                       .
-        lda     $00                             ; AAF5 A5 00                    ..
-        sta     $0470,x                         ; AAF7 9D 70 04                 .p.
-        asl     a                               ; AAFA 0A                       .
-        adc     $00                             ; AAFB 65 00                    e.
-        sta     $02                             ; AAFD 85 02                    ..
-        lda     #$00                            ; AAFF A9 00                    ..
-        asl     $02                             ; AB01 06 02                    ..
-        rol     a                               ; AB03 2A                       *
-        asl     $02                             ; AB04 06 02                    ..
-        rol     a                               ; AB06 2A                       *
-        asl     $02                             ; AB07 06 02                    ..
-        rol     a                               ; AB09 2A                       *
-        adc     #>WorldMapData                            ; AB0A 69 F7                    i.
-        sta     $03                             ; AB0C 85 03                    ..
-        ldx     #$00                            ; AB0E A2 00                    ..
-LAB10:
-        txa                                     ; AB10 8A                       .
-        tay                                     ; AB11 A8                       .
-        lda     ($02),y                         ; AB12 B1 02                    ..
-        sta     $04                             ; AB14 85 04                    ..
-        lda     #<EncounterMetaTiles                            ; AB16 A9 00                    ..
-        tay                                     ; AB18 A8                       .
-        asl     $04                             ; AB19 06 04                    ..
-        rol     a                               ; AB1B 2A                       *
-        asl     $04                             ; AB1C 06 04                    ..
-        rol     a                               ; AB1E 2A                       *
-        adc     #>EncounterMetaTiles                            ; AB1F 69 FB                    i.
-        sta     $05                             ; AB21 85 05                    ..
-        txa                                     ; AB23 8A                       .
-        pha                                     ; AB24 48                       H
-        asl     a                               ; AB25 0A                       .
-        tax                                     ; AB26 AA                       .
-        lda     ($04),y                         ; AB27 B1 04                    ..
-        iny                                     ; AB29 C8                       .
-        sta     BGDataPage1,x                         ; AB2A 9D 00 04                 ...
-        lda     ($04),y                         ; AB2D B1 04                    ..
-        iny                                     ; AB2F C8                       .
-        sta     BGDataPage2,x                         ; AB30 9D 30 04                 .0.
-        lda     ($04),y                         ; AB33 B1 04                    ..
-        iny                                     ; AB35 C8                       .
-        sta     BGDataPage1+1,x                         ; AB36 9D 01 04                 ...
-        lda     ($04),y                         ; AB39 B1 04                    ..
-        sta     BGDataPage2+1,x                         ; AB3B 9D 31 04                 .1.
-        pla                                     ; AB3E 68                       h
-        tax                                     ; AB3F AA                       .
-        inx                                     ; AB40 E8                       .
-        cpx     #$18                            ; AB41 E0 18                    ..
-        bcc     LAB10                           ; AB43 90 CB                    ..
-        lda     $00                             ; AB45 A5 00                    ..
-        asl     a                               ; AB47 0A                       .
-        and     #$1E                            ; AB48 29 1E                    ).
-        adc     #$80                            ; AB4A 69 80                    i.
-        sta     BGDataDrawOffset                           ; AB4C 8D 6D 04                 .m.
-        rts                                     ; AB4F 60                       `
+LoadVisibleMapStripes:
+        @StripeToLoad     = $00
+        @WorldMapDataPtr  = $02
+        @MetatilePtr      = $04
+        lda @StripeToLoad
+        and #$0F
+        tax
+        ; update slice list so we don't reload this slice.
+        lda @StripeToLoad
+        sta BGLoadedSlices,x
+        ; find offset into worldmapdata
+        asl a
+        adc @StripeToLoad
+        sta @WorldMapDataPtr
+        lda #$00
+        asl @WorldMapDataPtr
+        rol a
+        asl @WorldMapDataPtr
+        rol a
+        asl @WorldMapDataPtr
+        rol a
+        adc #>WorldMapData
+        sta @WorldMapDataPtr+1
+        ; and copy one 
+        ldx #$00
+@CopyNextTile:
+        txa
+        tay
+        ; load next metatile to load
+        lda (@WorldMapDataPtr),y
+        ; and find its pointer in the metatile list
+        sta @MetatilePtr
+        lda #<Metatiles
+        tay
+        asl @MetatilePtr
+        rol a
+        asl @MetatilePtr
+        rol a
+        adc #>Metatiles
+        sta @MetatilePtr+1
+        txa
+        pha
+        asl a
+        tax
+        ; copy the metatile data into the two
+        ; background drawing stripes
+        lda (@MetatilePtr),y
+        iny
+        sta VisibleMapStripe1,x
+        lda (@MetatilePtr),y
+        iny
+        sta VisibleMapStripe2,x
+        lda (@MetatilePtr),y
+        iny
+        sta VisibleMapStripe1+1,x
+        lda (@MetatilePtr),y
+        sta VisibleMapStripe2+1,x
+        pla
+        tax
+        inx
+        ; and keep looping until we've done the
+        ; full height of the world map
+        cpx #$18
+        bcc @CopyNextTile
+        ; find ppu offset to where the slice should be written
+        lda @StripeToLoad
+        asl a
+        and #$1E
+        adc #$80
+        sta DrawVisibleMapDataPPUPosition
+        rts
 
 ; ----------------------------------------------------------------------------
-LAB50:
-        lda     $00                             ; AB50 A5 00                    ..
-        and     #$0E                            ; AB52 29 0E                    ).
-        tax                                     ; AB54 AA                       .
-        lda     $0470,x                         ; AB55 BD 70 04                 .p.
-        lsr     a                               ; AB58 4A                       J
-        sta     $02                             ; AB59 85 02                    ..
-        asl     a                               ; AB5B 0A                       .
-        adc     $02                             ; AB5C 65 02                    e.
-        asl     a                               ; AB5E 0A                       .
-        asl     a                               ; AB5F 0A                       .
-        adc     $02                             ; AB60 65 02                    e.
-        sta     $02                             ; AB62 85 02                    ..
-        lda     $0471,x                         ; AB64 BD 71 04                 .q.
-        lsr     a                               ; AB67 4A                       J
-        sta     $04                             ; AB68 85 04                    ..
-        asl     a                               ; AB6A 0A                       .
-        adc     $04                             ; AB6B 65 04                    e.
-        asl     a                               ; AB6D 0A                       .
-        asl     a                               ; AB6E 0A                       .
-        adc     $04                             ; AB6F 65 04                    e.
-        sta     $04                             ; AB71 85 04                    ..
-        lda     #>WorldMapDataAttributes                            ; AB73 A9 FA                    ..
-        sta     $03                             ; AB75 85 03                    ..
-        sta     $05                             ; AB77 85 05                    ..
-        ldy     #$00                            ; AB79 A0 00                    ..
-LAB7B:
-        lda     ($02),y                         ; AB7B B1 02                    ..
-        and     #$33                            ; AB7D 29 33                    )3
-        sta     $06                             ; AB7F 85 06                    ..
-        lda     ($04),y                         ; AB81 B1 04                    ..
-        and     #$CC                            ; AB83 29 CC                    ).
-        ora     $06                             ; AB85 05 06                    ..
-        sta     $0460,y                         ; AB87 99 60 04                 .`.
-        iny                                     ; AB8A C8                       .
-        cpy     #$0D                            ; AB8B C0 0D                    ..
-        bcc     LAB7B                           ; AB8D 90 EC                    ..
-        lda     $00                             ; AB8F A5 00                    ..
-        and     #$0E                            ; AB91 29 0E                    ).
-        lsr     a                               ; AB93 4A                       J
-        adc     #$C8                            ; AB94 69 C8                    i.
-        sta     $046E                           ; AB96 8D 6E 04                 .n.
-        rts                                     ; AB99 60                       `
+LoadVisibleMapAttributeData:
+        @StripeToLoad       = $00
+        @Slice1Ptr          = $02
+        @Slice2Ptr          = $04
+        @CombinedAttributes = $06
+        lda @StripeToLoad
+        and #$0E
+        tax
+        ; load pointers to two neighboring slices
+        ; within the worldmap attributes table.
+        lda BGLoadedSlices,x
+        lsr a
+        sta @Slice1Ptr
+        asl a
+        adc @Slice1Ptr
+        asl a
+        asl a
+        adc @Slice1Ptr
+        sta @Slice1Ptr
+        lda BGLoadedSlices+1,x
+        lsr a
+        sta @Slice2Ptr
+        asl a
+        adc @Slice2Ptr
+        asl a
+        asl a
+        adc @Slice2Ptr
+        sta @Slice2Ptr
+        lda #>WorldMapDataAttributes
+        sta @Slice1Ptr+1
+        sta @Slice2Ptr+1
+        ldy #$00
+@CopyNextAttributes:
+        ; get left side attributes of slice 1
+        lda (@Slice1Ptr),y
+        and #%00110011
+        sta @CombinedAttributes
+        ; and right side of slice 2
+        lda (@Slice2Ptr),y
+        and #%11001100
+        ora @CombinedAttributes
+        ; then store the attributes in our working copy
+        sta VisibleMapAttributes,y
+        iny
+        ; copy a full height of the world map attributes table
+        cpy #$0D
+        bcc @CopyNextAttributes
+        ; find ppu offset to where the attributes should be written
+        lda @StripeToLoad
+        and #$0E
+        lsr a
+        adc #$C8
+        sta DrawVisibleMapAttrPPUPosition
+        rts
 
 ; ----------------------------------------------------------------------------
-DrawBGDataPage1And2:
-        jsr DrawBGDataPage1
-        jmp DrawBGDataPage2
+DrawVisibleMapStripe1And2:
+        jsr DrawVisibleMapStripe1
+        jmp DrawVisibleMapStripe2
 
 ; ----------------------------------------------------------------------------
-DrawBGDataPage1:
+DrawVisibleMapStripe1:
         lda PPUCTRL_MIRROR
         ora #%00000100                      ; set vertical rendering
         sta PPUCTRL_MIRROR
         sta PPUCTRL
         lda #$20
         sta PPUADDR
-        lda BGDataDrawOffset
+        lda DrawVisibleMapDataPPUPosition
         sta PPUADDR
         ldx #$00
 @KeepCopying1:
-        lda BGDataPage1,x
+        lda VisibleMapStripe1,x
         sta PPUDATA
         inx
         cpx #$1A
         bcc @KeepCopying1
         lda #$28
         sta PPUADDR
-        lda BGDataDrawOffset
+        lda DrawVisibleMapDataPPUPosition
         and #$1E
         sta PPUADDR
 @KeepCopying2:
-        lda BGDataPage1,x
+        lda VisibleMapStripe1,x
         sta PPUDATA
         inx
         cpx #$30
@@ -7158,31 +7203,31 @@ DrawBGDataPage1:
         rts
 
 ; ----------------------------------------------------------------------------
-DrawBGDataPage2:
+DrawVisibleMapStripe2:
         lda PPUCTRL_MIRROR
         ora #%00000100                      ; set vertical rendering
         sta PPUCTRL_MIRROR
         sta PPUCTRL
         lda #$20
         sta PPUADDR
-        lda BGDataDrawOffset
+        lda DrawVisibleMapDataPPUPosition
         ora #$01
         sta PPUADDR
         ldx #$00
 @KeepCopying1:
-        lda BGDataPage2,x
+        lda VisibleMapStripe2,x
         sta PPUDATA
         inx
         cpx #$1A
         bcc @KeepCopying1
         lda #$28
         sta PPUADDR
-        lda BGDataDrawOffset
+        lda DrawVisibleMapDataPPUPosition
         and #$1E
         ora #$01
         sta PPUADDR
 @KeepCopying2:
-        lda BGDataPage2,x
+        lda VisibleMapStripe2,x
         sta PPUDATA
         inx
         cpx #$30
@@ -7190,15 +7235,15 @@ DrawBGDataPage2:
         rts
 
 ; ----------------------------------------------------------------------------
-DrawBGDataPage3:
+DrawVisibleMapAttributes:
         ldx #$00
-        ldy $046E
+        ldy DrawVisibleMapAttrPPUPosition
 @KeepDrawing:
         ; set ppu to $23YY
         lda #$23
         sta PPUADDR
         sty PPUADDR
-        lda BGDataPage3,x
+        lda VisibleMapAttributes,x
         sta PPUDATA
         tya
         clc
@@ -7207,7 +7252,7 @@ DrawBGDataPage3:
         inx
         cpx #$07
         bcc @KeepDrawing
-        lda $046E
+        lda DrawVisibleMapAttrPPUPosition
         and #$C7
         tay
 @KeepDrawing2:
@@ -7215,7 +7260,7 @@ DrawBGDataPage3:
         lda #$2B
         sta PPUADDR
         sty PPUADDR
-        lda BGDataPage3,x
+        lda VisibleMapAttributes,x
         sta PPUDATA
         tya
         clc
@@ -7228,8 +7273,9 @@ DrawBGDataPage3:
 
 ; ----------------------------------------------------------------------------
 DrawBGMapRight1:
-        jsr DrawBGDataPage1
-        jsr DrawBGDataPage3
+        ; when the player moves to the right we draw stripe1 then stripe2
+        jsr DrawVisibleMapStripe1
+        jsr DrawVisibleMapAttributes
         ; continue to DrawBGMapRight2
         lda #$02
         sta NextBGUpdate
@@ -7237,15 +7283,16 @@ DrawBGMapRight1:
 
 ; ----------------------------------------------------------------------------
 DrawBGMapRight2:
-        jsr DrawBGDataPage2
+        jsr DrawVisibleMapStripe2
         lda #$00
         sta NextBGUpdate
         rts
 
 ; ----------------------------------------------------------------------------
 DrawBGMapLeft1:
-        jsr DrawBGDataPage2
-        jsr DrawBGDataPage3
+        ; when the player moves to the left we draw stripe2 then stripe1
+        jsr DrawVisibleMapStripe2
+        jsr DrawVisibleMapAttributes
         ; continue to DrawBGMapLeft2
         lda #$04
         sta NextBGUpdate
@@ -7253,7 +7300,7 @@ DrawBGMapLeft1:
 
 ; ----------------------------------------------------------------------------
 DrawBGMapLeft2:
-        jsr DrawBGDataPage1
+        jsr DrawVisibleMapStripe1
         lda #$00
         sta NextBGUpdate
         rts
@@ -7472,10 +7519,10 @@ LoadEncounterBackground:
         rol a
         tax
         lda @TempDataPointer
-        adc #<EncounterMetaTiles
+        adc #<Metatiles
         sta @TempDataPointer
         txa
-        adc #>EncounterMetaTiles
+        adc #>Metatiles
         sta @TempDataPointer+1
         rts
 
@@ -10256,7 +10303,7 @@ EncounterTypeSettings:
 ;  - FFFD COUNT ... - denotes a copy section, followed by 1 byte for how many copies to draw, then the bytes to draw
 ;  - FFFE - decrements the copy count and returns to the last FFFD section
 ;  - FFFF W H METATILE - draws a WxH section of the metatile
-;  - FFxx - FF followed by any other number skips the ppu ahead that many metatiles (2x2 tiles)
+;  - FFxx - FF followed by any other number skips the ppu ahead that many Metatiles (2x2 tiles)
 ;
 ; any data outside of these sections are metatile identifiers, drawn at the ppu position
 
@@ -11618,7 +11665,7 @@ EnterFinaleScreen:
         lda #$00
         sta FinalePlayerPosition
 @ClearBGData:
-        sta BGDataPage1,x
+        sta VisibleMapStripe1,x
         dex
         bpl @ClearBGData
         ; play music sound and enable rendering!
@@ -12932,21 +12979,18 @@ CopyTextPause:
         .byte $20 ; length
         .byte "             PAUSE              "
 
-; unused?
-.byte $00,$00,$00,$00
-.byte $00,$FF,$FF,$FF,$FF,$FC,$F8,$F0 ; F6C7 00 FF FF FF FF FC F8 F0  ........
-.byte $E3,$00,$00,$00,$00,$00,$00,$00 ; F6CF E3 00 00 00 00 00 00 00  ........
-.byte $00,$87,$E1,$C0,$00,$00,$00,$80 ; F6D7 00 87 E1 C0 00 00 00 80  ........
-.byte $00,$00,$00,$00,$00,$00,$00,$00 ; F6DF 00 00 00 00 00 00 00 00  ........
-.byte $00,$EF,$8E,$88,$00,$00,$00,$00 ; F6E7 00 EF 8E 88 00 00 00 00  ........
-.byte $00,$00,$00,$00,$00,$00,$00,$00 ; F6EF 00 00 00 00 00 00 00 00  ........
-.byte $00,$FF,$0F,$03,$07,$03,$00,$00 ; F6F7 00 FF 0F 03 07 03 00 00  ........
-.byte $00
-        
-        
+; unused
+.byte $00,$00,$00,$00,$00,$FF,$FF,$FF
+.byte $FF,$FC,$F8,$F0,$E3,$00,$00,$00
+.byte $00,$00,$00,$00,$00,$87,$E1,$C0
+.byte $00,$00,$00,$80,$00,$00,$00,$00
+.byte $00,$00,$00,$00,$00,$EF,$8E,$88
+.byte $00,$00,$00,$00,$00,$00,$00,$00
+.byte $00,$00,$00,$00,$00,$FF,$0F,$03
+.byte $07,$03,$00,$00,$00
 
-WorldMapData:
 ; first byte is top left of the map, descends in Y order, each line is full height of the map.
+WorldMapData:
 .byte $78,$78,$47,$48,$46,$49,$47,$48,$73,$34,$80,$3F,$80,$80,$80,$80,$3C,$1E,$82,$05,$35,$23,$20,$13
 .byte $40,$41,$43,$40,$49,$4A,$60,$78,$73,$1B,$24,$80,$80,$80,$80,$2F,$3D,$1D,$0D,$06,$36,$05,$35,$31
 .byte $78,$42,$44,$40,$45,$48,$65,$67,$64,$74,$72,$3A,$80,$10,$13,$80,$80,$3C,$08,$09,$28,$03,$36,$23
@@ -12999,22 +13043,17 @@ WorldMapDataAttributes:
 .byte $AA,$FA,$AF,$BA,$BB,$BB,$AA,$6A,$56,$55,$55,$55,$05
 .byte $AA,$AA,$AA,$AA,$AA,$AA,$AA,$5A,$55,$55,$55,$55,$05
 
-MapMetaTiles:
-.byte $03,$03,$07,$07
-.byte $03,$00,$00,$00
-.byte $03,$03,$07,$07
-.byte $03,$00,$00,$00
-.byte $80,$80,$C0,$C0
-.byte $80,$00,$00,$00
-.byte $80,$80,$C0,$C0
-.byte $80,$00,$00,$00
-.byte $00,$00,$00,$00
-.byte $00,$00,$00,$00
-.byte $00,$00,$00,$00
-.byte $00,$00,$00,$00
+; unused?
+.byte $03,$03,$07,$07,$03,$00,$00,$00
+.byte $03,$03,$07,$07,$03,$00,$00,$00
+.byte $80,$80,$C0,$C0,$80,$00,$00,$00
+.byte $80,$80,$C0,$C0,$80,$00,$00,$00
+.byte $00,$00,$00,$00,$00,$00,$00,$00
+.byte $00,$00,$00,$00,$00,$00,$00,$00
 
 ; im sure not all of these are the actual metatiles.. but whatever.
-EncounterMetaTiles:
+; a metatile is a block of 4 tiles that are drawn in a 2x2 square.
+Metatiles:
 .byte $01,$01,$01,$58 ; metatile $00
 .byte $FF,$FF,$FF,$FF ; metatile $01
 .byte $02,$10,$02,$02 ; metatile $02
@@ -13146,6 +13185,7 @@ EncounterMetaTiles:
 .byte $01,$01,$01,$01 ; metatile $80
 .byte $02,$02,$02,$02 ; metatile $81
 .byte $03,$03,$03,$03 ; metatile $82
+; these are used in encounters
 .byte $6C,$6D,$7C,$7D ; metatile $83
 .byte $6E,$6F,$7E,$7F ; metatile $84
 .byte $8C,$8D,$9C,$9D ; metatile $85
@@ -13198,15 +13238,17 @@ EncounterMetaTiles:
 .byte $4D,$4E,$5D,$5E ; metatile $B4
 .byte $4F,$59,$5F,$02 ; metatile $B5
 .byte $46,$40,$02,$02 ; metatile $B6
-.byte $00,$00,$00,$00 ; metatile $B7
-.byte $00,$00,$00,$00 ; metatile $B8
-.byte $00,$00,$00,$00 ; metatile $B9
-.byte $00,$00,$00,$00 ; metatile $BA
-.byte $00,$00,$00,$00 ; metatile $BB
-.byte $00,$00,$00,$00 ; metatile $BC
-.byte $00,$00,$00,$00 ; metatile $BD
-.byte $00,$00,$00,$00 ; metatile $BE
-.byte $00,$00,$00,$00 ; metatile $BF
+
+; unused
+.byte $00,$00,$00,$00
+.byte $00,$00,$00,$00
+.byte $00,$00,$00,$00
+.byte $00,$00,$00,$00
+.byte $00,$00,$00,$00
+.byte $00,$00,$00,$00
+.byte $00,$00,$00,$00
+.byte $00,$00,$00,$00
+.byte $00,$00,$00,$00
 
 WorldMapFlags:
 .byte $66,$66,$66,$66,$66,$66,$40,$00,$00,$00,$00,$00,$00,$00,$00,$00
@@ -13235,25 +13277,26 @@ WorldMapFlags:
 .byte $44,$46,$64,$44,$40,$00,$00,$00,$04,$44,$66,$66,$66,$66,$66,$66
 
 AwardPointsTable:
-        .byte  $00,$00,$00,$00,$00,$01
-        .byte  $00,$00,$00,$00,$00,$02
-        .byte  $00,$00,$00,$00,$00,$03
-        .byte  $00,$00,$00,$00,$00,$04
-        .byte  $00,$00,$00,$00,$00,$05
-        .byte  $00,$00,$00,$00,$00,$08
-        .byte  $00,$00,$00,$00,$01,$00
-        .byte  $00,$00,$00,$00,$01,$05
-        .byte  $00,$00,$00,$00,$02,$00
-        .byte  $00,$00,$00,$00,$03,$00
-        .byte  $00,$00,$00,$00,$05,$00
-        .byte  $00,$00,$00,$00,$08,$00
-        .byte  $00,$00,$00,$01,$00,$00
-        .byte  $00,$00,$00,$01,$05,$00
-        .byte  $00,$00,$00,$02,$00,$00
-        .byte  $00,$00,$00,$03,$00,$00
-        .byte  $00,$00,$00,$05,$00,$00
-        .byte  $00,$00,$01,$00,$00,$00
+.byte  $00,$00,$00,$00,$00,$01
+.byte  $00,$00,$00,$00,$00,$02
+.byte  $00,$00,$00,$00,$00,$03
+.byte  $00,$00,$00,$00,$00,$04
+.byte  $00,$00,$00,$00,$00,$05
+.byte  $00,$00,$00,$00,$00,$08
+.byte  $00,$00,$00,$00,$01,$00
+.byte  $00,$00,$00,$00,$01,$05
+.byte  $00,$00,$00,$00,$02,$00
+.byte  $00,$00,$00,$00,$03,$00
+.byte  $00,$00,$00,$00,$05,$00
+.byte  $00,$00,$00,$00,$08,$00
+.byte  $00,$00,$00,$01,$00,$00
+.byte  $00,$00,$00,$01,$05,$00
+.byte  $00,$00,$00,$02,$00,$00
+.byte  $00,$00,$00,$03,$00,$00
+.byte  $00,$00,$00,$05,$00,$00
+.byte  $00,$00,$01,$00,$00,$00
 
+; unused
 .byte   $70,$FF,$FF,$FF,$3C,$3C
 .byte   $3C,$FC,$FC,$FC,$F8,$E0
 .byte   $DF,$DF
