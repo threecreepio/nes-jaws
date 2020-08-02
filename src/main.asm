@@ -38,8 +38,8 @@ SoundtestSelected     = $00
 BonusEncounterPtr = $50
 BonusEncounterOffset = $52
 BonusCurrentWave = $53
-BonusNumberOfEnemiesHit = $54
-BonusScreenV4 = $55
+BonusEnemiesHit = $54
+BonusEnemiesHitInWave = $55
 
 ; this flag is raised during NMI.
 ; it's used in the main loops of each screen
@@ -243,6 +243,11 @@ EntityHitDetection          = $1F
 EntityMapJawsHeading             = $14
 EntityMapPrevJawsHeading         = $15
 EntityEncounterJawsSpawnTimer    = $14
+
+EntityBonusJellyStartingIndex = $14
+EntityBonusJellyAnimationPathIndex = $15
+EntityBonusJellyPathPointer = $18
+
 
 
 EntityHitEnabled        = %00000001
@@ -5632,7 +5637,7 @@ RunEntityJellyfish:
         ; mark the animation to end, and play death animation.
         lda #%10000000
         sta Workset + EntityAnimationIndex
-        lda #AnimationEncounterBubble
+        lda #AnimationEncounterJellyfishDeath
         jmp WorksetAnimationPlay
 
 ; ----------------------------------------------------------------------------
@@ -5741,7 +5746,7 @@ RunEntityHomingJellyfish:
         ; mark the animation to end, and play death animation.
         lda #%10000000
         sta Workset + EntityAnimationIndex
-        lda #AnimationEncounterBubble
+        lda #AnimationEncounterJellyfishDeath
         jmp WorksetAnimationPlay
 ; duplicate crab / star spawn code.
 @SpawnEntityCrabOrStar:
@@ -7497,7 +7502,7 @@ AnimationMapJawsDN                   = $13
 AnimationMapJawsDS                   = $14
 AnimationMapJawsEmergeEW             = $15
 AnimationMapJawsEmergeNS           = $16
-AnimationEncounterJellyfishDeath     = $17
+AnimationBonusJellyfish     = $17
 AnimationMapJawsEmergeDN           = $18
 AnimationMapJawsEmergeDS           = $19
 AnimationMapJawsSubmergeEW           = $1A
@@ -7531,7 +7536,7 @@ AnimationEncounter500Points          = $35
 AnimationEncounter1000Points         = $36
 AnimationEncounter2000Points         = $37
 AnimationEncounterJellyfish          = $38
-AnimationEncounterBubble             = $39
+AnimationEncounterJellyfishDeath     = $39
 AnimationUnused6                     = $3A
 AnimationUnused7                     = $3B
 AnimationEncounterStingray           = $3C
@@ -7560,7 +7565,7 @@ AnimationPointers:
   .addr @AnimationMapJawsDS
   .addr @AnimationMapJawsEmergeEW
   .addr @AnimationMapJawsEmergeNS
-  .addr @AnimationEncounterJellyfishDeath
+  .addr @AnimationBonusJellyfish
   .addr @AnimationMapJawsEmergeDN
   .addr @AnimationMapJawsEmergeDS
   .addr @AnimationMapJawsSubmergeEW
@@ -7594,7 +7599,7 @@ AnimationPointers:
   .addr @AnimationEncounter1000Points
   .addr @AnimationEncounter2000Points
   .addr @AnimationEncounterJellyfish
-  .addr @AnimationEncounterBubble
+  .addr @AnimationEncounterJellyfishDeath
   .addr @AnimationUnused6
   .addr @AnimationUnused7
   .addr @AnimationEncounterStingray
@@ -7872,7 +7877,7 @@ AnimationPointers:
 .addr SpritesetEncounterJellyfish3
 .byte $00
 .addr SpritesetEncounterJellyfish2
-@AnimationEncounterJellyfishDeath:
+@AnimationBonusJellyfish:
 .byte $08
 .addr SpritesetEncounterJellyfish1
 .byte $04
@@ -7882,7 +7887,7 @@ AnimationPointers:
 .byte $08
 .addr SpritesetEncounterJellyfish2
 .byte $ff
-@AnimationEncounterBubble:
+@AnimationEncounterJellyfishDeath:
 .byte $02
 .addr SpritesetEncounterBubble5
 .byte $02
@@ -10487,7 +10492,7 @@ RunBonusScreen:
         lda #$00
         sta BonusEncounterOffset
         sta BonusCurrentWave
-        sta BonusNumberOfEnemiesHit
+        sta BonusEnemiesHit
         jsr PPUEnableNMI
         jsr PPUEnableAndWaitFor1Frame
 @RunBonusScreen:
@@ -10554,7 +10559,7 @@ RunBonusScreen:
         sta VRAMBuffer,x
         inx
         ; get number of enemies that were hit.
-        lda BonusNumberOfEnemiesHit
+        lda BonusEnemiesHit
         ; convert number to BCD, then Ascii, then draw.
         jsr ConvertAToBCD
         jsr MoveAAndYToAsciiTable
@@ -10591,7 +10596,7 @@ RunBonusScreen:
         sta VRAMBuffer,x
         inx
         ; award 1 shell for every 3rd enemy killed
-        lda BonusNumberOfEnemiesHit
+        lda BonusEnemiesHit
         ldy #$00
 @CountShellsToAward:
         cmp #$03
@@ -10635,7 +10640,7 @@ RunBonusScreen:
         ora #DrawStatusbarShellsFlag
         sta PendingBGUpdates
         ; check if player hit all of the enemies.
-        lda BonusNumberOfEnemiesHit
+        lda BonusEnemiesHit
         cmp #$1E
         bcs @PlayerHitAllBonusEnemies
         ; if they did not, play a happy little sound, then exit after delaying for a bit.
@@ -10973,21 +10978,22 @@ BonusRunJellyfish:
         bne @SpawnNextEnemy
         inc BonusCurrentWave
         lda #$00
-        sta BonusScreenV4
+        sta BonusEnemiesHitInWave
         rts
 
 ; ----------------------------------------------------------------------------
 BonusRunSingleJellyfish:
         bit Workset + EntityHeader
-        bvs @AlreadyInitialized
+        bvs @Initialized
         lda #(EntityHeaderActive | EntityHeader7)
         sta Workset + EntityHeader
         ; get jellyfish offset into starting position table.
-        lda Workset + EntityAnimationIndex
+        lda Workset + EntityBonusJellyStartingIndex
         and #$1F
         asl a
         asl a
         tax
+        ; and load our starting position
         lda BonusJellyfishStartingPositions,x
         sta Workset + EntityX
         lda BonusJellyfishStartingPositions+1,x
@@ -10996,61 +11002,64 @@ BonusRunSingleJellyfish:
         sta Workset + EntityY
         lda BonusJellyfishStartingPositions+3,x
         sta Workset + EntityY + 1
-        lda Workset + EntityActiveAnimationIndex
+        ; load our starting position in the animation path table
+        lda Workset + EntityBonusJellyAnimationPathIndex
         asl a
         tax
-        lda LD616,x
-        sta Workset + EntityV18
-        lda LD617,x
-        sta Workset + EntityV19
+        lda BonusJellyPathPointers,x
+        sta Workset + EntityBonusJellyPathPointer
+        lda BonusJellyPathPointers+1,x
+        sta Workset + EntityBonusJellyPathPointer+1
+        ; clear out some settings
         lda #$00
-        sta Workset + EntityActiveAnimationIndex
+        sta Workset + EntityBonusJellyAnimationPathIndex
         sta Workset + EntityV1A
         sta Workset + EntityV1D
-        lda #AnimationEncounterJellyfishDeath
+        ; and play our animation
+        lda #AnimationBonusJellyfish
         jmp WorksetAnimationPlay
-@AlreadyInitialized:
-        bit Workset + EntityV1D                             ; D355 24 3D                    $=
-        bpl LD35C                           ; D357 10 03                    ..
-        jmp LD4B8                           ; D359 4C B8 D4                 L..
+@Initialized:
+        bit Workset + EntityV1D
+        bpl @LD35C
+        jmp @LD4B8
 
 ; ----------------------------------------------------------------------------
-LD35C:
-        bit     Workset + EntityActiveAnimationIndex                             ; D35C 24 35                    $5
-        bmi     LD377                           ; D35E 30 17                    0.
-        lda     Workset + EntityV16                            ; D360 A5 36                    .6
-        sec                                     ; D362 38                       8
-        sbc     #$01                            ; D363 E9 01                    ..
-        sta     Workset + EntityV16                            ; D365 85 36                    .6
-        lda     Workset + EntityV17                            ; D367 A5 37                    .7
-        sbc     #$00                            ; D369 E9 00                    ..
-        sta     Workset + EntityV17                            ; D36B 85 37                    .7
-        bpl     LD376                           ; D36D 10 07                    ..
-        lda     #$80                            ; D36F A9 80                    ..
-        sta     Workset + EntityActiveAnimationIndex                             ; D371 85 35                    .5
-        jmp     LD468                           ; D373 4C 68 D4                 Lh.
+@LD35C:
+        bit Workset + EntityBonusJellyAnimationPathIndex
+        bmi @AnimationComplete
+        lda Workset + EntityV16
+        sec
+        sbc #$01
+        sta Workset + EntityV16
+        lda Workset + EntityV17
+        sbc #$00
+        sta Workset + EntityV17
+        bpl @Exit
+        lda #$80
+        sta Workset + EntityBonusJellyAnimationPathIndex
+        jmp @LD468
 
 ; ----------------------------------------------------------------------------
-LD376:
+@Exit:
         rts                                     ; D376 60                       `
 
 ; ----------------------------------------------------------------------------
-LD377:
+@AnimationComplete:
         ldx     #$00                            ; D377 A2 00                    ..
         lda     #$03                            ; D379 A9 03                    ..
         sta     $47                             ; D37B 85 47                    .G
-LD37D:
+@LD37D:
         lda     $06A0,x                         ; D37D BD A0 06                 ...
-        bpl     LD3A5                           ; D380 10 23                    .#
+        bpl     @LD3A5                           ; D380 10 23                    .#
         asl     a                               ; D382 0A                       .
-        bpl     LD3A5                           ; D383 10 20                    . 
+        bpl     @LD3A5                           ; D383 10 20                    . 
         lda     $06A2,x                         ; D385 BD A2 06                 ...
         sec                                     ; D388 38                       8
         sbc     Workset + EntityX                             ; D389 E5 22                    ."
         tay                                     ; D38B A8                       .
         lda     $06A3,x                         ; D38C BD A3 06                 ...
         sbc     Workset + EntityX  + 1                            ; D38F E5 23                    .#
-        bcs     LD39F                           ; D391 B0 0C                    ..
+        bcs     @LD39F                           ; D391 B0 0C                    ..
         eor     #$FF                            ; D393 49 FF                    I.
         pha                                     ; D395 48                       H
         tya                                     ; D396 98                       .
@@ -11059,22 +11068,22 @@ LD37D:
         tay                                     ; D39B A8                       .
         pla                                     ; D39C 68                       h
         adc     #$00                            ; D39D 69 00                    i.
-LD39F:
-        bne     LD3A5                           ; D39F D0 04                    ..
+@LD39F:
+        bne     @LD3A5                           ; D39F D0 04                    ..
         cpy     #$08                            ; D3A1 C0 08                    ..
-        bcc     LD3A8                           ; D3A3 90 03                    ..
-LD3A5:
-        jmp     LD432                           ; D3A5 4C 32 D4                 L2.
+        bcc     @LD3A8                           ; D3A3 90 03                    ..
+@LD3A5:
+        jmp     @LD432                           ; D3A5 4C 32 D4                 L2.
 
 ; ----------------------------------------------------------------------------
-LD3A8:
+@LD3A8:
         lda     $06A4,x                         ; D3A8 BD A4 06                 ...
         sec                                     ; D3AB 38                       8
         sbc     Workset + EntityY                             ; D3AC E5 24                    .$
         tay                                     ; D3AE A8                       .
         lda     $06A5,x                         ; D3AF BD A5 06                 ...
         sbc     Workset + EntityY + 1                             ; D3B2 E5 25                    .%
-        bcs     LD3C2                           ; D3B4 B0 0C                    ..
+        bcs     @LD3C2                           ; D3B4 B0 0C                    ..
         eor     #$FF                            ; D3B6 49 FF                    I.
         pha                                     ; D3B8 48                       H
         tya                                     ; D3B9 98                       .
@@ -11083,114 +11092,124 @@ LD3A8:
         tay                                     ; D3BE A8                       .
         pla                                     ; D3BF 68                       h
         adc     #$00                            ; D3C0 69 00                    i.
-LD3C2:
-        bne     LD432                           ; D3C2 D0 6E                    .n
+@LD3C2:
+        bne     @LD432                           ; D3C2 D0 6E                    .n
         cpy     #$08                            ; D3C4 C0 08                    ..
-        bcs     LD432                           ; D3C6 B0 6A                    .j
+        bcs     @LD432                           ; D3C6 B0 6A                    .j
         lda     $06BF,x                         ; D3C8 BD BF 06                 ...
         ora     #$80                            ; D3CB 09 80                    ..
         sta     $06BF,x                         ; D3CD 9D BF 06                 ...
-        inc     BonusNumberOfEnemiesHit                             ; D3D0 E6 54                    .T
-        ldx     BonusScreenV4                             ; D3D2 A6 55                    .U
-        inc     BonusScreenV4                             ; D3D4 E6 55                    .U
-        lda     LD4D8,x                         ; D3D6 BD D8 D4                 ...
-        sta     Workset + EntityV1C                             ; D3D9 85 3C                    .<
-        lda     LD4DD,x                         ; D3DB BD DD D4                 ...
-        jsr     AwardPoints                           ; D3DE 20 D0 8C                  ..
-        lda     #$80                            ; D3E1 A9 80                    ..
-        sta     Workset + EntityV1D                             ; D3E3 85 3D                    .=
-        lda     #$00                            ; D3E5 A9 00                    ..
-        sta     Workset + EntityYSubspeed                            ; D3E7 85 32                    .2
-        lda     #$FF                            ; D3E9 A9 FF                    ..
-        sta     Workset + EntityYSpeed                             ; D3EB 85 33                    .3
-        lda     #$00                            ; D3ED A9 00                    ..
-        sta     VRAMBufferActive                           ; D3EF 8D 00 01                 ...
-        ldx     VRAMBufferOffset                           ; D3F2 AE 01 01                 ...
-        lda     #$AB                            ; D3F5 A9 AB                    ..
-        sta     VRAMBuffer,x                         ; D3F7 9D 02 01                 ...
-        inx                                     ; D3FA E8                       .
-        lda     #$91                            ; D3FB A9 91                    ..
-        sta     VRAMBuffer,x                         ; D3FD 9D 02 01                 ...
-        inx                                     ; D400 E8                       .
-        lda     #$02                            ; D401 A9 02                    ..
-        sta     VRAMBuffer,x                         ; D403 9D 02 01                 ...
-        inx                                     ; D406 E8                       .
-        lda     $54                             ; D407 A5 54                    .T
-        jsr     ConvertAToBCD                           ; D409 20 39 D1                  9.
-        jsr     MoveAAndYToAsciiTable                           ; D40C 20 46 D1                  F.
-        sta     VRAMBuffer+1,x                         ; D40F 9D 03 01                 ...
-        tya                                     ; D412 98                       .
-        sta     VRAMBuffer,x                         ; D413 9D 02 01                 ...
-        inx                                     ; D416 E8                       .
-        inx                                     ; D417 E8                       .
-        stx     VRAMBufferOffset                           ; D418 8E 01 01                 ...
-        lda     #$80                            ; D41B A9 80                    ..
-        sta     VRAMBufferActive                           ; D41D 8D 00 01                 ...
-        lda     PendingBGUpdates                           ; D420 AD 04 03                 ...
-        ora     #DrawVRAMBufferFlag                            ; D423 09 10                    ..
-        sta     PendingBGUpdates                           ; D425 8D 04 03                 ...
-        lda     #SFXEncounterEnemyDeath                            ; D428 A9 0E                    ..
-        jsr     SoundPlay                           ; D42A 20 CD E2                  ..
-        lda     #AnimationEncounterBubble                            ; D42D A9 39                    .9
-        jmp     WorksetAnimationPlay                           ; D42F 4C AD 97                 L..
+        ; increment the bonus stage hit counter
+        inc BonusEnemiesHit
+        ; increment wave hit counter
+        ldx BonusEnemiesHitInWave
+        inc BonusEnemiesHitInWave
+        ; get animation for points to award
+        lda @PointAnimations,x
+        sta Workset + EntityV1C
+        ; and award points to the player
+        lda @PointAmounts,x
+        jsr AwardPoints
+        ; clear some settings
+        lda #$80
+        sta Workset + EntityV1D
+        lda #$00
+        sta Workset + EntityYSubspeed
+        ; move upward during death sequence
+        lda #$FF
+        sta Workset + EntityYSpeed
+        ; update ui with new hit counter
+        ; disable vram buffer
+        lda #$00
+        sta VRAMBufferActive
+        ldx VRAMBufferOffset
+        ; set vram to render at 2B91
+        lda #$2B | VRAMFlagMultipleBytes
+        sta VRAMBuffer,x
+        inx
+        lda #$91
+        sta VRAMBuffer,x
+        inx
+        lda #$02
+        sta VRAMBuffer,x
+        inx
+        ; load bonus enemies hit, convert it to BCD, then to Ascii
+        lda BonusEnemiesHit
+        jsr ConvertAToBCD
+        jsr MoveAAndYToAsciiTable
+        ; and write out number
+        sta VRAMBuffer+1,x
+        tya
+        sta VRAMBuffer,x
+        inx
+        inx
+        stx VRAMBufferOffset
+        ; activate vram buffer
+        lda #$80
+        sta VRAMBufferActive
+        ; mark vram buffer date
+        lda PendingBGUpdates
+        ora #DrawVRAMBufferFlag
+        sta PendingBGUpdates
+        ; and play death animations
+        lda #SFXEncounterEnemyDeath
+        jsr SoundPlay
+        lda #AnimationEncounterJellyfishDeath
+        jmp WorksetAnimationPlay
+@LD432:
+        txa
+        clc
+        adc #$20
+        tax
+        dec $47
+        beq @LD43E
+        jmp @LD37D
+@LD43E:
+        jsr WorksetAnimationAdvance
+        jsr WorksetMoveX
+        jsr WorksetMoveY
+        bit Workset + EntityActiveAnimationIndex
+        bvs @LD458
+        lda #$01
+        bit Workset + EntityHitDetection
+        beq @LD463
+        lda #$C0
+        sta Workset + EntityActiveAnimationIndex
+        jmp @LD463
 
 ; ----------------------------------------------------------------------------
-LD432:
-        txa                                     ; D432 8A                       .
-        clc                                     ; D433 18                       .
-        adc     #$20                            ; D434 69 20                    i 
-        tax                                     ; D436 AA                       .
-        dec     $47                             ; D437 C6 47                    .G
-        beq     LD43E                           ; D439 F0 03                    ..
-        jmp     LD37D                           ; D43B 4C 7D D3                 L}.
-
-; ----------------------------------------------------------------------------
-LD43E:
-        jsr     WorksetAnimationAdvance                           ; D43E 20 BE 97                  ..
-        jsr     WorksetMoveX                           ; D441 20 FA 97                  ..
-        jsr     WorksetMoveY                           ; D444 20 1B 98                  ..
-        bit     Workset + EntityActiveAnimationIndex                             ; D447 24 35                    $5
-        bvs     LD458                           ; D449 70 0D                    p.
-        lda     #$01                            ; D44B A9 01                    ..
-        bit     Workset + EntityHitDetection                             ; D44D 24 3F                    $?
-        beq     LD463                           ; D44F F0 12                    ..
-        lda     #$C0                            ; D451 A9 C0                    ..
-        sta     Workset + EntityActiveAnimationIndex                             ; D453 85 35                    .5
-        jmp     LD463                           ; D455 4C 63 D4                 Lc.
-
-; ----------------------------------------------------------------------------
-LD458:
+@LD458:
         lda     #$01                            ; D458 A9 01                    ..
         bit     Workset + EntityHitDetection                             ; D45A 24 3F                    $?
-        bne     LD463                           ; D45C D0 05                    ..
+        bne     @LD463                           ; D45C D0 05                    ..
         .byte   $A9,$00,$85,$20,$60             ; D45E A9 00 85 20 60           ... `
 ; ----------------------------------------------------------------------------
-LD463:
+@LD463:
         dec     Workset + EntityV16                            ; D463 C6 36                    .6
-        beq     LD468                           ; D465 F0 01                    ..
+        beq     @LD468                           ; D465 F0 01                    ..
         rts                                     ; D467 60                       `
 
 ; ----------------------------------------------------------------------------
-LD468:
+@LD468:
         lda     #$00                            ; D468 A9 00                    ..
         sta     Workset + EntityXSpeed                             ; D46A 85 31                    .1
         sta     Workset + EntityYSpeed                             ; D46C 85 33                    .3
         ldy     Workset + EntityV1A                             ; D46E A4 3A                    .:
-        lda     ($38),y                         ; D470 B1 38                    .8
-        bne     LD479                           ; D472 D0 05                    ..
+        lda     (Workset + EntityBonusJellyPathPointer),y                         ; D470 B1 38                    .8
+        bne     @LD479                           ; D472 D0 05                    ..
         .byte   $A9,$00,$85,$20,$60             ; D474 A9 00 85 20 60           ... `
 ; ----------------------------------------------------------------------------
-LD479:
+@LD479:
         iny                                     ; D479 C8                       .
         sta     Workset + EntityV16                            ; D47A 85 36                    .6
-        lda     ($38),y                         ; D47C B1 38                    .8
+        lda     (Workset + EntityBonusJellyPathPointer),y                         ; D47C B1 38                    .8
         iny                                     ; D47E C8                       .
         sty     Workset + EntityV1A                             ; D47F 84 3A                    .:
         asl     a                               ; D481 0A                       .
-        bcc     LD486                           ; D482 90 02                    ..
+        bcc     @LD486                           ; D482 90 02                    ..
         .byte   $C6,$31                         ; D484 C6 31                    .1
 ; ----------------------------------------------------------------------------
-LD486:
+@LD486:
         asl     a                               ; D486 0A                       .
         rol     Workset + EntityXSpeed                             ; D487 26 31                    &1
         asl     a                               ; D489 0A                       .
@@ -11201,16 +11220,16 @@ LD486:
         tya                                     ; D491 98                       .
         asl     a                               ; D492 0A                       .
         asl     a                               ; D493 0A                       .
-        bcc     LD498                           ; D494 90 02                    ..
+        bcc     @LD498                           ; D494 90 02                    ..
         dec     Workset + EntityYSpeed                             ; D496 C6 33                    .3
-LD498:
+@LD498:
         asl     a                               ; D498 0A                       .
         rol     Workset + EntityYSpeed                             ; D499 26 33                    &3
         asl     a                               ; D49B 0A                       .
         rol     Workset + EntityYSpeed                             ; D49C 26 33                    &3
         sta     Workset + EntityYSubspeed                            ; D49E 85 32                    .2
         bit     $34                             ; D4A0 24 34                    $4
-        bpl     LD4B7                           ; D4A2 10 13                    ..
+        bpl     @LD4B7                           ; D4A2 10 13                    ..
         lda     Workset + EntityXSpeed                             ; D4A4 A5 31                    .1
         eor     #$FF                            ; D4A6 49 FF                    I.
         tay                                     ; D4A8 A8                       .
@@ -11222,11 +11241,11 @@ LD498:
         tya                                     ; D4B2 98                       .
         adc     #$00                            ; D4B3 69 00                    i.
         sta     Workset + EntityXSpeed                             ; D4B5 85 31                    .1
-LD4B7:
+@LD4B7:
         rts                                     ; D4B7 60                       `
 
 ; ----------------------------------------------------------------------------
-LD4B8:
+@LD4B8:
         jsr     WorksetAnimationAdvance
         jsr     WorksetMoveY
         bit     Workset + EntityV1D
@@ -11246,11 +11265,18 @@ LD4B8:
         rts
 
 ; ----------------------------------------------------------------------------
-LD4D8:
-        .byte   $32,$32,$33,$34,$35             ; D4D8 32 32 33 34 35           22345
-LD4DD:
-        .byte   $04,$04,$06,$08,$0A
-        
+@PointAnimations:
+        .byte AnimationEncounter50Points
+        .byte AnimationEncounter50Points
+        .byte AnimationEncounter100Points
+        .byte AnimationEncounter200Points
+        .byte AnimationEncounter500Points
+@PointAmounts:
+        .byte $04,$04,$06,$08,$0A
+
+; one row for every bonus screen (8 total bonus screens in game)
+; every bonus screen has 6 waves with 5 enemies.
+; the values correspond to a row in the "BonusEncounterWaveSpawn" table.
 BonusScreenEncounterSettings:
         .byte $00,$01,$00,$01,$02,$03
         .byte $04,$05,$04,$05,$06,$07
@@ -11263,7 +11289,7 @@ BonusScreenEncounterSettings:
 
 ; spawn indexes from BonusJellyfishStartingPositions.
 ; every wave has one row. first byte is a flag, does something.
-; the rest are indices for BonusJellyfishStartingPositions, with high bit set to spawn
+; the rest are indices for "BonusJellyfishStartingPositions", with high bit set to spawn
 ; the jellyfish on the right side of the screen.
 BonusEncounterWaveSpawn:
         .byte $00,@L|$00,@L|$00,@L|$00,@L|$00,@L|$00
@@ -11305,7 +11331,6 @@ BonusEncounterWaveSpawn:
 @R = %10000000
 
 ; Used for setting starting positions of the bonus stage jellyfish
-;
 ; Each spawn position has 2 16-bit values, X then Y coordinates.
 BonusJellyfishStartingPositions:
         .word $1020, $00D8 ; 00
@@ -11328,51 +11353,199 @@ BonusJellyfishStartingPositions:
 
 
 ; probably bonus stage jellyfish animations
-LD616:
-        .byte   $36                             ; D616 36                       6
-LD617:
-        .byte   $D6,$3D,$D6,$66,$D6,$6D,$D6,$88 ; D617 D6 3D D6 66 D6 6D D6 88  .=.f.m..
-        .byte   $D6,$9F,$D6,$AA,$D6,$BD,$D6,$C6 ; D61F D6 9F D6 AA D6 BD D6 C6  ........
-        .byte   $D6,$D3,$D6,$E4,$D6,$EF,$D6,$04 ; D627 D6 D3 D6 E4 D6 EF D6 04  ........
-        .byte   $D7,$21,$D7,$32,$D7,$55,$D7,$40 ; D62F D7 21 D7 32 D7 55 D7 40  .!.2.U.@
-        .byte   $0C,$C0,$21,$80,$C0,$00,$30,$0E ; D637 0C C0 21 80 C0 00 30 0E  ..!...0.
-        .byte   $20,$1E,$20,$2E,$18,$4F,$08,$41 ; D63F 20 1E 20 2E 18 4F 08 41   . ..O.A
-        .byte   $08,$33,$08,$14,$08,$F4,$08,$D3 ; D647 08 33 08 14 08 F4 08 D3  .3......
-        .byte   $08,$C1,$08,$CF,$08,$DD,$08,$FC ; D64F 08 C1 08 CF 08 DD 08 FC  ........
-        .byte   $08,$1C,$08,$3D,$08,$4F,$18,$41 ; D657 08 1C 08 3D 08 4F 18 41  ...=.O.A
-        .byte   $20,$22,$20,$12,$30,$02,$00,$80 ; D65F 20 22 20 12 30 02 00 80   " .0...
-        .byte   $4E,$60,$C0,$80,$42,$00,$40,$0C ; D667 4E 60 C0 80 42 00 40 0C  N`..B.@.
-        .byte   $08,$4C,$10,$40,$08,$44,$20,$04 ; D66F 08 4C 10 40 08 44 20 04  .L.@.D .
-        .byte   $08,$44,$10,$40,$08,$4C,$20,$0C ; D677 08 44 10 40 08 4C 20 0C  .D.@.L .
-        .byte   $08,$4C,$10,$40,$08,$44,$40,$04 ; D67F 08 4C 10 40 08 44 40 04  .L.@.D@.
-        .byte   $00,$30,$0C,$04,$C0,$04,$CC,$08 ; D687 00 30 0C 04 C0 04 CC 08  .0......
-        .byte   $0C,$04,$4C,$08,$40,$04,$44,$08 ; D68F 0C 04 4C 08 40 04 44 08  ..L.@.D.
-        .byte   $04,$04,$C4,$04,$C0,$60,$02,$00 ; D697 04 04 C4 04 C0 60 02 00  .....`..
-        .byte   $40,$0C,$60,$41,$60,$C0,$60,$41 ; D69F 40 0C 60 41 60 C0 60 41  @.`A`.`A
-        .byte   $80,$C0,$00,$60,$0E,$10,$1E,$08 ; D6A7 80 C0 00 60 0E 10 1E 08  ...`....
-        .byte   $2E,$10,$2F,$10,$20,$10,$21,$08 ; D6AF 2E 10 2F 10 20 10 21 08  ../. .!.
-        .byte   $22,$10,$12,$60,$02,$00,$80,$4E ; D6B7 22 10 12 60 02 00 80 4E  "..`...N
-        .byte   $30,$04,$60,$CE,$40,$04,$00,$40 ; D6BF 30 04 60 CE 40 04 00 40  0.`.@..@
-        .byte   $4C,$30,$C0,$30,$44,$30,$4C,$30 ; D6C7 4C 30 C0 30 44 30 4C 30  L0.0D0L0
-        .byte   $C0,$40,$44,$00,$30,$2A,$20,$26 ; D6CF C0 40 44 00 30 2A 20 26  .@D.0* &
-        .byte   $20,$2A,$20,$26,$20,$2A,$20,$26 ; D6D7 20 2A 20 26 20 2A 20 26   * & * &
-        .byte   $20,$2A,$30,$26,$00,$40,$0C,$10 ; D6DF 20 2A 30 26 00 40 0C 10   *0&.@..
-        .byte   $20,$20,$E0,$10,$20,$80,$02,$00 ; D6E7 20 20 E0 10 20 80 02 00    .. ...
-        .byte   $70,$40,$08,$44,$08,$C4,$50,$C0 ; D6EF 70 40 08 44 08 C4 50 C0  p@.D..P.
-        .byte   $08,$C4,$08,$44,$50,$40,$08,$44 ; D6F7 08 C4 08 44 50 40 08 44  ...DP@.D
-        .byte   $08,$C4,$70,$C0,$00,$48,$40,$10 ; D6FF 08 C4 70 C0 00 48 40 10  ..p..H@.
-        .byte   $41,$08,$44,$10,$14,$10,$F4,$08 ; D707 41 08 44 10 14 10 F4 08  A.D.....
-        .byte   $C4,$10,$C1,$10,$CF,$08,$CC,$10 ; D70F C4 10 C1 10 CF 08 CC 10  ........
-        .byte   $FC,$10,$1C,$08,$4C,$10,$4F,$48 ; D717 FC 10 1C 08 4C 10 4F 48  ....L.OH
-        .byte   $40,$00,$18,$40,$20,$31,$20,$22 ; D71F 40 00 18 40 20 31 20 22  @..@ 1 "
-        .byte   $20,$13,$20,$1D,$20,$2E,$20,$3F ; D727 20 13 20 1D 20 2E 20 3F   . . . ?
-        .byte   $18,$40,$00,$10,$40,$20,$06,$10 ; D72F 18 40 00 10 40 20 06 10  .@..@ ..
-        .byte   $40,$20,$0A,$10,$40,$20,$06,$10 ; D737 40 20 0A 10 40 20 06 10  @ ..@ ..
-        .byte   $40,$20,$0A,$10,$40,$20,$06,$10 ; D73F 40 20 0A 10 40 20 06 10  @ ..@ ..
-        .byte   $40,$20,$0A,$10,$40,$20,$06,$10 ; D747 40 20 0A 10 40 20 06 10  @ ..@ ..
-        .byte   $40,$20,$0A,$10,$40,$00,$18,$40 ; D74F 40 20 0A 10 40 00 18 40  @ ..@..@
-        .byte   $30,$04,$30,$4C,$30,$44,$30,$0C ; D757 30 04 30 4C 30 44 30 0C  0.0L0D0.
-        .byte   $18,$40,$00                     ; D75F 18 40 00                 .@.
+BonusJellyPathPointers:
+        .addr BonusJellyPath00
+        .addr BonusJellyPath01
+        .addr BonusJellyPath02
+        .addr BonusJellyPath03
+        .addr BonusJellyPath04
+        .addr BonusJellyPath05
+        .addr BonusJellyPath06
+        .addr BonusJellyPath07
+        .addr BonusJellyPath08
+        .addr BonusJellyPath09
+        .addr BonusJellyPath0A
+        .addr BonusJellyPath0B
+        .addr BonusJellyPath0C
+        .addr BonusJellyPath0D
+        .addr BonusJellyPath0E
+        .addr BonusJellyPath0F
+
+; each path has a series of two byte animation points.
+BonusJellyPath00:
+        .byte $40,$0C
+        .byte $C0,$21
+        .byte $80,$C0
+        .byte $00
+BonusJellyPath01:
+        .byte $30,$0E
+        .byte $20,$1E
+        .byte $20,$2E
+        .byte $18,$4F
+        .byte $08,$41
+        .byte $08,$33
+        .byte $08,$14
+        .byte $08,$F4
+        .byte $08,$D3
+        .byte $08,$C1
+        .byte $08,$CF
+        .byte $08,$DD
+        .byte $08,$FC
+        .byte $08,$1C
+        .byte $08,$3D
+        .byte $08,$4F
+        .byte $18,$41
+        .byte $20,$22
+        .byte $20,$12
+        .byte $30,$02
+        .byte $00
+BonusJellyPath02:
+        .byte $80,$4E
+        .byte $60,$C0
+        .byte $80,$42
+        .byte $00
+BonusJellyPath03:
+        .byte $40,$0C
+        .byte $08,$4C
+        .byte $10,$40
+        .byte $08,$44
+        .byte $20,$04
+        .byte $08,$44
+        .byte $10,$40
+        .byte $08,$4C
+        .byte $20,$0C
+        .byte $08,$4C
+        .byte $10,$40
+        .byte $08,$44
+        .byte $40,$04
+        .byte $00
+BonusJellyPath04:
+        .byte $30,$0C
+        .byte $04,$C0
+        .byte $04,$CC
+        .byte $08,$0C
+        .byte $04,$4C
+        .byte $08,$40
+        .byte $04,$44
+        .byte $08,$04
+        .byte $04,$C4
+        .byte $04,$C0
+        .byte $60,$02
+        .byte $00
+BonusJellyPath05:
+        .byte $40,$0C
+        .byte $60,$41
+        .byte $60,$C0
+        .byte $60,$41
+        .byte $80,$C0
+        .byte $00
+BonusJellyPath06:
+        .byte $60,$0E
+        .byte $10,$1E
+        .byte $08,$2E
+        .byte $10,$2F
+        .byte $10,$20
+        .byte $10,$21
+        .byte $08,$22
+        .byte $10,$12
+        .byte $60,$02
+        .byte $00
+BonusJellyPath07:
+        .byte $80,$4E
+        .byte $30,$04
+        .byte $60,$CE
+        .byte $40,$04
+        .byte $00
+BonusJellyPath08:
+        .byte $40,$4C
+        .byte $30,$C0
+        .byte $30,$44
+        .byte $30,$4C
+        .byte $30,$C0
+        .byte $40,$44
+        .byte $00
+BonusJellyPath09:
+        .byte $30,$2A
+        .byte $20,$26
+        .byte $20,$2A
+        .byte $20,$26
+        .byte $20,$2A
+        .byte $20,$26
+        .byte $20,$2A
+        .byte $30,$26
+        .byte $00
+BonusJellyPath0A:
+        .byte $40,$0C
+        .byte $10,$20
+        .byte $20,$E0
+        .byte $10,$20
+        .byte $80,$02
+        .byte $00
+BonusJellyPath0B:
+        .byte $70,$40
+        .byte $08,$44
+        .byte $08,$C4
+        .byte $50,$C0
+        .byte $08,$C4
+        .byte $08,$44
+        .byte $50,$40
+        .byte $08,$44
+        .byte $08,$C4
+        .byte $70,$C0
+        .byte $00
+BonusJellyPath0C:
+        .byte $48,$40
+        .byte $10,$41
+        .byte $08,$44
+        .byte $10,$14
+        .byte $10,$F4
+        .byte $08,$C4
+        .byte $10,$C1
+        .byte $10,$CF
+        .byte $08,$CC
+        .byte $10,$FC
+        .byte $10,$1C
+        .byte $08,$4C
+        .byte $10,$4F
+        .byte $48,$40
+        .byte $00
+BonusJellyPath0D:
+        .byte $18,$40
+        .byte $20,$31
+        .byte $20,$22
+        .byte $20,$13
+        .byte $20,$1D
+        .byte $20,$2E
+        .byte $20,$3F
+        .byte $18,$40
+        .byte $00
+BonusJellyPath0E:
+        .byte $10,$40
+        .byte $20,$06
+        .byte $10,$40
+        .byte $20,$0A
+        .byte $10,$40
+        .byte $20,$06
+        .byte $10,$40
+        .byte $20,$0A
+        .byte $10,$40
+        .byte $20,$06
+        .byte $10,$40
+        .byte $20,$0A
+        .byte $10,$40
+        .byte $20,$06
+        .byte $10,$40
+        .byte $20,$0A
+        .byte $10,$40
+        .byte $00
+BonusJellyPath0F:
+        .byte $18,$40
+        .byte $30,$04
+        .byte $30,$4C
+        .byte $30,$44
+        .byte $30,$0C
+        .byte $18,$40
+        .byte $00
 
 
 ; ----------------------------------------------------------------------------
