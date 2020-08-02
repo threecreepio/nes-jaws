@@ -4946,26 +4946,26 @@ MapRunJaws:
         ; check if header1 is set
         lda #EntityHeader1
         bit Workset + EntityHeader
-        bne @ContinueAnimating
-        bcs @Submerge
+        bne @PlayEmergeAnimations
+        bcs @PlaySubmergeAnimation
         bit Workset + EntityV17
-        bvs @Emerge
+        bvs @PlaySurfaceAnimation
         ; check if our desired animation is equal to our current animation
         lda Workset + EntityMapPrevJawsHeading
         cmp Workset + EntityMapJawsHeading
         ; and if so continue moving jaws
         beq @FinishJawsAction
-@Emerge:
+@PlaySurfaceAnimation:
         lda #$00
         sta Workset + EntityV17
         ldx #$08
         bne @UpdateJawsAnimation
-@Submerge:
+@PlaySubmergeAnimation:
         lda #%10000000
         sta Workset + EntityV17
         ldx #$10
         bne @UpdateJawsAnimation
-@ContinueAnimating:
+@PlayEmergeAnimations:
         bcs @FinishJawsAction
         lda #%01000000
         sta Workset + EntityV17
