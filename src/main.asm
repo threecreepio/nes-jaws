@@ -4956,17 +4956,20 @@ MapRunJaws:
         ; and if so continue moving jaws
         beq @FinishJawsAction
 @PlaySurfaceAnimation:
+        ; remain on surface
         lda #$00
         sta Workset + EntityV17
         ldx #$08
         bne @UpdateJawsAnimation
 @PlaySubmergeAnimation:
+        ; play submerge animation
         lda #%10000000
         sta Workset + EntityV17
         ldx #$10
         bne @UpdateJawsAnimation
 @PlayEmergeAnimations:
         bcs @FinishJawsAction
+        ; emerge from the depths!
         lda #%01000000
         sta Workset + EntityV17
         ldx #$00
@@ -5247,176 +5250,184 @@ EncounterRunJaws:
         jmp WorksetSave
 @JawsSpawn:
         lda Workset + EntityV18
-        beq LA02B
+        beq @NormalSpeed
         clc
         lda Workset + EntityXSpeed
-        bpl LA01D
+        bpl @DamageSlowdown
         sec
-LA01D:
+@DamageSlowdown:
         ror Workset + EntityXSpeed
         ror Workset + EntityXSubspeed
         jsr WorksetMoveX
         asl Workset + EntityXSubspeed
         rol Workset + EntityXSpeed
-        jmp LA02E
-
-; ----------------------------------------------------------------------------
-LA02B:
-        jsr     WorksetMoveX                           ; A02B 20 FA 97                  ..
-LA02E:
-        lda     Workset + EntityX  + 1                            ; A02E A5 23                    .#
-        cmp     #$10                            ; A030 C9 10                    ..
-        beq     LA045                           ; A032 F0 11                    ..
-        lda     Workset + EntityX                             ; A034 A5 22                    ."
-        bcs     LA040                           ; A036 B0 08                    ..
-        cmp     #$E0                            ; A038 C9 E0                    ..
-        bcs     LA045                           ; A03A B0 09                    ..
-        sec                                     ; A03C 38                       8
-        jmp     LA046                           ; A03D 4C 46 A0                 LF.
-
-; ----------------------------------------------------------------------------
-LA040:
-        cmp     #$20                            ; A040 C9 20                    . 
-        jmp     LA046                           ; A042 4C 46 A0                 LF.
-
-; ----------------------------------------------------------------------------
-LA045:
-        clc                                     ; A045 18                       .
-LA046:
-        bit     Workset + EntityV16                            ; A046 24 36                    $6
-        bmi     LA053                           ; A048 30 09                    0.
-        bcs     LA072                           ; A04A B0 26                    .&
-        lda     #$80                            ; A04C A9 80                    ..
-        sta     Workset + EntityV16                            ; A04E 85 36                    .6
-        jmp     LA075                           ; A050 4C 75 A0                 Lu.
-
-; ----------------------------------------------------------------------------
-LA053:
-        bcc     LA075                           ; A053 90 20                    . 
-        lda     #$00                            ; A055 A9 00                    ..
-        sta     Workset + EntityV16                            ; A057 85 36                    .6
-        lda     Workset + EntityHeader                             ; A059 A5 20                    . 
-        eor     #EntityHeaderFacingLeft                            ; A05B 49 10                    I.
-        sta     Workset + EntityHeader                             ; A05D 85 20                    . 
-        lda     Workset + EntityXSpeed                             ; A05F A5 31                    .1
-        eor     #$FF                            ; A061 49 FF                    I.
-        tay                                     ; A063 A8                       .
-        lda     Workset + EntityXSubspeed                             ; A064 A5 30                    .0
-        eor     #$FF                            ; A066 49 FF                    I.
-        clc                                     ; A068 18                       .
-        adc     #$01                            ; A069 69 01                    i.
-        sta     Workset + EntityXSubspeed                             ; A06B 85 30                    .0
-        tya                                     ; A06D 98                       .
-        adc     #$00                            ; A06E 69 00                    i.
-        sta     Workset + EntityXSpeed                             ; A070 85 31                    .1
-LA072:
-        jmp     WorksetSave                           ; A072 4C 61 97                 La.
-
-; ----------------------------------------------------------------------------
-LA075:
-        jsr     WorksetAnimationAdvance                           ; A075 20 BE 97                  ..
-        jsr     WorksetDetectProjectileHit                           ; A078 20 F8 98                  ..
-        jsr     CheckFlagsAndHitDetectAgainstPlayer                           ; A07B 20 40 99                  @.
-        lda     $38                             ; A07E A5 38                    .8
-        bne     LA0E3                           ; A080 D0 61                    .a
-        bit     Workset + EntityHitDetection                             ; A082 24 3F                    $?
-        bvc     LA0EE                           ; A084 50 68                    Ph
-        ldx     PlayerPowerLevel                           ; A086 AE 91 03                 ...
-        lda     JawsDamageByPowerLevel,x                         ; A089 BD 2D A1                 .-.
-        sta     $16                             ; A08C 85 16                    ..
-        lda     #$00                            ; A08E A9 00                    ..
-        sta     $17                             ; A090 85 17                    ..
-        ldx     HitDetectionProjectileType                           ; A092 AE 4A 03                 .J.
-        lda     JawsDamageMultipliers,x                         ; A095 BD 28 A1                 .(.
-        beq     LA09E                           ; A098 F0 04                    ..
-        asl     $16                             ; A09A 06 16                    ..
-        rol     $17                             ; A09C 26 17                    &.
-LA09E:
-        lda     JawsHP                           ; A09E AD 88 03                 ...
-        sec                                     ; A0A1 38                       8
-        sbc     $16                             ; A0A2 E5 16                    ..
-        sta     JawsHP                           ; A0A4 8D 88 03                 ...
-        lda     JawsHP+1                           ; A0A7 AD 89 03                 ...
-        sbc     $17                             ; A0AA E5 17                    ..
-        bpl     LA0B3                           ; A0AC 10 05                    ..
-        .byte   $A9,$00,$8D,$88,$03             ; A0AE A9 00 8D 88 03           .....
-; ----------------------------------------------------------------------------
-LA0B3:
-        sta     JawsHP+1                           ; A0B3 8D 89 03                 ...
-        ora     JawsHP                           ; A0B6 0D 88 03                 ...
-        bne     LA0C6                           ; A0B9 D0 0B                    ..
-        lda     EventFlags                           ; A0BB AD 06 03                 ...
-        ora     #%00100000                            ; A0BE 09 20                    . 
-        sta     EventFlags                           ; A0C0 8D 06 03                 ...
-        jmp     WorksetSave                           ; A0C3 4C 61 97                 La.
-
-; ----------------------------------------------------------------------------
-LA0C6:
-        ldx     HitDetectionProjectileType                           ; A0C6 AE 4A 03                 .J.
-        lda     JawsHitSounds,x                         ; A0C9 BD 23 A1                 .#.
-        jsr     SoundPlay                           ; A0CC 20 CD E2                  ..
-        lda     #$18                            ; A0CF A9 18                    ..
-        sta     $38                             ; A0D1 85 38                    .8
-        lda     PendingBGUpdates                           ; A0D3 AD 04 03                 ...
-        ora     #DrawStatusbarJawsPowerFlag                            ; A0D6 09 40                    .@
-        sta     PendingBGUpdates                           ; A0D8 8D 04 03                 ...
-        lda     #$01                            ; A0DB A9 01                    ..
-        jsr     AwardPoints                           ; A0DD 20 D0 8C                  ..
-        jmp     LA0EE                           ; A0E0 4C EE A0                 L..
-
-; ----------------------------------------------------------------------------
-LA0E3:
-        jsr     WorksetAnimationAdvance                           ; A0E3 20 BE 97                  ..
-        jsr     WorksetAnimationAdvance                           ; A0E6 20 BE 97                  ..
-        jsr     WorksetAnimationAdvance                           ; A0E9 20 BE 97                  ..
-        dec     $38                             ; A0EC C6 38                    .8
-LA0EE:
-        lda     #$00                            ; A0EE A9 00                    ..
-        sta     Workset + EntityYSubspeed                            ; A0F0 85 32                    .2
-        sta     Workset + EntityYSpeed                             ; A0F2 85 33                    .3
-        lda     HitDetectYDistance+1                             ; A0F4 A5 1D                    ..
-        bne     LA117                           ; A0F6 D0 1F                    ..
-        lda     HitDetectYDistance                             ; A0F8 A5 1C                    ..
-        cmp     #$08                            ; A0FA C9 08                    ..
-        bcc     LA117                           ; A0FC 90 19                    ..
-        lda     #$02                            ; A0FE A9 02                    ..
-        bit     HitDetectYDirection                             ; A100 24 15                    $.
-        bne     LA10F                           ; A102 D0 0B                    ..
-        lda     #$80                            ; A104 A9 80                    ..
-        sta     Workset + EntityYSubspeed                            ; A106 85 32                    .2
-        lda     #$00                            ; A108 A9 00                    ..
-        sta     Workset + EntityYSpeed                             ; A10A 85 33                    .3
-        jmp     LA117                           ; A10C 4C 17 A1                 L..
-
-; ----------------------------------------------------------------------------
-LA10F:
-        lda     #$80                            ; A10F A9 80                    ..
-        sta     Workset + EntityYSubspeed                            ; A111 85 32                    .2
-        lda     #$FF                            ; A113 A9 FF                    ..
-        sta     Workset + EntityYSpeed                             ; A115 85 33                    .3
-LA117:
-        jsr     WorksetMoveY                           ; A117 20 1B 98                  ..
-        jsr     EncounterClampWorksetMinimumYDoubled                           ; A11A 20 14 9A                  ..
-        jsr     EncounterClampWorksetMaximumY                           ; A11D 20 D0 99                  ..
-        jmp     WorksetSave                           ; A120 4C 61 97                 La.
-
+        jmp @Continue
+@NormalSpeed:
+        jsr WorksetMoveX
+@Continue:
+        lda Workset + EntityX + 1
+        cmp #$10
+        ; todo - this isnt well documented
+        beq @JawsTurnaround
+        lda Workset + EntityX
+        bcs @CheckLeftEdge
+        cmp #$E0
+        bcs @JawsTurnaround
+        sec
+        jmp @CheckForTurnaround
+@CheckLeftEdge:
+        cmp #$20
+        jmp @CheckForTurnaround
+@JawsTurnaround:
+        clc
+@CheckForTurnaround:
+        bit Workset + EntityV16
+        bmi @AlternateDirection
+        bcs @MaintainCourse
+        ; set negative flag
+        lda #%10000000
+        sta Workset + EntityV16
+        jmp @HitDetection
+@AlternateDirection:
+        ; not yet time to switch direction, go do hit detection stuff
+        bcc @HitDetection
+        lda #$00
+        sta Workset + EntityV16
+        ; turn to face opposite direction
+        lda Workset + EntityHeader
+        eor #EntityHeaderFacingLeft
+        sta Workset + EntityHeader
+        ; and invert speed values
+        lda Workset + EntityXSpeed
+        eor #$FF
+        tay
+        lda Workset + EntityXSubspeed
+        eor #$FF
+        clc
+        adc #$01
+        sta Workset + EntityXSubspeed
+        tya
+        adc #$00
+        sta Workset + EntityXSpeed
+@MaintainCourse:
+        ; save and exit!
+        jmp WorksetSave
+@HitDetection:
+        @TempHitDamage = $16
+        jsr WorksetAnimationAdvance
+        jsr WorksetDetectProjectileHit
+        jsr CheckFlagsAndHitDetectAgainstPlayer
+        ; if jaws is within iframes, we can ignore damage
+        lda Workset + EntityV18
+        bne @StillWithinIFrames
+        ; otherwise check if we hit something
+        bit Workset + EntityHitDetection
+        bvc @HitDetectionComplete
+        ; if we did, figure out how much damage we just did
+        ldx PlayerPowerLevel
+        lda @JawsDamageByPowerLevel,x
+        sta @TempHitDamage
+        lda #$00
+        sta @TempHitDamage+1
+        ; if we fired a bomb, we will need to multiply the damage
+        ldx HitDetectionProjectileType
+        lda @JawsDamageMultipliers,x
+        beq @NoMultiplier
+        ; apply damage multiplier
+        asl @TempHitDamage
+        rol @TempHitDamage+1
+@NoMultiplier:
+        ; and apply damage to jaws hp
+        lda JawsHP
+        sec
+        sbc @TempHitDamage
+        sta JawsHP
+        lda JawsHP+1
+        sbc @TempHitDamage+1
+        bpl @StoreHP
+        lda #$00
+        sta JawsHP
+@StoreHP:
+        sta JawsHP+1
+        ora JawsHP
+        bne @StillAlive
+        ; if jaws has died, we mark the death event and exit
+        lda EventFlags
+        ora #EventFlagsEncounterJawsDead
+        sta EventFlags
+        jmp WorksetSave
+@StillAlive:
+        ; but if jaws is still alive we should play a satisfying hit sound
+        ; this will be based on the projectile used.
+        ldx HitDetectionProjectileType
+        lda @JawsHitSounds,x
+        jsr SoundPlay
+        ; assign $18 frames worth of iframes.
+        lda #$18
+        sta Workset + EntityV18
+        ; and then update jaws health bar
+        lda PendingBGUpdates
+        ora #DrawStatusbarJawsPowerFlag
+        sta PendingBGUpdates
+        ; also give the player some points for doing a good job!
+        lda #$01
+        jsr AwardPoints
+        jmp @HitDetectionComplete
+@StillWithinIFrames:
+        jsr WorksetAnimationAdvance
+        jsr WorksetAnimationAdvance
+        jsr WorksetAnimationAdvance
+        dec Workset + EntityV18
+@HitDetectionComplete:
+        ; clear out our y speed
+        lda #$00
+        sta Workset + EntityYSubspeed
+        sta Workset + EntityYSpeed
+        ; if jaws is in line with the player
+        ; we dont need to change y speed
+        lda HitDetectYDistance+1
+        bne @MoveAndExit
+        lda HitDetectYDistance
+        cmp #$08
+        bcc @MoveAndExit
+        lda #$02
+        ; but if player  is higher than jaws he should swim up
+        bit HitDetectYDirection
+        bne @Ascend
+        ; and otherwise descend
+        lda #$80
+        sta Workset + EntityYSubspeed
+        lda #$00
+        sta Workset + EntityYSpeed
+        jmp @MoveAndExit
+@Ascend:
+        lda #$80
+        sta Workset + EntityYSubspeed
+        lda #$FF
+        sta Workset + EntityYSpeed
+@MoveAndExit:
+        ; move jaws y position
+        jsr WorksetMoveY
+        ; and make sure he's stayed within level bounds
+        jsr EncounterClampWorksetMinimumYDoubled
+        jsr EncounterClampWorksetMaximumY
+        ; then save and exit!
+        jmp WorksetSave
 
 ; sound effects to play when jaws takes damage
-JawsHitSounds:
+@JawsHitSounds:
         .byte SFXEncounterJawsHit               ; when hit with the boat
         .byte SFXEncounterJawsHarpoonHit        ; when hit with a harpoon
         .byte SFXEncounterJawsHit               ; when hit with the submarine
-        .byte SFXEncounterJawsHarpoonHit        ; unused powerup state
-        .byte SFXEncounterJawsHarpoonHit        ; unused powerup state
-
-JawsDamageMultipliers:
+        .byte SFXEncounterJawsHarpoonHit        ; unused?
+        .byte SFXEncounterJawsHarpoonHit        ; unused?
+@JawsDamageMultipliers:
         .byte 1                                 ; extra damage with boat
         .byte 0                                 ; normal damage with harpoon
-        .byte 1                                 ; extra damage with submarine
-        .byte 0                                 ; unused powerup state
-        .byte 0                                 ; unused powerup state
-
-JawsDamageByPowerLevel:
+        .byte 1                                 ; extra damage with submarine bomb
+        .byte 0                                 ; unused?
+        .byte 0                                 ; unused?
+@JawsDamageByPowerLevel:
         .byte $08                               ; power level 0
         .byte $10                               ; power level 1
         .byte $20                               ; power level 2
