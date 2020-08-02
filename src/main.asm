@@ -5002,14 +5002,16 @@ MapRunJaws:
 ; First byte per row is the entity flags, used to flip the sprites if heading left.
 ; Second byte is the animation number to play.
 @MapJawsAnimations:
+        ; jaws emerging from depths
         .byte $00,AnimationMapJawsEmergeEW
-        .byte $00,AnimationMapJawsSubmergeDS
-        .byte $00,AnimationMapJawsSubmergeNS
-        .byte EntityHeaderFacingLeft,AnimationMapJawsSubmergeDS
+        .byte $00,AnimationMapJawsEmergeDS
+        .byte $00,AnimationMapJawsEmergeNS
+        .byte EntityHeaderFacingLeft,AnimationMapJawsEmergeDS
         .byte EntityHeaderFacingLeft,AnimationMapJawsEmergeEW
-        .byte EntityHeaderFacingLeft,AnimationMapJawsSubmergeDN
-        .byte $00,AnimationMapJawsSubmergeNS
-        .byte $00,AnimationMapJawsSubmergeDN
+        .byte EntityHeaderFacingLeft,AnimationMapJawsEmergeDN
+        .byte $00,AnimationMapJawsEmergeNS
+        .byte $00,AnimationMapJawsEmergeDN
+        ; jaws visible
         .byte $00,AnimationMapJawsEW
         .byte $00,AnimationMapJawsDS
         .byte $00,AnimationMapJawsS
@@ -5018,14 +5020,15 @@ MapRunJaws:
         .byte EntityHeaderFacingLeft,AnimationMapJawsDN
         .byte $00,AnimationMapJawsN
         .byte $00,AnimationMapJawsDN
+        ; jaws submerging from surface
         .byte $00,AnimationMapJawsSubmergeEW
-        .byte $00,AnimationMapJawsEmergeDS
-        .byte $00,AnimationMapJawsEmergeNS
-        .byte EntityHeaderFacingLeft,AnimationMapJawsEmergeDS
+        .byte $00,AnimationMapJawsSubmergeDS
+        .byte $00,AnimationMapJawsSubmergeNS
+        .byte EntityHeaderFacingLeft,AnimationMapJawsSubmergeDS
         .byte EntityHeaderFacingLeft,AnimationMapJawsSubmergeEW
-        .byte EntityHeaderFacingLeft,AnimationMapJawsEmergeDN
-        .byte $00,AnimationMapJawsEmergeNS
-        .byte $00,AnimationMapJawsEmergeDN
+        .byte EntityHeaderFacingLeft,AnimationMapJawsSubmergeDN
+        .byte $00,AnimationMapJawsSubmergeNS
+        .byte $00,AnimationMapJawsSubmergeDN
 
 @GetNextLocationMapFlags:
         lda Workset + EntityMapJawsHeading
@@ -7482,15 +7485,15 @@ AnimationMapJawsS                    = $12
 AnimationMapJawsDN                   = $13
 AnimationMapJawsDS                   = $14
 AnimationMapJawsEmergeEW             = $15
-AnimationMapJawsSubmergeNS           = $16
+AnimationMapJawsEmergeNS           = $16
 AnimationEncounterJellyfishDeath     = $17
-AnimationMapJawsSubmergeDN           = $18
-AnimationMapJawsSubmergeDS           = $19
+AnimationMapJawsEmergeDN           = $18
+AnimationMapJawsEmergeDS           = $19
 AnimationMapJawsSubmergeEW           = $1A
-AnimationMapJawsEmergeNS             = $1B
+AnimationMapJawsSubmergeNS             = $1B
 AnimationUnused1                     = $1C
-AnimationMapJawsEmergeDN             = $1D
-AnimationMapJawsEmergeDS             = $1E
+AnimationMapJawsSubmergeDN             = $1D
+AnimationMapJawsSubmergeDS             = $1E
 AnimationEncounterBabyshark          = $1F
 AnimationEncounterBoat               = $20
 AnimationEncounterSubmarine          = $21
@@ -7545,15 +7548,15 @@ AnimationPointers:
   .addr @AnimationMapJawsDN
   .addr @AnimationMapJawsDS
   .addr @AnimationMapJawsEmergeEW
-  .addr @AnimationMapJawsSubmergeNS
-  .addr @AnimationEncounterJellyfishDeath
-  .addr @AnimationMapJawsSubmergeDN
-  .addr @AnimationMapJawsSubmergeDS
-  .addr @AnimationMapJawsSubmergeEW
   .addr @AnimationMapJawsEmergeNS
-  .addr @AnimationUnused1
+  .addr @AnimationEncounterJellyfishDeath
   .addr @AnimationMapJawsEmergeDN
   .addr @AnimationMapJawsEmergeDS
+  .addr @AnimationMapJawsSubmergeEW
+  .addr @AnimationMapJawsSubmergeNS
+  .addr @AnimationUnused1
+  .addr @AnimationMapJawsSubmergeDN
+  .addr @AnimationMapJawsSubmergeDS
   .addr @AnimationEncounterBabyshark
   .addr @AnimationEncounterBoat
   .addr @AnimationEncounterSubmarine
@@ -7708,42 +7711,42 @@ AnimationPointers:
 .byte $ff
 @AnimationMapJawsEmergeEW:
 .byte $07
-.addr SpritesetMapJawsSubmergeEW4
+.addr SpritesetMapJawsEWTransition4
 .byte $07
-.addr SpritesetMapJawsSubmergeEW3
+.addr SpritesetMapJawsEWTransition3
 .byte $06
-.addr SpritesetMapJawsSubmergeEW2
+.addr SpritesetMapJawsEWTransition2
 .byte $06
-.addr SpritesetMapJawsSubmergeEW1
+.addr SpritesetMapJawsEWTransition1
 .byte $03
 .addr SpritesetMapJawsEW3
 .byte $00
 .addr SpritesetMapJawsEW4
-@AnimationMapJawsSubmergeNS:
+@AnimationMapJawsEmergeNS:
 .byte $08
-.addr SpritesetMapJawsSubmergeNS1
+.addr SpritesetMapJawsNSTransition1
 .byte $08
-.addr SpritesetMapJawsSubmergeNS2
+.addr SpritesetMapJawsNSTransition2
 .byte $08
-.addr SpritesetMapJawsSubmergeNS3
+.addr SpritesetMapJawsNSTransition3
 .byte $00
-.addr SpritesetMapJawsSubmergeNS4
-@AnimationMapJawsSubmergeDN:
+.addr SpritesetMapJawsNSTransition4
+@AnimationMapJawsEmergeDN:
 .byte $08
-.addr SpritesetMapJawsSubmergeDN1
+.addr SpritesetMapJawsDNTransition1
 .byte $08
-.addr SpritesetMapJawsSubmergeDN2
+.addr SpritesetMapJawsDNTransition2
 .byte $08
-.addr SpritesetMapJawsSubmergeDN3
+.addr SpritesetMapJawsDNTransition3
 .byte $00
 .addr SpritesetMapJawsDN3
-@AnimationMapJawsSubmergeDS:
+@AnimationMapJawsEmergeDS:
 .byte $08
-.addr SpritesetMapJawsSubmergeDS1
+.addr SpritesetMapJawsDSTransition1
 .byte $08
-.addr SpritesetMapJawsSubmergeDS2
+.addr SpritesetMapJawsDSTransition2
 .byte $08
-.addr SpritesetMapJawsSubmergeDS3
+.addr SpritesetMapJawsDSTransition3
 .byte $00
 .addr SpritesetMapJawsDS3
 @AnimationMapJawsSubmergeEW:
@@ -7752,40 +7755,40 @@ AnimationPointers:
 .byte $03
 .addr SpritesetMapJawsEW3
 .byte $06
-.addr SpritesetMapJawsSubmergeEW1
+.addr SpritesetMapJawsEWTransition1
 .byte $06
-.addr SpritesetMapJawsSubmergeEW2
+.addr SpritesetMapJawsEWTransition2
 .byte $07
-.addr SpritesetMapJawsSubmergeEW3
+.addr SpritesetMapJawsEWTransition3
 .byte $00
-.addr SpritesetMapJawsSubmergeEW4
-@AnimationMapJawsEmergeNS:
+.addr SpritesetMapJawsEWTransition4
+@AnimationMapJawsSubmergeNS:
 .byte $08
-.addr SpritesetMapJawsSubmergeNS4
+.addr SpritesetMapJawsNSTransition4
 .byte $08
-.addr SpritesetMapJawsSubmergeNS3
+.addr SpritesetMapJawsNSTransition3
 .byte $08
-.addr SpritesetMapJawsSubmergeNS2
+.addr SpritesetMapJawsNSTransition2
 .byte $00
-.addr SpritesetMapJawsSubmergeNS1
-@AnimationMapJawsEmergeDN:
+.addr SpritesetMapJawsNSTransition1
+@AnimationMapJawsSubmergeDN:
 .byte $08
 .addr SpritesetMapJawsDN3
 .byte $08
-.addr SpritesetMapJawsSubmergeDN3
+.addr SpritesetMapJawsDNTransition3
 .byte $08
-.addr SpritesetMapJawsSubmergeDN2
+.addr SpritesetMapJawsDNTransition2
 .byte $00
-.addr SpritesetMapJawsSubmergeDN1
-@AnimationMapJawsEmergeDS:
+.addr SpritesetMapJawsDNTransition1
+@AnimationMapJawsSubmergeDS:
 .byte $08
 .addr SpritesetMapJawsDS3
 .byte $08
-.addr SpritesetMapJawsSubmergeDS3
+.addr SpritesetMapJawsDSTransition3
 .byte $08
-.addr SpritesetMapJawsSubmergeDS2
+.addr SpritesetMapJawsDSTransition2
 .byte $00
-.addr SpritesetMapJawsSubmergeDS1
+.addr SpritesetMapJawsDSTransition1
 @AnimationEncounterBoat:
 .byte $00
 .addr SpritesetEncounterBoat1
@@ -8427,73 +8430,73 @@ SpritesetMapJawsDS4:
 .byte $F8,$00,$D6,$02
 .byte $00,$00,$D7,$02
 .byte $80
-SpritesetMapJawsSubmergeEW1:
+SpritesetMapJawsEWTransition1:
 .byte $04,$04
 .byte $F8,$FA,$84,$02
 .byte $00,$FA,$85,$02
 .byte $F8,$02,$C8,$02
 .byte $00,$02,$C9,$02
 .byte $80
-SpritesetMapJawsSubmergeEW2:
+SpritesetMapJawsEWTransition2:
 .byte $04,$04
 .byte $F8,$FC,$84,$02
 .byte $00,$FC,$85,$02
 .byte $F8,$04,$D8,$02
 .byte $00,$04,$D9,$02
 .byte $80
-SpritesetMapJawsSubmergeEW3:
+SpritesetMapJawsEWTransition3:
 .byte $04,$04
 .byte $F8,$FA,$84,$02
 .byte $00,$FA,$85,$02
 .byte $F8,$02,$CA,$02
 .byte $00,$02,$CB,$02
 .byte $80
-SpritesetMapJawsSubmergeEW4:
+SpritesetMapJawsEWTransition4:
 .byte $04,$04
 .byte $F8,$00,$DA,$02
 .byte $00,$00,$DB,$02
 .byte $80
-SpritesetMapJawsSubmergeNS1:
+SpritesetMapJawsNSTransition1:
 .byte $02,$02
 .byte $FC,$00,$DE,$02
 .byte $80
-SpritesetMapJawsSubmergeNS2:
+SpritesetMapJawsNSTransition2:
 .byte $02,$02
 .byte $FC,$00,$CE,$02
 .byte $80
-SpritesetMapJawsSubmergeNS3:
+SpritesetMapJawsNSTransition3:
 .byte $02,$04
 .byte $FC,$F8,$CD,$02
 .byte $FC,$00,$DD,$02
 .byte $80
-SpritesetMapJawsSubmergeNS4:
+SpritesetMapJawsNSTransition4:
 .byte $02,$04
 .byte $FC,$F8,$CC,$02
 .byte $FC,$00,$DC,$02
 .byte $80
-SpritesetMapJawsSubmergeDN1:
+SpritesetMapJawsDNTransition1:
 .byte $03,$03
 .byte $FA,$00,$CF,$02
 .byte $80
-SpritesetMapJawsSubmergeDN2:
+SpritesetMapJawsDNTransition2:
 .byte $03,$03
 .byte $FA,$00,$E1,$02
 .byte $80
-SpritesetMapJawsSubmergeDN3:
+SpritesetMapJawsDNTransition3:
 .byte $04,$04
 .byte $F8,$F8,$E0,$02
 .byte $F8,$00,$F0,$02
 .byte $00,$00,$F1,$02
 .byte $80
-SpritesetMapJawsSubmergeDS1:
+SpritesetMapJawsDSTransition1:
 .byte $03,$03
 .byte $FA,$00,$DF,$02
 .byte $80
-SpritesetMapJawsSubmergeDS2:
+SpritesetMapJawsDSTransition2:
 .byte $03,$03
 .byte $FA,$00,$E3,$02
 .byte $80
-SpritesetMapJawsSubmergeDS3:
+SpritesetMapJawsDSTransition3:
 .byte $04,$04
 .byte $F8,$F8,$E2,$02
 .byte $F8,$00,$F2,$02
