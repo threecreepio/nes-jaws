@@ -1,24 +1,20 @@
 AS = ca65
-CC = cc65
 LD = ld65
-IPS = flips
 
 .PHONY: clean
 
+build: jaws.chr main.nes
+
 %.o: %.asm
-	$(AS) -g --debug-info $< -o $@
-
-#patch.zip: patch.ips
-#	zip $@ readme.txt patch.ips
-
-#patch.ips: main.nes
-#	$(IPS) --exact --create --ips "files/original.nes" "main.nes" $@
+	$(AS) --create-dep "$@.dep" -g --debug-info $< -o $@
 
 main.nes: layout src/entry.o
 	$(LD)  --dbgfile $@.dbg -C $^ -o $@
-	radiff2 -t 20 -q -x main.nes files/original.nes | head -n 20
-	diff main.nes files/original.nes && echo "\n\nROM UNCHANGED!\n\n"
-	
+
+jaws.chr: original.nes
+	dd if="original.nes" of="$@" bs=1 skip=32784
 
 clean:
-	rm -f release.zip main*.nes patch.ips *.o src/*.o
+	rm -f ./main*.nes ./*.nes.dbg ./*.chr ./src/*.o ./src/*.dep
+
+include $(wildcard ./*.dep ./*/*.dep)

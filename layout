@@ -3,7 +3,7 @@ MEMORY
 	INES:     start =     0, size =   $10, fill=yes, fillval=$00;
 	PRG:      start = $8000, size = $7FFA, fill=no;
 	VECTORS:  start = $FFFA, size =    $6, fill=no;
-	CHR:  start =     0, size = $8000, fill=yes, fillval=$FF;
+	CHR:      start =     0, size = $8000, fill=yes, fillval=$FF;
 }
 
 SEGMENTS

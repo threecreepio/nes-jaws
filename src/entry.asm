@@ -8,4 +8,4 @@
 .include "main.asm"
 
 .segment "CHR"
-.incbin "jaws.chr"
+.incbin "../jaws.chr"

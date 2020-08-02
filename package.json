@@ -1,5 +1,0 @@
-{
-    "scripts": {
-        "start": "..\\..\\nintendulator\\Nintendulator.exe .\\output.nes"
-    }
-}

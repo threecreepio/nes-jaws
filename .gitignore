@@ -1,6 +1,8 @@
 *.nes
 *.nes.dbg
 *.o
+*.o.dep
 *.zip
 *.deb
 *.ips
+*.chr
