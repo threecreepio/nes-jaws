@@ -1,12 +1,3 @@
-; da65 V2.16 - Git 6de78c5
-; Created:    2020-02-30 20:56:58
-; Input file: TMP.prg.bin
-; Page:       1
-
-
-        .setcpu "6502"
-
-; ----------------------------------------------------------------------------
 PPUCTRL               = $2000
 PPUMASK               = $2001
 PPUSTATUS             = $2002
@@ -80,7 +71,7 @@ EventFlags            = $0306
 
 
 
-EventFlagsMapEnterPort           = %00000001
+EventFlagsMapTouchedJaws         = %00000001
 EventFlagsMapPortPurchasing      = %00000010
 EventFlagsMapTriggerEncounter    = %00000100
 EventFlagsPortNotEnoughShells    = %00001000
@@ -217,39 +208,41 @@ SoundIsPlaying        = $055D
 PPUADDRStatusbarText  = $2B20
 
 ; $20 bytes of working data
-WorksetPtr            = $40
-Workset               = $20
+WorksetPtr                  = $40
+Workset                     = $20
 
-EntityHeader          = $00
-EntityType            = $01
-EntityX               = $02 ; 16 bit
-EntityY               = $04 ; 16 bit
-EntitySpritesetPtr    = $06 ; 16 bit
-EntityAnimPtr         = $08 ; 16 bit
-EntityAnimOffset      = $0A
-EntityAnimTimer       = $0B
-EntityBBoxW           = $0E
-EntityBBoxH           = $0F
-EntityXSubpixel       = $0C
-EntityYSubpixel       = $0D
-EntityXSubspeed       = $10
-EntityXSpeed          = $11
-EntityYSubspeed       = $12
-EntityYSpeed          = $13
-EntityAnimationIndex   = $14
-EntityActiveAnimationIndex             = $15
-EntityV16             = $16
-EntityV17             = $17
-EntityV18             = $18
-EntityV19             = $19
-EntityV1A             = $1A
-EntityV1C             = $1C
-EntityV1D             = $1D
-EntityV1E             = $1E
-EntityHitDetection    = $1F
+EntityHeader                = $00
+EntityType                  = $01
+EntityX                     = $02 ; 16 bit
+EntityY                     = $04 ; 16 bit
+EntitySpritesetPtr          = $06 ; 16 bit
+EntityAnimPtr               = $08 ; 16 bit
+EntityAnimOffset            = $0A
+EntityAnimTimer             = $0B
+EntityBBoxW                 = $0E
+EntityBBoxH                 = $0F
+EntityXSubpixel             = $0C
+EntityYSubpixel             = $0D
+EntityXSubspeed             = $10
+EntityXSpeed                = $11
+EntityYSubspeed             = $12
+EntityYSpeed                = $13
+EntityAnimationIndex        = $14
+EntityActiveAnimationIndex  = $15
+EntityV16                   = $16
+EntityV17                   = $17
+EntityV18                   = $18
+EntityV19                   = $19
+EntityV1A                   = $1A
+EntityV1C                   = $1C
+EntityV1D                   = $1D
+EntityV1E                   = $1E
+EntityHitDetection          = $1F
 
 
-EntityJawsSpawnTimer = $14
+EntityMapJawsHeading             = $14
+EntityMapPrevJawsHeading         = $15
+EntityEncounterJawsSpawnTimer    = $14
 
 
 EntityHitEnabled        = %00000001
@@ -311,11 +304,7 @@ JOY_RIGHT             = %10000000
 
 VRAMFlagMultipleBytes = %10000000
 
-; ----------------------------------------------------------------------------
-
-.org $8000
-.segment        "PRG": absolute
-
+.segment "PRG"
 ; LJN copyright notice at the top of the ROM. Why not.
 .byte "(c)1987 LJN TOYS,INC.",$0D,$0A
 .byte "TM&(c)1987 UNIVERSAL CITY STUDIOS,INC. ALL RIGHTS RESERVED.",$0D,$0A
@@ -2492,7 +2481,7 @@ MapMovePlayer:
         lsr TempCoordY
         lda MapSubmarineY
         cmp TempCoordY
-        ; branchy away if we're not at the right y coordinate
+        ; branch away if we're not at the right y coordinate
         bne @CheckForEncounter
         ; give the player their submarine!
         lda #$01
@@ -2502,7 +2491,7 @@ MapMovePlayer:
         sta $06A0
         sta MapSubmarineVisible
 @CheckForEncounter:
-        ; cadvance our rng!
+        ; advance our rng!
         jsr RNGAdvance
         ; if one of the low bits are set we will not trigger.
         and #%00011111
@@ -2581,16 +2570,16 @@ MapRunPlayerAnimation:
         .byte $00,AnimationMapBoatEW        ; boat heading east
         .byte $00,AnimationMapBoatS
         .byte $00,AnimationMapBoatS         ; boat heading south
-        .byte $10,AnimationMapBoatEW
-        .byte $10,AnimationMapBoatEW        ; boat heading west
+        .byte EntityHeaderFacingLeft,AnimationMapBoatEW
+        .byte EntityHeaderFacingLeft,AnimationMapBoatEW        ; boat heading west
         .byte $00,AnimationMapBoatN
         .byte $00,AnimationMapBoatN         ; boat heading north
         .byte $00,AnimationMapBoatStillEW
         .byte $00,AnimationMapBoatStillEW   ; boat facing east
         .byte $00,AnimationMapBoatStillS
         .byte $00,AnimationMapBoatStillS    ; boat facing south
-        .byte $10,AnimationMapBoatStillEW
-        .byte $10,AnimationMapBoatStillEW   ; boat facing west
+        .byte EntityHeaderFacingLeft,AnimationMapBoatStillEW
+        .byte EntityHeaderFacingLeft,AnimationMapBoatStillEW   ; boat facing west
         .byte $00,AnimationMapBoatStillN
         .byte $00,AnimationMapBoatStillN    ; boat facing north
 
@@ -2617,7 +2606,6 @@ MapGetDPadDirection:
         tay
         lda (@TempPointer),y
         rts
-
 
 FacingDirectionsPerEntityType:
         .addr FacingDirectionsBoat
@@ -4884,32 +4872,32 @@ MapRunJaws:
         lda #$00
         rol a
         sta Workset + EntityY + 1
-        jsr L9EFA
+        jsr @TurnTowardPlayer
         lda #$00
         sta Workset + EntityV17
         ; and set up his starting flags
         lda #(EntityHeaderActive | EntityHeader7 | EntityHeader1)
         sta Workset + EntityHeader
-        ; jaws won't move during iframes.
+        ; jaws can't interact with player right after spawning
         lda #$80
         sta Workset + EntityV1D
         jmp WorksetSave
 @JawsIsActive:
         jsr WorksetAnimationAdvance
         lda Workset + EntityV1D
-        bne @InvincibilityFrames
+        bne @StartupTimer
         jsr CheckFlagsAndHitDetectAgainstPlayer
         lda Workset + EntityHitDetection
         bpl @UpdateJawsTrackerDistance
         jsr CopyWorksetCoordinatesToTempCoordinate
         jsr GetWorldMapFlagsAtTempCoords
         sta CurrentMapPositionFlags
-        lda #%00000001
+        lda #EventFlagsMapTouchedJaws
         sta EventFlags
         jmp WorksetSave
-@InvincibilityFrames:
+@StartupTimer:
         dec Workset + EntityV1D
-        jmp @L9E05
+        jmp @JawsMovement
 
 ; convert jaws distance from player to a single number
 ; and store that as the tracker distance which is used to
@@ -4939,55 +4927,60 @@ MapRunJaws:
         lda @TempPlayerYDistance
 @StoreTrackerDistance:
         sta TrackerDistancePrev
-
-@L9E05:
+@JawsMovement:
+        ; finish if we are still waiting on our timer.
         dec Workset + EntityV16
-        bne @L9E4A
+        bne @FinishJawsAction
         bit Workset + EntityV17
-        bpl @L9E15
+        bpl @Activated
+        ; mark jaws as active
         lda #(EntityHeaderActive | EntityHeader7 | EntityHeader1)
         sta Workset + EntityHeader
         lda #$00
         sta Workset + EntityV17
-@L9E15:
-        jsr L9EFA
+@Activated:
+        jsr @TurnTowardPlayer
+        ; check our distance to the player
         lda TrackerDistancePrev
         cmp #$03
+        ; check if header1 is set
         lda #EntityHeader1
         bit Workset + EntityHeader
-        bne @L9E3F
-        bcs @L9E37
+        bne @ContinueAnimating
+        bcs @Submerge
         bit Workset + EntityV17
-        bvs @L9E2F
-        lda Workset + EntityActiveAnimationIndex                             ; 9E29 A5 35                    .5
-        cmp Workset + EntityAnimationIndex                             ; 9E2B C5 34                    .4
-        beq @L9E4A                           ; 9E2D F0 1B                    ..
-@L9E2F:
-        lda #$00                            ; 9E2F A9 00                    ..
-        sta Workset + EntityV17                            ; 9E31 85 37                    .7
-        ldx #$08                            ; 9E33 A2 08                    ..
-        bne @UpdateJawsAnimation                           ; 9E35 D0 10                    ..
-@L9E37:
-        lda #$80                            ; 9E37 A9 80                    ..
-        sta Workset + EntityV17                            ; 9E39 85 37                    .7
-        ldx #$10                            ; 9E3B A2 10                    ..
-        bne @UpdateJawsAnimation                           ; 9E3D D0 08                    ..
-@L9E3F:
-        bcs @L9E4A                           ; 9E3F B0 09                    ..
-        lda #$40                            ; 9E41 A9 40                    .@
-        sta Workset + EntityV17                            ; 9E43 85 37                    .7
-        ldx #$00                            ; 9E45 A2 00                    ..
+        bvs @Emerge
+        ; check if our desired animation is equal to our current animation
+        lda Workset + EntityMapPrevJawsHeading
+        cmp Workset + EntityMapJawsHeading
+        ; and if so continue moving jaws
+        beq @FinishJawsAction
+@Emerge:
+        lda #$00
+        sta Workset + EntityV17
+        ldx #$08
+        bne @UpdateJawsAnimation
+@Submerge:
+        lda #%10000000
+        sta Workset + EntityV17
+        ldx #$10
+        bne @UpdateJawsAnimation
+@ContinueAnimating:
+        bcs @FinishJawsAction
+        lda #%01000000
+        sta Workset + EntityV17
+        ldx #$00
 @UpdateJawsAnimation:
-        jsr @ChangeJawsAnimation                           ; 9E47 20 53 9E                  S.
-@L9E4A:
-        jsr WorksetMoveX                           ; 9E4A 20 FA 97                  ..
-        jsr WorksetMoveY                           ; 9E4D 20 1B 98                  ..
-        jmp WorksetSave                           ; 9E50 4C 61 97                 La.
+        jsr @ChangeJawsAnimation
+@FinishJawsAction:
+        jsr WorksetMoveX
+        jsr WorksetMoveY
+        jmp WorksetSave
 @ChangeJawsAnimation:
         txa
         clc
-        ; use animation index to find pointer into table
-        adc Workset + EntityAnimationIndex
+        ; use heading to find pointer into table
+        adc Workset + EntityMapJawsHeading
         asl a
         tax
         ; remove flags from the header
@@ -5034,126 +5027,137 @@ MapRunJaws:
         .byte $00,AnimationMapJawsEmergeNS
         .byte $00,AnimationMapJawsEmergeDN
 
-; ----------------------------------------------------------------------------
-L9E9F:
-        lda     Workset + EntityAnimationIndex                             ; 9E9F A5 34                    .4
-        asl     a                               ; 9EA1 0A                       .
-        tax                                     ; 9EA2 AA                       .
-        ldy     L9EB1,x                         ; 9EA3 BC B1 9E                 ...
-        lda     L9EB0,x                         ; 9EA6 BD B0 9E                 ...
-        tax                                     ; 9EA9 AA                       .
-        jsr     GetWorldMapFlagsAtTargetLocation                           ; 9EAA 20 F5 95                  ..
-        cmp     #$06                            ; 9EAD C9 06                    ..
-        rts                                     ; 9EAF 60                       `
+@GetNextLocationMapFlags:
+        lda Workset + EntityMapJawsHeading
+        asl a
+        tax
+        ldy @NextTileOffset+1,x
+        lda @NextTileOffset,x
+        tax
+        jsr GetWorldMapFlagsAtTargetLocation
+        cmp #$06
+        rts
+
+@NextTileOffset:
+        .byte $10,$00
+        .byte $10,$10
+        .byte $00,$10
+        .byte $F0,$10
+        .byte $F0,$00
+        .byte $F0,$F0
+        .byte $00,$F0
+        .byte $10,$F0
+
+@UpdateSpeed:
+        ; shift the animation we're playing to match the speed table
+        lda Workset + EntityMapJawsHeading
+        asl a
+        asl a
+        tax
+        ; read out all of our speeds
+        lda @JawsSpeeds,x
+        sta Workset + EntityXSubspeed
+        lda @JawsSpeeds+1,x
+        sta Workset + EntityXSpeed
+        lda @JawsSpeeds+2,x
+        sta Workset + EntityYSubspeed
+        lda @JawsSpeeds+3,x
+        sta Workset + EntityYSpeed
+        rts
+
+; jaws directions mapped to speeds per direction
+@JawsSpeeds:
+        ;       x,  X,  y,  Y
+        .byte $80,$00,$00,$00
+        .byte $80,$00,$80,$00
+        .byte $00,$00,$80,$00
+        .byte $80,$FF,$80,$00
+        .byte $80,$FF,$00,$00
+        .byte $80,$FF,$80,$FF
+        .byte $00,$00,$80,$FF
+        .byte $80,$00,$80,$FF
 
 ; ----------------------------------------------------------------------------
-L9EB0:
-        .byte   $10                             ; 9EB0 10                       .
-L9EB1:
-        .byte   $00,$10,$10,$00,$10,$F0,$10,$F0 ; 9EB1 00 10 10 00 10 F0 10 F0  ........
-        .byte   $00,$F0,$F0,$00,$F0,$10,$F0     ; 9EB9 00 F0 F0 00 F0 10 F0     .......
-; ----------------------------------------------------------------------------
-L9EC0:
-        lda     Workset + EntityAnimationIndex                             ; 9EC0 A5 34                    .4
-        asl     a                               ; 9EC2 0A                       .
-        asl     a                               ; 9EC3 0A                       .
-        tax                                     ; 9EC4 AA                       .
-        lda     L9EDA,x                         ; 9EC5 BD DA 9E                 ...
-        sta     Workset + EntityXSubspeed                             ; 9EC8 85 30                    .0
-        lda     L9EDB,x                         ; 9ECA BD DB 9E                 ...
-        sta     Workset + EntityXSpeed                             ; 9ECD 85 31                    .1
-        lda     L9EDC,x                         ; 9ECF BD DC 9E                 ...
-        sta     Workset + EntityYSubspeed                            ; 9ED2 85 32                    .2
-        lda     L9EDD,x                         ; 9ED4 BD DD 9E                 ...
-        sta     Workset + EntityYSpeed                             ; 9ED7 85 33                    .3
-        rts                                     ; 9ED9 60                       `
+@TurnTowardPlayer:
+        lda Workset + EntityMapJawsHeading
+        sta Workset + EntityMapPrevJawsHeading
+        jsr @GetDirectionToPlayer
+        sta Workset + EntityMapJawsHeading
+        jsr @GetNextLocationMapFlags
+        bcc @ContinueInCurrentDirection
+        ; we can't continue in this direction, pick direction to rotate.
+        jsr RNGAdvance
+        and #$01
+        bne @Rotate
+        ; decrement rotateion if rng bit was set
+        lda #$FF
+@Rotate:
+        pha
+        clc
+        ; add our rotation value, and wrap if needed
+        adc Workset + EntityMapJawsHeading
+        and #$07
+        sta Workset + EntityMapJawsHeading
+        ; check if the new rotation is okay
+        jsr @GetNextLocationMapFlags
+        pla
+        ; otherwise keep twirling, twirling towards freedom!
+        bcs @Rotate
+@ContinueInCurrentDirection:
+        jsr @UpdateSpeed
+        lda #$20
+        sta Workset + EntityV16
+        rts
 
 ; ----------------------------------------------------------------------------
-L9EDA:
-        .byte   $80                             ; 9EDA 80                       .
-L9EDB:
-        .byte   $00                             ; 9EDB 00                       .
-L9EDC:
-        .byte   $00                             ; 9EDC 00                       .
-L9EDD:
-        .byte   $00,$80,$00,$80,$00,$00,$00,$80 ; 9EDD 00 80 00 80 00 00 00 80  ........
-        .byte   $00,$80,$FF,$80,$00,$80,$FF,$00 ; 9EE5 00 80 FF 80 00 80 FF 00  ........
-        .byte   $00,$80,$FF,$80,$FF,$00,$00,$80 ; 9EED 00 80 FF 80 FF 00 00 80  ........
-        .byte   $FF,$80,$00,$80,$FF             ; 9EF5 FF 80 00 80 FF           .....
-; ----------------------------------------------------------------------------
-L9EFA:
-        lda     Workset + EntityAnimationIndex                             ; 9EFA A5 34                    .4
-        sta     Workset + EntityActiveAnimationIndex                             ; 9EFC 85 35                    .5
-        jsr     L9F27                           ; 9EFE 20 27 9F                  '.
-        sta     Workset + EntityAnimationIndex                             ; 9F01 85 34                    .4
-        jsr     L9E9F                           ; 9F03 20 9F 9E                  ..
-        bcc     L9F1F                           ; 9F06 90 17                    ..
-        jsr     RNGAdvance                           ; 9F08 20 69 8C                  i.
-        and     #$01                            ; 9F0B 29 01                    ).
-        bne     L9F11                           ; 9F0D D0 02                    ..
-        lda     #$FF                            ; 9F0F A9 FF                    ..
-L9F11:
-        pha                                     ; 9F11 48                       H
-        clc                                     ; 9F12 18                       .
-        adc     Workset + EntityAnimationIndex                             ; 9F13 65 34                    e4
-        and     #$07                            ; 9F15 29 07                    ).
-        sta     Workset + EntityAnimationIndex                             ; 9F17 85 34                    .4
-        jsr     L9E9F                           ; 9F19 20 9F 9E                  ..
-        pla                                     ; 9F1C 68                       h
-        bcs     L9F11                           ; 9F1D B0 F2                    ..
-L9F1F:
-        jsr     L9EC0                           ; 9F1F 20 C0 9E                  ..
-        lda     #$20                            ; 9F22 A9 20                    . 
-        sta     Workset + EntityV16                            ; 9F24 85 36                    .6
-        rts                                     ; 9F26 60                       `
+@GetDirectionToPlayer:
+        @TempPlayerYDirection = $12
+        ; todo.. document this mess better.
+        ; copy distance to player from hit detection
+        lda HitDetectXDistance
+        sta @TempPlayerXDistance
+        lda HitDetectXDistance+1
+        sta @TempPlayerXDistance+1
+        lda HitDetectYDistance
+        sta @TempPlayerYDistance
+        lda HitDetectYDistance+1
+        sta @TempPlayerYDistance+1
+        lda HitDetectYDirection
+        sta @TempPlayerYDirection
+        lda @TempPlayerXDistance
+        cmp @TempPlayerYDistance
+        lda @TempPlayerXDistance+1
+        sbc @TempPlayerYDistance+1
+        bcc @Skip
+        lda @TempPlayerXDistance
+        ldx @TempPlayerYDistance
+        sta @TempPlayerYDistance
+        stx @TempPlayerXDistance
+        lda @TempPlayerXDistance+1
+        ldx @TempPlayerYDistance+1
+        sta @TempPlayerYDistance+1
+        stx @TempPlayerXDistance+1
+        lda @TempPlayerYDirection
+        ora #$04
+        sta @TempPlayerYDirection
+@Skip:
+        asl @TempPlayerXDistance
+        rol @TempPlayerXDistance+1
+        lda @TempPlayerXDistance
+        cmp @TempPlayerYDistance
+        lda @TempPlayerXDistance+1
+        sbc @TempPlayerYDistance+1
+        lda @TempPlayerYDirection
+        bcc @GetDirection
+        ora #$08
+@GetDirection:
+        tax
+        lda @JawsDirectionsToPlayer,x
+        rts
+@JawsDirectionsToPlayer:
+        .byte $02,$02,$06,$06,$00,$04,$00,$04
+        .byte $01,$03,$07,$05,$01,$03,$07,$05
 
-; ----------------------------------------------------------------------------
-L9F27:
-        lda     HitDetectXDistance                            ; 9F27 A5 1A                    ..
-        sta     $16                             ; 9F29 85 16                    ..
-        lda     HitDetectXDistance+1                            ; 9F2B A5 1B                    ..
-        sta     $17                             ; 9F2D 85 17                    ..
-        lda     HitDetectYDistance                             ; 9F2F A5 1C                    ..
-        sta     $18                             ; 9F31 85 18                    ..
-        lda     HitDetectYDistance+1                             ; 9F33 A5 1D                    ..
-        sta     $19                             ; 9F35 85 19                    ..
-        lda     HitDetectYDirection                             ; 9F37 A5 15                    ..
-        sta     $12                             ; 9F39 85 12                    ..
-        lda     $16                             ; 9F3B A5 16                    ..
-        cmp     $18                             ; 9F3D C5 18                    ..
-        lda     $17                             ; 9F3F A5 17                    ..
-        sbc     $19                             ; 9F41 E5 19                    ..
-        bcc     L9F5B                           ; 9F43 90 16                    ..
-        lda     $16                             ; 9F45 A5 16                    ..
-        ldx     $18                             ; 9F47 A6 18                    ..
-        sta     $18                             ; 9F49 85 18                    ..
-        stx     $16                             ; 9F4B 86 16                    ..
-        lda     $17                             ; 9F4D A5 17                    ..
-        ldx     $19                             ; 9F4F A6 19                    ..
-        sta     $19                             ; 9F51 85 19                    ..
-        stx     $17                             ; 9F53 86 17                    ..
-        lda     $12                             ; 9F55 A5 12                    ..
-        ora     #$04                            ; 9F57 09 04                    ..
-        sta     $12                             ; 9F59 85 12                    ..
-L9F5B:
-        asl     $16                             ; 9F5B 06 16                    ..
-        rol     $17                             ; 9F5D 26 17                    &.
-        lda     $16                             ; 9F5F A5 16                    ..
-        cmp     $18                             ; 9F61 C5 18                    ..
-        lda     $17                             ; 9F63 A5 17                    ..
-        sbc     $19                             ; 9F65 E5 19                    ..
-        lda     $12                             ; 9F67 A5 12                    ..
-        bcc     L9F6D                           ; 9F69 90 02                    ..
-        ora     #$08                            ; 9F6B 09 08                    ..
-L9F6D:
-        tax                                     ; 9F6D AA                       .
-        lda     L9F72,x                         ; 9F6E BD 72 9F                 .r.
-        rts                                     ; 9F71 60                       `
-
-; ----------------------------------------------------------------------------
-L9F72:
-        .byte   $02,$02,$06,$06,$00,$04,$00,$04 ; 9F72 02 02 06 06 00 04 00 04  ........
-        .byte   $01,$03,$07,$05,$01,$03,$07,$05 ; 9F7A 01 03 07 05 01 03 07 05  ........
 ; ----------------------------------------------------------------------------
 EncounterRunJaws:
         lda EncounterJawsActive
@@ -5207,8 +5211,8 @@ EncounterRunJaws:
         sta Workset + EntityY + 1
         ; set delay for jaws to spawn
         lda EncounterJawsActive
-        sta Workset + EntityJawsSpawnTimer
-        sta Workset + EntityJawsSpawnTimer+1
+        sta Workset + EntityEncounterJawsSpawnTimer
+        sta Workset + EntityEncounterJawsSpawnTimer+1
         beq @FinishSetup
         ldx TrackerDistancePrev
         inx
@@ -5226,17 +5230,17 @@ EncounterRunJaws:
         jsr WorksetAnimationPlay
         jmp WorksetSave
 @Main:
-        lda Workset + EntityJawsSpawnTimer
-        ora Workset + EntityJawsSpawnTimer+1
+        lda Workset + EntityEncounterJawsSpawnTimer
+        ora Workset + EntityEncounterJawsSpawnTimer+1
         beq @JawsSpawn
         ; decrement spawn timer until it's time to get in there.
-        lda Workset + EntityJawsSpawnTimer
+        lda Workset + EntityEncounterJawsSpawnTimer
         sec
         sbc #1
-        sta Workset + EntityJawsSpawnTimer
-        lda Workset + EntityJawsSpawnTimer+1
+        sta Workset + EntityEncounterJawsSpawnTimer
+        lda Workset + EntityEncounterJawsSpawnTimer+1
         sbc #0
-        sta Workset + EntityJawsSpawnTimer+1
+        sta Workset + EntityEncounterJawsSpawnTimer+1
         jmp WorksetSave
 @JawsSpawn:
         lda Workset + EntityV18
@@ -10186,7 +10190,6 @@ RomGraphicsFacingDirectionsPerEntityType:
 .byte $04,$05,$0D,$0F,$05,$FF
 .byte $00
 
-;
 ; settings for each type of encounter.
 ; a little overkill since there's only two, but OK.
 ;
@@ -10196,7 +10199,6 @@ RomGraphicsFacingDirectionsPerEntityType:
 ;  - u16 water level
 ;  - u16 water depth
 ;  -  u8 palette
-;
 
 EncounterTypeDeep = 0
 EncounterType1 = 1
@@ -10225,7 +10227,6 @@ EncounterTypeSettings:
 .word $00C0 ; water depth
 .byte PaletteEncounterShallow
 
-;
 ; instructions for drawing the background of the encounter screens
 ;
 ; starts with the ppu address to start drawing at.
@@ -10239,7 +10240,6 @@ EncounterTypeSettings:
 ;  - FFxx - FF followed by any other number skips the ppu ahead that many metatiles (2x2 tiles)
 ;
 ; any data outside of these sections are metatile identifiers, drawn at the ppu position
-;
 
 EncounterBackgroundShallow = 0
 EncounterBackgroundDeep    = 1
@@ -13075,8 +13075,3 @@ AwardPointsTable:
 .word VNMI
 .word VBOOT
 .word VIRQ
-
-; End of "game" segment
-; ----------------------------------------------------------------------------
-.code
-
