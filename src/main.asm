@@ -259,6 +259,32 @@ EntityBonusJellyDelay              = $16
 EntityBonusJellyPathPointer        = $18
 EntityBonusJellyPathOffset         = $1A
 
+; offset into sprite memory where the finale boat sprites are located
+FinaleBoatSpriteOffset          = SPR*8
+; offset into sprite memory where the finale jaws sprites are located
+FinaleJawsSpriteOffset          = SPR*46
+FinaleJawsFlags                 = Workset + EntityHeader
+FinaleJawsFlags2                = Workset + EntityType
+FinaleJawsX                     = Workset + EntityX
+FinaleJawsY                     = Workset + EntityY
+FinaleJawsAnimPtr1              = Workset + EntitySpritesetPtr
+FinaleJawsAnimPtr               = Workset + EntityAnimPtr
+FinaleJawsAnimOffset            = Workset + EntityAnimOffset
+FinaleJawsAnimTimer             = Workset + EntityAnimTimer
+FinaleJawsXSubpixel             = Workset + EntityXSubpixel
+FinaleJawsYSubpixel             = Workset + EntityYSubpixel
+FinaleJawsXSubspeed             = Workset + EntityXSubspeed
+FinaleJawsXSpeed                = Workset + EntityXSpeed
+FinaleJawsYSubspeed             = Workset + EntityYSubspeed
+FinaleJawsYSpeed                = Workset + EntityYSpeed
+FinaleJawsAnimationIndex        = Workset + EntityAnimationIndex
+FinaleJawsActiveAnimationIndex  = Workset + EntityActiveAnimationIndex
+FinaleJawsV16                   = Workset + EntityV16
+FinaleJawsV17                   = Workset + EntityV17
+FinaleJawsXDirection            = Workset + EntityV18
+FinaleJawsV1E                   = Workset + EntityV1E
+FinaleJawsHitDetection          = Workset + EntityHitDetection
+FinaleJawsFlags2Reversing       = %00000001
 
 
 EntityHitEnabled        = %00000001
@@ -11626,11 +11652,6 @@ BonusJellyPath0F:
         .byte $18,$40
         .byte $00
 
-
-; ----------------------------------------------------------------------------
-; offset into sprite memory where the boat sprites are located
-FinaleBoatSpriteOffset = SPR*8
-FinaleJawsSpriteOffset = SPR*46
 EnterFinaleScreen:
         ; this is where we give up and just hardcode the crap out of everything.
         ; clear screen and sound
@@ -11659,11 +11680,11 @@ EnterFinaleScreen:
         inx
         cpx #$20
         bcc @UpdateSpriteY
-        ; inactivate all the entities
+        ; clear out memory
         ldx #$1F
         lda #$00
 @InactivateAllEntities:
-        sta Workset + EntityHeader,x
+        sta $20,x
         dex
         bpl @InactivateAllEntities
         ; update sprite positions
@@ -11711,8 +11732,8 @@ EnterFinaleScreen:
         jsr WaitFor1Frame
         ldy #$01
         jsr WaitForYSpins
-        jsr FinaleProcessSomething1
-        jsr FinaleProcessSomething2
+        jsr FinaleUpdateJawsPosition
+        jsr FinaleUpdateJawsSprites
         jsr FinaleProcessStrobeAndJab
         jsr FinaleUpdateParallax
         jsr ReadJoypads
@@ -11750,7 +11771,11 @@ EnterFinaleScreen:
         bmi @ProcessJawsDeath
         lda PlayerStrobeCount
         bne @MainLoop
-        .byte $24,$21,$30,$A1,$60
+        ; if we're out of strobes, but jaws is not dead,
+        ; exit back to the map
+        bit FinaleJawsFlags2
+        bmi @MainLoop
+        rts
 @ProcessJawsDeath:
         @TempDelayTimer = $12
         lda #$40
@@ -11764,7 +11789,7 @@ EnterFinaleScreen:
         bne @DelayForJawsDeathAnimation
         jmp EnterOutroScreen
 @LD862:
-        lda Workset + EntityX + 1
+        lda FinaleJawsX + 1
         bne LD86C
         lda #$F0
         sta SpritePosY + (SPR * 44)
@@ -11780,7 +11805,7 @@ LD86C:
 
 
 ; This is the "STROBE" text shown on the Finale,
-; presumably uses sprites to avoid interaction with Parallax scroll I would assume.
+; presumably uses sprites to avoid interaction with Parallax scroll.
 FinaleStrobeTextSprites:
         ;       Y,  T,  A,  X
         .byte $47,$FF,$20,$C4 ; SPR0
@@ -11974,22 +11999,22 @@ FinaleProcessStrobeAndJab:
 
 ; ----------------------------------------------------------------------------
 AttemptToStrikeJawsWithBoat:
-        lda Workset + EntityX  + 1
+        lda FinaleJawsX  + 1
         bne @Exit
-        lda Workset + EntityX
+        lda FinaleJawsX
         cmp #$7C
         bcc @Exit
         cmp #$84
         bcs @Exit
-        lda Workset + EntityY + 1
+        lda FinaleJawsY + 1
         bne @Exit
-        lda Workset + EntityY
+        lda FinaleJawsY
         cmp #$A8
         bcc @Exit
         cmp #$B0
         bcs @Exit
         lda #$20
-        bit Workset + EntityV1E
+        bit FinaleJawsV1E
         beq @Exit
         ; jaws has been struck dead.
         ; time to place out our strike strikes and delay until the outro.
@@ -12029,30 +12054,16 @@ AttemptToStrikeJawsWithBoat:
 ; ----------------------------------------------------------------------------
 
 
-
-FinaleJawsFlags = $20
-FinaleJawsV1 = $21
-FinaleJawsV16 = $36
-FinaleJawsV17 = $37
-FinaleJawsV18 = $38
-FinaleJawsV1F = $3F
-FinaleJawsOffset = $2A
-FinaleJawsTimer = $2B
-FinaleJawsX = $22
-FinaleJawsY = $24
-FinaleJawsPtr1 = $26
-FinaleJawsPtr2 = $28
-
-FinaleProcessSomething1:
-        ; check if entity is initialized
+FinaleUpdateJawsPosition:
+        ; check if jaws is initialized
         bit FinaleJawsFlags
         bvs @Initialized1
         ; mark as initialized
         lda #(EntityHeaderActive | EntityHeader7)
         sta FinaleJawsFlags
         lda #$00
-        sta FinaleJawsV1
-        sta FinaleJawsV18
+        sta FinaleJawsFlags2
+        sta FinaleJawsXDirection
         ; set jaws starting position
         lda #$80
         sta FinaleJawsX
@@ -12063,320 +12074,356 @@ FinaleProcessSomething1:
         lda #$00
         sta FinaleJawsY + 1
 @Initialized1:
-        bit FinaleJawsV1
+        bit FinaleJawsFlags2
         bpl @Initialized2
-        jmp LDB80
+        jmp @KeepMoving
 @Initialized2:
-        jsr LDBB2
-        bit FinaleJawsV1
-        bvs LDA75
-        lda FinaleJawsV1
-        ora #$40
-        sta FinaleJawsV1
+        jsr @GetJawsRoughDistance
+        bit FinaleJawsFlags2
+        bvs @CheckForDirectionUpdate
+        lda FinaleJawsFlags2
+        ora #%01000000
+        sta FinaleJawsFlags2
         lda #$FF
-        sta Workset + EntityActiveAnimationIndex
+        sta FinaleJawsActiveAnimationIndex
         lda FinaleJawsV16
-        jmp LDA7B
-LDA75:
+        jmp @ChangeJawsDirection
+@CheckForDirectionUpdate:
         lda FinaleJawsV16
         cmp FinaleJawsV17
-        beq LDA99
-LDA7B:
+        beq @AdjustSpeedForParallax
+@ChangeJawsDirection:
         sta FinaleJawsV17
         asl a
         sta $12
-        lda FinaleJawsV1
-        and #$01
+        lda FinaleJawsFlags2
+        and #FinaleJawsFlags2Reversing
         clc
         adc $12
         adc #$04
-        jsr LDBE5
+        jsr @UpdateJawsMovementPattern
         jsr RNGAdvance
-        and #$03
-        beq LDA97
-        cmp #$03
-        bcs LDA99
-LDA97:
-        sta $38
-LDA99:
-        lda $34
-        cmp Workset + EntityActiveAnimationIndex
-        beq LDAFE
-        sta Workset + EntityActiveAnimationIndex
+        and #%00000011
+        beq @UpdateMovementDirection
+        cmp #%00000011
+        bcs @AdjustSpeedForParallax
+@UpdateMovementDirection:
+        sta FinaleJawsXDirection
+@AdjustSpeedForParallax:
+        @TempSpeed = $18
+        lda FinaleJawsAnimationIndex
+        cmp FinaleJawsActiveAnimationIndex
+        beq @CheckInputs
+        sta FinaleJawsActiveAnimationIndex
         asl a
         tax
         lda ParallaxBackgroundOffset,x
-        sta $18
+        sta @TempSpeed
         lda ParallaxBackgroundOffset+1,x
-        sta $19
-        lda $18
-        sta Workset + EntityXSubspeed
-        lda $19
-        sta Workset + EntityXSpeed
-        lsr $19
-        ror $18
-        lda $18
-        sta Workset + EntityYSubspeed
-        lda $19
-        sta Workset + EntityYSpeed
-        lda $38
-        bne LDACE
+        sta @TempSpeed+1
+        lda @TempSpeed
+        sta FinaleJawsXSubspeed
+        lda @TempSpeed+1
+        sta FinaleJawsXSpeed
+        lsr @TempSpeed+1
+        ror @TempSpeed
+        lda @TempSpeed
+        sta FinaleJawsYSubspeed
+        lda @TempSpeed+1
+        sta FinaleJawsYSpeed
+        lda FinaleJawsXDirection
+        bne @SetMovementSpeed
+        ; direction is 0, clear speed
         lda #$00
-        sta Workset + EntityXSubspeed
-        sta Workset + EntityXSpeed
-        jmp LDAE5
-LDACE:
+        sta FinaleJawsXSubspeed
+        sta FinaleJawsXSpeed
+        jmp @UpdateYSpeed
+@SetMovementSpeed:
         cmp #$01
-        beq LDAE5
-        lda Workset + EntityXSpeed
+        beq @UpdateYSpeed
+        lda FinaleJawsXSpeed
         eor #$FF
         tay
-        lda Workset + EntityXSubspeed
+        lda FinaleJawsXSubspeed
         eor #$FF
         clc
         adc #$01
-        sta Workset + EntityXSubspeed
+        sta FinaleJawsXSubspeed
         tya
         adc #$00
-        sta Workset + EntityXSpeed
-LDAE5:
+        sta FinaleJawsXSpeed
+@UpdateYSpeed:
         lda #$01
-        bit Workset + EntityType
-        beq LDAFE
-        .byte   $A5,$33,$49,$FF,$A8,$A5,$32,$49
-        .byte   $FF,$18,$69,$01,$85,$32,$98,$69
-        .byte   $00,$85,$33
-LDAFE:
-        lda $34
+        bit FinaleJawsFlags2
+        beq @CheckInputs
+        lda FinaleJawsYSpeed
+        eor #$FF
+        tay
+        lda FinaleJawsYSubspeed
+        eor #$FF
+        clc
+        adc #$01
+        sta FinaleJawsYSubspeed
+        tya
+        adc #$00
+        sta FinaleJawsYSpeed
+@CheckInputs:
+        @TempJawsXSpeed = $16
+        lda FinaleJawsAnimationIndex
         asl a
         tax
-        lda #$C0
+        lda #(JOY_LEFT | JOY_RIGHT)
         and Joy1Inputs
-        beq LDB2F
-        bpl LDB1D
-        lda Workset + EntityXSubspeed
+        beq @PlayerNoMovement
+        bpl @PlayerMovingLeft
+        ; player is moving to the right.
+        ; adjust jaws movement speed to match direction.
+        lda FinaleJawsXSubspeed
         sec
         sbc ParallaxBackgroundOffset,x
-        sta $16
-        lda Workset + EntityXSpeed
+        sta @TempJawsXSpeed
+        lda FinaleJawsXSpeed
         sbc ParallaxBackgroundOffset+1,x
-        sta $17
-        jmp LDB37
-LDB1D:
-        lda Workset + EntityXSubspeed
+        sta @TempJawsXSpeed+1
+        jmp @PlayerMovementComplete
+@PlayerMovingLeft:
+        ; player is moving to the left
+        ; adjust jaws movement speed to match direction.
+        lda FinaleJawsXSubspeed
         clc
         adc ParallaxBackgroundOffset,x
-        sta $16
-        lda Workset + EntityXSpeed
+        sta @TempJawsXSpeed
+        lda FinaleJawsXSpeed
         adc ParallaxBackgroundOffset+1,x
-        sta $17
-        jmp LDB37
-LDB2F:
-        lda Workset + EntityXSubspeed
-        sta $16
-        lda Workset + EntityXSpeed
-        sta $17
-LDB37:
-        lda Workset + EntityXSubpixel
+        sta @TempJawsXSpeed+1
+        jmp @PlayerMovementComplete
+@PlayerNoMovement:
+        ; player is moving straight ahead
+        lda FinaleJawsXSubspeed
+        sta @TempJawsXSpeed
+        lda FinaleJawsXSpeed
+        sta @TempJawsXSpeed+1
+@PlayerMovementComplete:
+        lda FinaleJawsXSubpixel
         clc
-        adc $16
-        sta Workset + EntityXSubpixel
-        lda Workset + EntityX
-        adc $17
-        sta Workset + EntityX
-        lda $17
-        bmi LDB4F
-        lda Workset + EntityX  + 1
+        adc @TempJawsXSpeed
+        sta FinaleJawsXSubpixel
+        lda FinaleJawsX
+        adc @TempJawsXSpeed+1
+        sta FinaleJawsX
+        lda @TempJawsXSpeed+1
+        bmi @HandleOverflow
+        lda FinaleJawsX + 1
         adc #$00
-        jmp LDB53
-LDB4F:
-        lda Workset + EntityX  + 1
+        jmp @UpdatePosition
+@HandleOverflow:
+        lda FinaleJawsX + 1
         adc #$FF
-LDB53:
-        sta Workset + EntityX  + 1
+@UpdatePosition:
+        sta FinaleJawsX + 1
         jsr WorksetMoveY
         lda #$01
-        bit FinaleJawsV1
-        bne LDB6F
-        lda Workset + EntityY
+        bit FinaleJawsFlags2
+        bne @CheckIfJawsShouldAdvance
+        lda FinaleJawsY
+        ; check if jaws is too close to the player
         cmp #$B8
-        bcc LDB6C
-        .byte   $A9,$B8,$85,$24,$A9,$01,$85,$21
-LDB6C:
-        jmp LDBB1
-LDB6F:
-        .byte   $A5,$24,$C9,$50,$B0,$F7,$A9,$50
-        .byte   $85,$24,$A9,$00,$85,$21,$4C,$B1
-        .byte   $DB
-
-LDB80:
-        bit FinaleJawsV1
-        bvs LDBA5
-        lda FinaleJawsV1
-        ora #$40
-        sta FinaleJawsV1
-        lda Workset + EntityX  + 1
-        bmi LDB94
-        bne LDB9A
-        lda Workset + EntityX
-        bmi LDB9A
-LDB94:
+        bcc @ContinueInCurrentDirection
+        ; in that case turn around and move 
+        lda #$B8
+        sta FinaleJawsY
+        lda #$01
+        sta FinaleJawsFlags2
+@ContinueInCurrentDirection:
+        jmp @Exit
+@CheckIfJawsShouldAdvance:
+        ; if jaws is currently moving backwards, check if
+        ; it's time to start advancing again!
+        lda FinaleJawsY
+        cmp #$50
+        bcs @ContinueInCurrentDirection
+        lda #$50
+        sta FinaleJawsY
+        lda #$00
+        sta FinaleJawsFlags2
+        jmp @Exit
+@KeepMoving:
+        bit FinaleJawsFlags2
+        bvs @ReverseIfNeeded
+        lda FinaleJawsFlags2
+        ora #%01000000
+        sta FinaleJawsFlags2
+        lda FinaleJawsX + 1
+        bmi @TurnLeft
+        bne @TurnRight
+        lda FinaleJawsX
+        bmi @TurnRight
+@TurnLeft:
         lda FinaleJawsFlags
         ora #EntityHeaderFacingLeft
-        bne LDB9E
-LDB9A:
-        .byte   $A5,$20,$29,$EF
-LDB9E:
+        bne @CarryOn
+@TurnRight:
+        lda FinaleJawsFlags
+        and #($FF ^ EntityHeaderFacingLeft)
+@CarryOn:
         sta FinaleJawsFlags
         lda FinaleJawsV16
-        jmp LDBE5
-LDBA5:
+        jmp @UpdateJawsMovementPattern
+@ReverseIfNeeded:
         lda #$02
-        bit FinaleJawsV1F
-        beq LDBB1
-        .byte   $A5,$21,$29,$01,$85,$21
-LDBB1:
+        bit FinaleJawsHitDetection
+        beq @Exit
+        lda FinaleJawsFlags2
+        and #$01
+        sta FinaleJawsFlags2
+@Exit:
         rts
-LDBB2:
+
+@GetJawsRoughDistance:
         ldy #$00
-        lda Workset + EntityY
+        lda FinaleJawsY
         sec
         sbc #$50
-        bcs LDBBD
-        .byte   $A9,$00
-LDBBD:
+        bcs @Distance1
+        lda #$00
+@Distance1:
         cmp #$10
-        bcc LDBE0
+        bcc @Done
         iny
         sbc #$10
         lsr a
         cmp #$08
-        bcs LDBCE
+        bcs @Distance2
         adc #$10
-        jmp LDBE0
-LDBCE:
+        jmp @Done
+@Distance2:
         iny
         sbc #$08
         lsr a
         cmp #$08
-        bcc LDBD8
+        bcc @Distance3
         lda #$07
-LDBD8:
+@Distance3:
         clc
         adc #$18
         cmp #$1E
-        bcc LDBE0
+        bcc @Done
         iny
-LDBE0:
-        sta $34
+@Done:
+        sta FinaleJawsAnimationIndex
         sty FinaleJawsV16
         rts
-LDBE5:
+
+@UpdateJawsMovementPattern:
         asl a
         tax
-        lda LDED3,x
-        sta Workset + EntityAnimPtr
-        lda LDED4,x
+        lda FinaleJawsMovementPattern,x
+        sta FinaleJawsAnimPtr
+        lda FinaleJawsMovementPattern+1,x
         sta $29
         lda #$00
         sta $2A
         lda #$01
-        sta Workset + EntityAnimTimer
+        sta FinaleJawsAnimTimer
         rts
 
 
 
-
-
-FinaleProcessSomething2:
-        lda FinaleJawsTimer
-        beq ContinueJawsing
-        dec FinaleJawsTimer
-        bne ContinueJawsing
-        ldy FinaleJawsOffset
-LDC04:
-        lda (FinaleJawsPtr2),y
-        bne LDC11
-        lda $3F
-        ora #$02
-        sta $3F
-        jmp ContinueJawsing
-LDC11:
+FinaleUpdateJawsSprites:
+        lda FinaleJawsAnimTimer
+        beq @UpdateJawsSprites
+        dec FinaleJawsAnimTimer
+        bne @UpdateJawsSprites
+        ldy FinaleJawsAnimOffset
+@CheckSpriteOffset:
+        lda (FinaleJawsAnimPtr),y
+        bne @AdvanceOffset
+        lda FinaleJawsHitDetection
+        ora #%00000010
+        sta FinaleJawsHitDetection
+        jmp @UpdateJawsSprites
+@AdvanceOffset:
         iny
         cmp #$FF
-        bne LDC1A
+        bne @Continue
+        ; reset sprite offset
         ldy #$00
-        beq LDC04
-LDC1A:
-        sta FinaleJawsTimer
+        beq @CheckSpriteOffset
+@Continue:
+        sta FinaleJawsAnimTimer
         tax
-        lda Workset + EntityHitDetection
-        and #$FD
-        sta Workset + EntityHitDetection
-        lda (FinaleJawsPtr2),y
+        lda FinaleJawsHitDetection
+        and #($FF ^ %00000010)
+        sta FinaleJawsHitDetection
+        lda (FinaleJawsAnimPtr),y
         iny
-        sta Workset + (EntitySpritesetPtr + 0)
-        lda (FinaleJawsPtr2),y
+        sta FinaleJawsAnimPtr1
+        lda (FinaleJawsAnimPtr),y
         iny
-        sta Workset + (EntitySpritesetPtr + 1)
+        sta FinaleJawsAnimPtr1+1
         txa
+        ; update animation timer
         and #$1F
-        sta FinaleJawsTimer
-        sty $2A
+        sta FinaleJawsAnimTimer
+        sty FinaleJawsAnimOffset
         txa
         and #$60
-        sta Workset + EntityV1E
-ContinueJawsing:
+        sta FinaleJawsV1E
+@UpdateJawsSprites:
         ldy #$00
         ldx #$00
         lda #$12
         sta $00
-        lda Workset + EntityHeader
+        lda FinaleJawsFlags
         asl a
         asl a
-        eor Workset + EntityV1E
+        eor FinaleJawsV1E
         and #$40
         ora #$01
         sta $01
-LDC4D:
-        lda ($26),y
+@UpdateNextSprite:
+        lda (FinaleJawsAnimPtr1),y
         cmp #$80
-        beq LDCAB
+        beq @MoveSpritesOffScreen
         iny
         bit $01
-        bvc LDC5D
+        bvc @UpdateNextSprite2
+        ; invert
         eor #$FF
         clc
         adc #$F8
-LDC5D:
+@UpdateNextSprite2:
         clc
         and #$FF
-        bmi LDC6F
-        adc Workset + EntityX
+        bmi @NegativeOffset
+        adc FinaleJawsX
         sta SpritePosX + FinaleJawsSpriteOffset,x
-        lda Workset + EntityX  + 1
+        lda FinaleJawsX  + 1
         adc #$00
-        beq LDC7A
-        bne LDCA6
-LDC6F:
+        beq @UpdateSpriteY
+        bne @SkipSprite
+@NegativeOffset:
         adc FinaleJawsX
         sta SpritePosX + FinaleJawsSpriteOffset,x
         lda FinaleJawsX + 1
         adc #$FF
-        bne LDCA6
-LDC7A:
-        lda (FinaleJawsPtr1),y
+        bne @SkipSprite
+@UpdateSpriteY:
+        lda (FinaleJawsAnimPtr1),y
         clc
-        bmi LDC86
-        .byte   $65,$24,$9D,$B8,$02,$A9,$00
-LDC86:
+        bmi @UpdateSpriteY2
+        ; handle positive sprite y offset
+        adc FinaleJawsY
+        sta SpritePosY + FinaleJawsSpriteOffset,x
+        lda #$00
+@UpdateSpriteY2:
         adc FinaleJawsY
         sta SpritePosY + FinaleJawsSpriteOffset,x
         lda #$FF
         adc FinaleJawsY + 1
-        bne LDCA6
+        bne @SkipSprite
         iny
-        lda (FinaleJawsPtr1),y
+        lda (FinaleJawsAnimPtr1),y
         iny
         sta SpriteTile + FinaleJawsSpriteOffset,x
         lda $01
@@ -12386,23 +12433,23 @@ LDC86:
         inx
         inx
         dec $00
-        jmp LDC4D
-LDCA6:
+        jmp @UpdateNextSprite
+@SkipSprite:
         iny
         iny
-        jmp LDC4D
-LDCAB:
+        jmp @UpdateNextSprite
+@MoveSpritesOffScreen:
         ldy $00
         beq @Done
         lda #$F0
-@LDCB1:
+@MoveSpriteOffScreen:
         sta SpritePosY + FinaleJawsSpriteOffset,x
         inx
         inx
         inx
         inx
         dey
-        bne @LDCB1
+        bne @MoveSpriteOffScreen
 @Done:
         lda #$01
         sta NMISpriteHandlingDisabled
@@ -12689,130 +12736,490 @@ OutroRunJawsDeath:
         rts
 
 ; ----------------------------------------------------------------------------
-LDED3:
-        .byte   $EB                             ; DED3 EB                       .
-LDED4:
-        .byte   $DE,$0D,$DF,$2F,$DF,$51,$DF,$79 ; DED4 DE 0D DF 2F DF 51 DF 79  .../.Q.y
-        .byte   $DF,$80,$DF,$84,$DF,$8B,$DF,$8F ; DEDC DF 80 DF 84 DF 8B DF 8F  ........
-        .byte   $DF,$99,$DF,$9D,$DF,$A7,$DF,$08 ; DEE4 DF 99 DF 9D DF A7 DF 08  ........
-        .byte   $AB,$DF,$08,$B2,$DF,$08,$B9,$DF ; DEEC AB DF 08 B2 DF 08 B9 DF  ........
-        .byte   $0C,$C6,$DF,$0C,$D3,$DF,$0C,$E0 ; DEF4 0C C6 DF 0C D3 DF 0C E0  ........
-        .byte   $DF,$4C,$D3,$DF,$4C,$C6,$DF,$48 ; DEFC DF 4C D3 DF 4C C6 DF 48  .L..L..H
-        .byte   $B9,$DF,$48,$B2,$DF,$48,$AB,$DF ; DF04 B9 DF 48 B2 DF 48 AB DF  ..H..H..
-        .byte   $00,$08,$ED,$DF,$08,$F7,$DF,$08 ; DF0C 00 08 ED DF 08 F7 DF 08  ........
-        .byte   $04,$E0,$0C,$17,$E0,$0C,$33,$E0 ; DF14 04 E0 0C 17 E0 0C 33 E0  ......3.
-        .byte   $0C,$4C,$E0,$4C,$33,$E0,$4C,$17 ; DF1C 0C 4C E0 4C 33 E0 4C 17  .L.L3.L.
-        .byte   $E0,$48,$04,$E0,$48,$F7,$DF,$48 ; DF24 E0 48 04 E0 48 F7 DF 48  .H..H..H
-        .byte   $ED,$DF,$00,$08,$03,$E1,$08,$F0 ; DF2C ED DF 00 08 03 E1 08 F0  ........
-        .byte   $E0,$08,$D4,$E0,$0C,$65,$E0,$0C ; DF34 E0 08 D4 E0 0C 65 E0 0C  .....e..
-        .byte   $B2,$E0,$0C,$87,$E0,$4C,$B2,$E0 ; DF3C B2 E0 0C 87 E0 4C B2 E0  .....L..
-        .byte   $4C,$65,$E0,$48,$D4,$E0,$48,$F0 ; DF44 4C 65 E0 48 D4 E0 48 F0  Le.H..H.
-        .byte   $E0,$48,$03,$E1,$00,$06,$FA,$E1 ; DF4C E0 48 03 E1 00 06 FA E1  .H......
-        .byte   $06,$E7,$E1,$06,$CB,$E1,$06,$A0 ; DF54 06 E7 E1 06 CB E1 06 A0  ........
-        .byte   $E1,$0A,$0D,$E1,$2A,$3B,$E1,$2A ; DF5C E1 0A 0D E1 2A 3B E1 2A  ....*;.*
-        .byte   $6C,$E1,$6A,$3B,$E1,$4A,$0D,$E1 ; DF64 6C E1 6A 3B E1 4A 0D E1  l.j;.J..
-        .byte   $46,$A0,$E1,$46,$CB,$E1,$46,$E7 ; DF6C 46 A0 E1 46 CB E1 46 E7  F..F..F.
-        .byte   $E1,$46,$FA,$E1,$00,$08,$04,$E2 ; DF74 E1 46 FA E1 00 08 04 E2  .F......
-        .byte   $08,$08,$E2,$FF,$01,$0C,$E2,$00 ; DF7C 08 08 E2 FF 01 0C E2 00  ........
-        .byte   $08,$10,$E2,$08,$1D,$E2,$FF,$01 ; DF84 08 10 E2 08 1D E2 FF 01  ........
-        .byte   $2A,$E2,$00,$06,$31,$E2,$06,$3E ; DF8C 2A E2 00 06 31 E2 06 3E  *...1..>
-        .byte   $E2,$06,$4B,$E2,$FF,$01,$58,$E2 ; DF94 E2 06 4B E2 FF 01 58 E2  ..K...X.
-        .byte   $00,$06,$5F,$E2,$06,$6F,$E2,$06 ; DF9C 00 06 5F E2 06 6F E2 06  .._..o..
-        .byte   $7F,$E2,$FF,$01,$8F,$E2,$00,$F8 ; DFA4 7F E2 FF 01 8F E2 00 F8  ........
-        .byte   $F8,$AF,$00,$F8,$9F,$80,$F8,$F8 ; DFAC F8 AF 00 F8 9F 80 F8 F8  ........
-        .byte   $AD,$00,$F8,$AE,$80,$F8,$F0,$AB ; DFB4 AD 00 F8 AE 80 F8 F0 AB  ........
-        .byte   $00,$F0,$AC,$F8,$F8,$BB,$00,$F8 ; DFBC 00 F0 AC F8 F8 BB 00 F8  ........
-        .byte   $BC,$80,$F8,$F0,$A5,$00,$F0,$A6 ; DFC4 BC 80 F8 F0 A5 00 F0 A6  ........
-        .byte   $F8,$F8,$B5,$00,$F8,$B6,$80,$F8 ; DFCC F8 F8 B5 00 F8 B6 80 F8  ........
-        .byte   $F0,$A9,$00,$F0,$AA,$F8,$F8,$B9 ; DFD4 F0 A9 00 F0 AA F8 F8 B9  ........
-        .byte   $00,$F8,$BA,$80,$F8,$F0,$A7,$00 ; DFDC 00 F8 BA 80 F8 F0 A7 00  ........
-        .byte   $F0,$A8,$F8,$F8,$B7,$00,$F8,$B8 ; DFE4 F0 A8 F8 F8 B7 00 F8 B8  ........
-        .byte   $80,$F0,$F8,$E3,$F8,$F8,$E4,$00 ; DFEC 80 F0 F8 E3 F8 F8 E4 00  ........
-        .byte   $F8,$F4,$80,$F0,$F8,$C3,$F8,$F8 ; DFF4 F8 F4 80 F0 F8 C3 F8 F8  ........
-        .byte   $C4,$00,$F8,$D3,$08,$F8,$D4,$80 ; DFFC C4 00 F8 D3 08 F8 D4 80  ........
-        .byte   $F8,$F0,$91,$00,$F0,$92,$F0,$F8 ; E004 F8 F0 91 00 F0 92 F0 F8  ........
-        .byte   $F0,$F8,$F8,$F1,$00,$F8,$F2,$08 ; E00C F0 F8 F8 F1 00 F8 F2 08  ........
-        .byte   $F8,$F3,$80,$F8,$E8,$91,$00,$E8 ; E014 F8 F3 80 F8 E8 91 00 E8  ........
-        .byte   $92,$F0,$F0,$A0,$F8,$F0,$A1,$00 ; E01C 92 F0 F0 A0 F8 F0 A1 00  ........
-        .byte   $F0,$A2,$F0,$F8,$B0,$F8,$F8,$B1 ; E024 F0 A2 F0 F8 B0 F8 F8 B1  ........
-        .byte   $00,$F8,$B2,$08,$F8,$9E,$80,$F8 ; E02C 00 F8 B2 08 F8 9E 80 F8  ........
-        .byte   $E8,$93,$00,$E8,$94,$F8,$F0,$A3 ; E034 E8 93 00 E8 94 F8 F0 A3  ........
-        .byte   $00,$F0,$A4,$F0,$F8,$90,$F8,$F8 ; E03C 00 F0 A4 F0 F8 90 F8 F8  ........
-        .byte   $B3,$00,$F8,$B4,$08,$F8,$C0,$80 ; E044 B3 00 F8 B4 08 F8 C0 80  ........
-        .byte   $F8,$E8,$C1,$00,$E8,$C2,$F8,$F0 ; E04C F8 E8 C1 00 E8 C2 F8 F0  ........
-        .byte   $D1,$00,$F0,$D2,$F0,$F8,$E0,$F8 ; E054 D1 00 F0 D2 F0 F8 E0 F8  ........
-        .byte   $F8,$E1,$00,$F8,$E2,$08,$F8,$D0 ; E05C F8 E1 00 F8 E2 08 F8 D0  ........
-        .byte   $80,$F9,$E0,$04,$01,$E0,$05,$F9 ; E064 80 F9 E0 04 01 E0 05 F9  ........
-        .byte   $E8,$14,$01,$E8,$15,$F1,$F0,$23 ; E06C E8 14 01 E8 15 F1 F0 23  .......#
-        .byte   $F9,$F0,$24,$01,$F0,$25,$F1,$F8 ; E074 F9 F0 24 01 F0 25 F1 F8  ..$..%..
-        .byte   $33,$F9,$F8,$34,$01,$F8,$35,$09 ; E07C 33 F9 F8 34 01 F8 35 09  3..4..5.
-        .byte   $F8,$36,$80,$F7,$E0,$16,$FF,$E0 ; E084 F8 36 80 F7 E0 16 FF E0  .6......
-        .byte   $50,$F7,$E8,$26,$FF,$E8,$60,$F7 ; E08C 50 F7 E8 26 FF E8 60 F7  P..&..`.
-        .byte   $F0,$17,$FF,$F0,$70,$E7,$F8,$19 ; E094 F0 17 FF F0 70 E7 F8 19  ....p...
-        .byte   $EF,$F8,$28,$F7,$F8,$27,$FF,$F8 ; E09C EF F8 28 F7 F8 27 FF F8  ..(..'..
-        .byte   $80,$07,$F8,$81,$0F,$F8,$82,$EF ; E0A4 80 07 F8 81 0F F8 82 EF  ........
-        .byte   $F0,$18,$07,$F0,$71,$80,$F8,$E0 ; E0AC F0 18 07 F0 71 80 F8 E0  ....q...
-        .byte   $53,$00,$E0,$54,$F8,$E8,$63,$00 ; E0B4 53 00 E0 54 F8 E8 63 00  S..T..c.
-        .byte   $E8,$64,$F0,$F0,$51,$F8,$F0,$73 ; E0BC E8 64 F0 F0 51 F8 F0 73  .d..Q..s
-        .byte   $00,$F0,$74,$F0,$F8,$61,$F8,$F8 ; E0C4 00 F0 74 F0 F8 61 F8 F8  ..t..a..
-        .byte   $83,$00,$F8,$84,$08,$F8,$52,$80 ; E0CC 83 00 F8 84 08 F8 52 80  ......R.
-        .byte   $F8,$E8,$04,$00,$E8,$05,$F0,$F0 ; E0D4 F8 E8 04 00 E8 05 F0 F0  ........
-        .byte   $37,$F8,$F0,$14,$00,$F0,$47,$F0 ; E0DC 37 F8 F0 14 00 F0 47 F0  7.....G.
-        .byte   $F8,$43,$F8,$F8,$44,$00,$F8,$45 ; E0E4 F8 43 F8 F8 44 00 F8 45  .C..D..E
-        .byte   $08,$F8,$46,$80,$F7,$F0,$04,$FF ; E0EC 08 F8 46 80 F7 F0 04 FF  ..F.....
-        .byte   $F0,$05,$EF,$F8,$38,$F7,$F8,$39 ; E0F4 F0 05 EF F8 38 F7 F8 39  ....8..9
-        .byte   $FF,$F8,$3A,$07,$F8,$3B,$80,$EE ; E0FC FF F8 3A 07 F8 3B 80 EE  ..:..;..
-        .byte   $F8,$48,$F6,$F8,$49,$FE,$F8,$4A ; E104 F8 48 F6 F8 49 FE F8 4A  .H..I..J
-        .byte   $80,$F4,$D8,$55,$FC,$D8,$56,$F4 ; E10C 80 F4 D8 55 FC D8 56 F4  ...U..V.
-        .byte   $E0,$65,$FC,$E0,$66,$04,$E0,$67 ; E114 E0 65 FC E0 66 04 E0 67  .e..f..g
-        .byte   $F4,$E8,$75,$FC,$E8,$76,$04,$E8 ; E11C F4 E8 75 FC E8 76 04 E8  ..u..v..
-        .byte   $77,$F4,$F0,$85,$FC,$F0,$86,$04 ; E124 77 F4 F0 85 FC F0 86 04  w.......
-        .byte   $F0,$87,$EC,$F8,$57,$F4,$F8,$95 ; E12C F0 87 EC F8 57 F4 F8 95  ....W...
-        .byte   $FC,$F8,$96,$04,$F8,$97,$80,$F4 ; E134 FC F8 96 04 F8 97 80 F4  ........
-        .byte   $D8,$58,$FC,$D8,$59,$04,$D8,$5A ; E13C D8 58 FC D8 59 04 D8 5A  .X..Y..Z
-        .byte   $F4,$E0,$68,$FC,$E0,$69,$04,$E0 ; E144 F4 E0 68 FC E0 69 04 E0  ..h..i..
-        .byte   $6A,$F4,$E8,$78,$FC,$E8,$79,$04 ; E14C 6A F4 E8 78 FC E8 79 04  j..x..y.
-        .byte   $E8,$7A,$F4,$F0,$88,$FC,$F0,$89 ; E154 E8 7A F4 F0 88 FC F0 89  .z......
-        .byte   $04,$F0,$8A,$EC,$F8,$4B,$F4,$F8 ; E15C 04 F0 8A EC F8 4B F4 F8  .....K..
-        .byte   $98,$FC,$F8,$99,$04,$F8,$9A,$80 ; E164 98 FC F8 99 04 F8 9A 80  ........
-        .byte   $F4,$D8,$5B,$FC,$D8,$5C,$04,$D8 ; E16C F4 D8 5B FC D8 5C 04 D8  ..[..\..
-        .byte   $5D,$F4,$E0,$6B,$FC,$E0,$6C,$04 ; E174 5D F4 E0 6B FC E0 6C 04  ]..k..l.
-        .byte   $E0,$6D,$F4,$E8,$7B,$FC,$E8,$7C ; E17C E0 6D F4 E8 7B FC E8 7C  .m..{..|
-        .byte   $04,$E8,$7D,$F4,$F0,$8B,$FC,$F0 ; E184 04 E8 7D F4 F0 8B FC F0  ..}.....
-        .byte   $8C,$04,$F0,$8D,$EC,$F8,$3C,$F4 ; E18C 8C 04 F0 8D EC F8 3C F4  ......<.
-        .byte   $F8,$9B,$FC,$F8,$9C,$04,$F8,$9D ; E194 F8 9B FC F8 9C 04 F8 9D  ........
-        .byte   $0C,$F8,$4C,$80,$F4,$E0,$55,$FC ; E19C 0C F8 4C 80 F4 E0 55 FC  ..L...U.
-        .byte   $E0,$56,$F4,$E8,$65,$FC,$E8,$66 ; E1A4 E0 56 F4 E8 65 FC E8 66  .V..e..f
-        .byte   $04,$E8,$67,$F4,$F0,$2E,$FC,$F0 ; E1AC 04 E8 67 F4 F0 2E FC F0  ..g.....
-        .byte   $76,$04,$F0,$77,$0C,$F0,$2F,$EC ; E1B4 76 04 F0 77 0C F0 2F EC  v..w../.
-        .byte   $F8,$3D,$F4,$F8,$3E,$FC,$F8,$3F ; E1BC F8 3D F4 F8 3E FC F8 3F  .=..>..?
-        .byte   $04,$F8,$1E,$0C,$F8,$1F,$80,$F4 ; E1C4 04 F8 1E 0C F8 1F 80 F4  ........
-        .byte   $E8,$55,$FC,$E8,$56,$F4,$F0,$65 ; E1CC E8 55 FC E8 56 F4 F0 65  .U..V..e
-        .byte   $FC,$F0,$66,$04,$F0,$67,$F4,$F8 ; E1D4 FC F0 66 04 F0 67 F4 F8  ..f..g..
-        .byte   $4D,$FC,$F8,$4E,$04,$F8,$4F,$0C ; E1DC 4D FC F8 4E 04 F8 4F 0C  M..N..O.
-        .byte   $F8,$5E,$80,$F4,$F0,$55,$FC,$F0 ; E1E4 F8 5E 80 F4 F0 55 FC F0  .^...U..
-        .byte   $56,$F4,$F8,$6E,$FC,$F8,$6F,$04 ; E1EC 56 F4 F8 6E FC F8 6F 04  V..n..o.
-        .byte   $F8,$7E,$0C,$F8,$7F,$80,$F4,$F8 ; E1F4 F8 7E 0C F8 7F 80 F4 F8  .~......
-        .byte   $8E,$FC,$F8,$8F,$04,$F8,$5F,$80 ; E1FC 8E FC F8 8F 04 F8 5F 80  ......_.
-        .byte   $FC,$F8,$C7,$80,$FC,$F8,$D7,$80 ; E204 FC F8 C7 80 FC F8 D7 80  ........
-        .byte   $FC,$F8,$CF,$80,$FC,$F0,$D5,$F4 ; E20C FC F8 CF 80 FC F0 D5 F4  ........
-        .byte   $F8,$C8,$FC,$F8,$C9,$04,$F8,$CA ; E214 F8 C8 FC F8 C9 04 F8 CA  ........
-        .byte   $80,$FC,$F0,$D5,$F4,$F8,$D8,$FC ; E21C 80 FC F0 D5 F4 F8 D8 FC  ........
-        .byte   $F8,$D9,$04,$F8,$DA,$80,$FC,$F0 ; E224 F8 D9 04 F8 DA 80 FC F0  ........
-        .byte   $D5,$FC,$F8,$DF,$80,$FC,$F0,$CB ; E22C D5 FC F8 DF 80 FC F0 CB  ........
-        .byte   $F4,$F8,$E8,$FC,$F8,$E9,$04,$F8 ; E234 F4 F8 E8 FC F8 E9 04 F8  ........
-        .byte   $EA,$80,$FC,$F0,$CB,$F4,$F8,$F8 ; E23C EA 80 FC F0 CB F4 F8 F8  ........
-        .byte   $FC,$F8,$F9,$04,$F8,$FA,$80,$FC ; E244 FC F8 F9 04 F8 FA 80 FC  ........
-        .byte   $F0,$CB,$F4,$F8,$CC,$FC,$F8,$CD ; E24C F0 CB F4 F8 CC FC F8 CD  ........
-        .byte   $04,$F8,$CE,$80,$FC,$F0,$CB,$FC ; E254 04 F8 CE 80 FC F0 CB FC  ........
-        .byte   $F8,$EF,$80,$FC,$E8,$C6,$FC,$F0 ; E25C F8 EF 80 FC E8 C6 FC F0  ........
-        .byte   $D6,$F4,$F8,$F5,$FC,$F8,$F6,$04 ; E264 D6 F4 F8 F5 FC F8 F6 04  ........
-        .byte   $F8,$F7,$80,$FC,$E8,$C6,$FC,$F0 ; E26C F8 F7 80 FC E8 C6 FC F0  ........
-        .byte   $D6,$F4,$F8,$BD,$FC,$F8,$BE,$04 ; E274 D6 F4 F8 BD FC F8 BE 04  ........
-        .byte   $F8,$BF,$80,$FC,$E8,$C6,$FC,$F0 ; E27C F8 BF 80 FC E8 C6 FC F0  ........
-        .byte   $D6,$F4,$F8,$E5,$FC,$F8,$E6,$04 ; E284 D6 F4 F8 E5 FC F8 E6 04  ........
-        .byte   $F8,$E7,$80,$FC,$E8,$C6,$FC,$F0 ; E28C F8 E7 80 FC E8 C6 FC F0  ........
-        .byte   $D6,$FC,$F8,$C5,$80             ; E294 D6 FC F8 C5 80           .....
+FinaleJawsMovementPattern:
+        .byte $EB,$DE
+        .byte $0D,$DF
+        .byte $2F,$DF
+        .byte $51,$DF
+        .byte $79,$DF
+        .byte $80,$DF
+        .byte $84,$DF
+        .byte $8B,$DF
+        .byte $8F,$DF
+        .byte $99,$DF
+        .byte $9D,$DF
+        .byte $A7,$DF
+        .byte $08,$AB
+        .byte $DF,$08
+        .byte $B2,$DF
+        .byte $08,$B9
+        .byte $DF,$0C
+        .byte $C6,$DF
+        .byte $0C,$D3
+        .byte $DF,$0C
+        .byte $E0,$DF
+        .byte $4C,$D3
+        .byte $DF,$4C
+        .byte $C6,$DF
+        .byte $48,$B9
+        .byte $DF,$48
+        .byte $B2,$DF
+        .byte $48,$AB
+        .byte $DF,$00
+        .byte $08,$ED
+        .byte $DF,$08
+        .byte $F7,$DF
+        .byte $08,$04
+        .byte $E0,$0C
+        .byte $17,$E0
+        .byte $0C,$33
+        .byte $E0,$0C
+        .byte $4C,$E0
+        .byte $4C,$33
+        .byte $E0,$4C
+        .byte $17,$E0
+        .byte $48,$04
+        .byte $E0,$48
+        .byte $F7,$DF
+        .byte $48,$ED
+        .byte $DF,$00
+        .byte $08,$03
+        .byte $E1,$08
+        .byte $F0,$E0
+        .byte $08,$D4
+        .byte $E0,$0C
+        .byte $65,$E0
+        .byte $0C,$B2
+        .byte $E0,$0C
+        .byte $87,$E0
+        .byte $4C,$B2
+        .byte $E0,$4C
+        .byte $65,$E0
+        .byte $48,$D4
+        .byte $E0,$48
+        .byte $F0,$E0
+        .byte $48,$03
+        .byte $E1,$00
+        .byte $06,$FA
+        .byte $E1,$06
+        .byte $E7,$E1
+        .byte $06,$CB
+        .byte $E1,$06
+        .byte $A0,$E1
+        .byte $0A,$0D
+        .byte $E1,$2A
+        .byte $3B,$E1
+        .byte $2A,$6C
+        .byte $E1,$6A
+        .byte $3B,$E1
+        .byte $4A,$0D
+        .byte $E1,$46
+        .byte $A0,$E1
+        .byte $46,$CB
+        .byte $E1,$46
+        .byte $E7,$E1
+        .byte $46,$FA
+        .byte $E1,$00
+        .byte $08,$04
+        .byte $E2,$08
+        .byte $08,$E2
+        .byte $FF,$01
+        .byte $0C,$E2
+        .byte $00,$08
+        .byte $10,$E2
+        .byte $08,$1D
+        .byte $E2,$FF
+        .byte $01,$2A
+        .byte $E2,$00
+        .byte $06,$31
+        .byte $E2,$06
+        .byte $3E,$E2
+        .byte $06,$4B
+        .byte $E2,$FF
+        .byte $01,$58
+        .byte $E2,$00
+        .byte $06,$5F
+        .byte $E2,$06
+        .byte $6F,$E2
+        .byte $06,$7F
+        .byte $E2,$FF
+        .byte $01,$8F
+        .byte $E2,$00
+        .byte $F8,$F8
+        .byte $AF,$00
+        .byte $F8,$9F
+        .byte $80,$F8
+        .byte $F8,$AD
+        .byte $00,$F8
+        .byte $AE,$80
+        .byte $F8,$F0
+        .byte $AB,$00
+        .byte $F0,$AC
+        .byte $F8,$F8
+        .byte $BB,$00
+        .byte $F8,$BC
+        .byte $80,$F8
+        .byte $F0,$A5
+        .byte $00,$F0
+        .byte $A6,$F8
+        .byte $F8,$B5
+        .byte $00,$F8
+        .byte $B6,$80
+        .byte $F8,$F0
+        .byte $A9,$00
+        .byte $F0,$AA
+        .byte $F8,$F8
+        .byte $B9,$00
+        .byte $F8,$BA
+        .byte $80,$F8
+        .byte $F0,$A7
+        .byte $00,$F0
+        .byte $A8,$F8
+        .byte $F8,$B7
+        .byte $00,$F8
+        .byte $B8,$80
+        .byte $F0,$F8
+        .byte $E3,$F8
+        .byte $F8,$E4
+        .byte $00,$F8
+        .byte $F4,$80
+        .byte $F0,$F8
+        .byte $C3,$F8
+        .byte $F8,$C4
+        .byte $00,$F8
+        .byte $D3,$08
+        .byte $F8,$D4
+        .byte $80,$F8
+        .byte $F0,$91
+        .byte $00,$F0
+        .byte $92,$F0
+        .byte $F8,$F0
+        .byte $F8,$F8
+        .byte $F1,$00
+        .byte $F8,$F2
+        .byte $08,$F8
+        .byte $F3,$80
+        .byte $F8,$E8
+        .byte $91,$00
+        .byte $E8,$92
+        .byte $F0,$F0
+        .byte $A0,$F8
+        .byte $F0,$A1
+        .byte $00,$F0
+        .byte $A2,$F0
+        .byte $F8,$B0
+        .byte $F8,$F8
+        .byte $B1,$00
+        .byte $F8,$B2
+        .byte $08,$F8
+        .byte $9E,$80
+        .byte $F8,$E8
+        .byte $93,$00
+        .byte $E8,$94
+        .byte $F8,$F0
+        .byte $A3,$00
+        .byte $F0,$A4
+        .byte $F0,$F8
+        .byte $90,$F8
+        .byte $F8,$B3
+        .byte $00,$F8
+        .byte $B4,$08
+        .byte $F8,$C0
+        .byte $80,$F8
+        .byte $E8,$C1
+        .byte $00,$E8
+        .byte $C2,$F8
+        .byte $F0,$D1
+        .byte $00,$F0
+        .byte $D2,$F0
+        .byte $F8,$E0
+        .byte $F8,$F8
+        .byte $E1,$00
+        .byte $F8,$E2
+        .byte $08,$F8
+        .byte $D0,$80
+        .byte $F9,$E0
+        .byte $04,$01
+        .byte $E0,$05
+        .byte $F9,$E8
+        .byte $14,$01
+        .byte $E8,$15
+        .byte $F1,$F0
+        .byte $23,$F9
+        .byte $F0,$24
+        .byte $01,$F0
+        .byte $25,$F1
+        .byte $F8,$33
+        .byte $F9,$F8
+        .byte $34,$01
+        .byte $F8,$35
+        .byte $09,$F8
+        .byte $36,$80
+        .byte $F7,$E0
+        .byte $16,$FF
+        .byte $E0,$50
+        .byte $F7,$E8
+        .byte $26,$FF
+        .byte $E8,$60
+        .byte $F7,$F0
+        .byte $17,$FF
+        .byte $F0,$70
+        .byte $E7,$F8
+        .byte $19,$EF
+        .byte $F8,$28
+        .byte $F7,$F8
+        .byte $27,$FF
+        .byte $F8,$80
+        .byte $07,$F8
+        .byte $81,$0F
+        .byte $F8,$82
+        .byte $EF,$F0
+        .byte $18,$07
+        .byte $F0,$71
+        .byte $80,$F8
+        .byte $E0,$53
+        .byte $00,$E0
+        .byte $54,$F8
+        .byte $E8,$63
+        .byte $00,$E8
+        .byte $64,$F0
+        .byte $F0,$51
+        .byte $F8,$F0
+        .byte $73,$00
+        .byte $F0,$74
+        .byte $F0,$F8
+        .byte $61,$F8
+        .byte $F8,$83
+        .byte $00,$F8
+        .byte $84,$08
+        .byte $F8,$52
+        .byte $80,$F8
+        .byte $E8,$04
+        .byte $00,$E8
+        .byte $05,$F0
+        .byte $F0,$37
+        .byte $F8,$F0
+        .byte $14,$00
+        .byte $F0,$47
+        .byte $F0,$F8
+        .byte $43,$F8
+        .byte $F8,$44
+        .byte $00,$F8
+        .byte $45,$08
+        .byte $F8,$46
+        .byte $80,$F7
+        .byte $F0,$04
+        .byte $FF,$F0
+        .byte $05,$EF
+        .byte $F8,$38
+        .byte $F7,$F8
+        .byte $39,$FF
+        .byte $F8,$3A
+        .byte $07,$F8
+        .byte $3B,$80
+        .byte $EE,$F8
+        .byte $48,$F6
+        .byte $F8,$49
+        .byte $FE,$F8
+        .byte $4A,$80
+        .byte $F4,$D8
+        .byte $55,$FC
+        .byte $D8,$56
+        .byte $F4,$E0
+        .byte $65,$FC
+        .byte $E0,$66
+        .byte $04,$E0
+        .byte $67,$F4
+        .byte $E8,$75
+        .byte $FC,$E8
+        .byte $76,$04
+        .byte $E8,$77
+        .byte $F4,$F0
+        .byte $85,$FC
+        .byte $F0,$86
+        .byte $04,$F0
+        .byte $87,$EC
+        .byte $F8,$57
+        .byte $F4,$F8
+        .byte $95,$FC
+        .byte $F8,$96
+        .byte $04,$F8
+        .byte $97,$80
+        .byte $F4,$D8
+        .byte $58,$FC
+        .byte $D8,$59
+        .byte $04,$D8
+        .byte $5A,$F4
+        .byte $E0,$68
+        .byte $FC,$E0
+        .byte $69,$04
+        .byte $E0,$6A
+        .byte $F4,$E8
+        .byte $78,$FC
+        .byte $E8,$79
+        .byte $04,$E8
+        .byte $7A,$F4
+        .byte $F0,$88
+        .byte $FC,$F0
+        .byte $89,$04
+        .byte $F0,$8A
+        .byte $EC,$F8
+        .byte $4B,$F4
+        .byte $F8,$98
+        .byte $FC,$F8
+        .byte $99,$04
+        .byte $F8,$9A
+        .byte $80,$F4
+        .byte $D8,$5B
+        .byte $FC,$D8
+        .byte $5C,$04
+        .byte $D8,$5D
+        .byte $F4,$E0
+        .byte $6B,$FC
+        .byte $E0,$6C
+        .byte $04,$E0
+        .byte $6D,$F4
+        .byte $E8,$7B
+        .byte $FC,$E8
+        .byte $7C,$04
+        .byte $E8,$7D
+        .byte $F4,$F0
+        .byte $8B,$FC
+        .byte $F0,$8C
+        .byte $04,$F0
+        .byte $8D,$EC
+        .byte $F8,$3C
+        .byte $F4,$F8
+        .byte $9B,$FC
+        .byte $F8,$9C
+        .byte $04,$F8
+        .byte $9D,$0C
+        .byte $F8,$4C
+        .byte $80,$F4
+        .byte $E0,$55
+        .byte $FC,$E0
+        .byte $56,$F4
+        .byte $E8,$65
+        .byte $FC,$E8
+        .byte $66,$04
+        .byte $E8,$67
+        .byte $F4,$F0
+        .byte $2E,$FC
+        .byte $F0,$76
+        .byte $04,$F0
+        .byte $77,$0C
+        .byte $F0,$2F
+        .byte $EC,$F8
+        .byte $3D,$F4
+        .byte $F8,$3E
+        .byte $FC,$F8
+        .byte $3F,$04
+        .byte $F8,$1E
+        .byte $0C,$F8
+        .byte $1F,$80
+        .byte $F4,$E8
+        .byte $55,$FC
+        .byte $E8,$56
+        .byte $F4,$F0
+        .byte $65,$FC
+        .byte $F0,$66
+        .byte $04,$F0
+        .byte $67,$F4
+        .byte $F8,$4D
+        .byte $FC,$F8
+        .byte $4E,$04
+        .byte $F8,$4F
+        .byte $0C,$F8
+        .byte $5E,$80
+        .byte $F4,$F0
+        .byte $55,$FC
+        .byte $F0,$56
+        .byte $F4,$F8
+        .byte $6E,$FC
+        .byte $F8,$6F
+        .byte $04,$F8
+        .byte $7E,$0C
+        .byte $F8,$7F
+        .byte $80,$F4
+        .byte $F8,$8E
+        .byte $FC,$F8
+        .byte $8F,$04
+        .byte $F8,$5F
+        .byte $80,$FC
+        .byte $F8,$C7
+        .byte $80,$FC
+        .byte $F8,$D7
+        .byte $80,$FC
+        .byte $F8,$CF
+        .byte $80,$FC
+        .byte $F0,$D5
+        .byte $F4,$F8
+        .byte $C8,$FC
+        .byte $F8,$C9
+        .byte $04,$F8
+        .byte $CA,$80
+        .byte $FC,$F0
+        .byte $D5,$F4
+        .byte $F8,$D8
+        .byte $FC,$F8
+        .byte $D9,$04
+        .byte $F8,$DA
+        .byte $80,$FC
+        .byte $F0,$D5
+        .byte $FC,$F8
+        .byte $DF,$80
+        .byte $FC,$F0
+        .byte $CB,$F4
+        .byte $F8,$E8
+        .byte $FC,$F8
+        .byte $E9,$04
+        .byte $F8,$EA
+        .byte $80,$FC
+        .byte $F0,$CB
+        .byte $F4,$F8
+        .byte $F8,$FC
+        .byte $F8,$F9
+        .byte $04,$F8
+        .byte $FA,$80
+        .byte $FC,$F0
+        .byte $CB,$F4
+        .byte $F8,$CC
+        .byte $FC,$F8
+        .byte $CD,$04
+        .byte $F8,$CE
+        .byte $80,$FC
+        .byte $F0,$CB
+        .byte $FC,$F8
+        .byte $EF,$80
+        .byte $FC,$E8
+        .byte $C6,$FC
+        .byte $F0,$D6
+        .byte $F4,$F8
+        .byte $F5,$FC
+        .byte $F8,$F6
+        .byte $04,$F8
+        .byte $F7,$80
+        .byte $FC,$E8
+        .byte $C6,$FC
+        .byte $F0,$D6
+        .byte $F4,$F8
+        .byte $BD,$FC
+        .byte $F8,$BE
+        .byte $04,$F8
+        .byte $BF,$80
+        .byte $FC,$E8
+        .byte $C6,$FC
+        .byte $F0,$D6
+        .byte $F4,$F8
+        .byte $E5,$FC
+        .byte $F8,$E6
+        .byte $04,$F8
+        .byte $E7,$80
+        .byte $FC,$E8
+        .byte $C6,$FC
+        .byte $F0,$D6
+        .byte $FC,$F8
+        .byte $C5,$80            
 
 .include "sound.asm"
 
