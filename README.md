@@ -15,9 +15,8 @@ Left to document
 
 Much of the game has been documented, the main remaining areas are:
 
- - Bonus stage jelly animation code
- - Finale screen
  - Sound system
+ - Finale screen needs cleaning up
 
 On top of this it would be nice to provide aliases for things like flags used differently by different enemy types.
 
