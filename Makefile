@@ -5,6 +5,9 @@ LD = ld65
 
 build: jaws.chr main.nes
 
+integritycheck: main.nes
+	radiff2 -x main.nes original.nes | head -n 100
+
 %.o: %.asm
 	$(AS) --create-dep "$@.dep" -g --debug-info $< -o $@
 

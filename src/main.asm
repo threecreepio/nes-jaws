@@ -35,6 +35,8 @@ NextBGUpdate          = $0303
 PendingBGUpdates      = $0304
 CheatsEnabled         = $0308
 SoundtestSelected     = $00
+
+
 BonusEncounterPtr = $50
 BonusEncounterOffset = $52
 BonusCurrentWave = $53
@@ -251,9 +253,11 @@ EntityMapJawsHeading             = $14
 EntityMapPrevJawsHeading         = $15
 EntityEncounterJawsSpawnTimer    = $14
 
-EntityBonusJellyStartingIndex = $14
+EntityBonusJellyStartingPosition   = $14
 EntityBonusJellyAnimationPathIndex = $15
-EntityBonusJellyPathPointer = $18
+EntityBonusJellyDelay              = $16
+EntityBonusJellyPathPointer        = $18
+EntityBonusJellyPathOffset         = $1A
 
 
 
@@ -10970,17 +10974,20 @@ BonusRunJellyfish:
 @DoneWithBonusScreen:
         rts
 
-; TODO.. this.. :(
 @StartNextWave:
-        @NextWavePtr = $44
+        @StartingDelay  = $00
+        @StartingIndex  = $12
+        @NextWavePtr    = $44
         @EnemiesToSpawn = $46
+        ; get next wave from BonusScreenEncounterSettings
         ldy BonusEncounterOffset
         lda (BonusEncounterPtr),y
         iny
         sty BonusEncounterOffset
-        sta $44
+        ; find offset into BonusEncounterWaveSpawn for the wave
+        sta @NextWavePtr
         asl a
-        adc $44
+        adc @NextWavePtr
         asl a
         adc #<BonusEncounterWaveSpawn
         sta @NextWavePtr
@@ -10988,41 +10995,47 @@ BonusRunJellyfish:
         adc #>BonusEncounterWaveSpawn
         sta @NextWavePtr+1
         ldy #$00
+        ; first byte of wave data
         lda (@NextWavePtr),y
         iny
-        sta $12
+        sta @StartingIndex
+        ; set up starting timing offsets
         ldx #$00
         lda #$40
-        sta $00
+        sta @StartingDelay
         lda #$00
-        sta $01
+        sta @StartingDelay+1
         lda #$05
         sta @EnemiesToSpawn
 @SpawnNextEnemy:
+        ; activate enemy
         lda #EntityHeaderActive
         sta Enemy1Data + EntityHeader,x
-        
+        ; load starting position data
         lda (@NextWavePtr),y
-        sta Enemy1Data + EntityAnimationIndex,x
+        sta Enemy1Data + EntityBonusJellyStartingPosition,x
+        ; load wave animation path
         iny
-        lda $12
-        sta Enemy1Data + EntityActiveAnimationIndex,x
+        lda @StartingIndex
+        sta Enemy1Data + EntityBonusJellyAnimationPathIndex,x
+        ; increment starting delay to space out the wave
         lda #$10
         clc
-        adc $00
-        sta $00
-        sta Enemy1Data + EntityV16,x
-        lda $01
-        adc $01
-        sta $01
-        sta Enemy1Data + EntityV17,x
-        ; advance to next enemy
+        adc @StartingDelay
+        sta @StartingDelay
+        sta Enemy1Data + EntityBonusJellyDelay,x
+        lda @StartingDelay+1
+        adc @StartingDelay+1
+        sta @StartingDelay+1
+        sta Enemy1Data + EntityBonusJellyDelay+1,x
+        ; advance to next enemy data set
         txa
         clc
         adc #$20
         tax
         dec @EnemiesToSpawn
         bne @SpawnNextEnemy
+        ; increment wave number and clear hit counter
         inc BonusCurrentWave
         lda #$00
         sta BonusEnemiesHitInWave
@@ -11035,7 +11048,7 @@ BonusRunSingleJellyfish:
         lda #(EntityHeaderActive | EntityHeader7)
         sta Workset + EntityHeader
         ; get jellyfish offset into starting position table.
-        lda Workset + EntityBonusJellyStartingIndex
+        lda Workset + EntityBonusJellyStartingPosition
         and #$1F
         asl a
         asl a
@@ -11060,92 +11073,101 @@ BonusRunSingleJellyfish:
         ; clear out some settings
         lda #$00
         sta Workset + EntityBonusJellyAnimationPathIndex
-        sta Workset + EntityV1A
+        sta Workset + EntityBonusJellyPathOffset
         sta Workset + EntityV1D
         ; and play our animation
         lda #AnimationBonusJellyfish
         jmp WorksetAnimationPlay
 @Initialized:
         bit Workset + EntityV1D
-        bpl @LD35C
-        jmp @LD4B8
-
-; ----------------------------------------------------------------------------
-@LD35C:
+        bpl @DelayUntilNextAnimation
+        jmp @MoveJellyfish
+@DelayUntilNextAnimation:
+        ; finish up if there are no more segments to play
         bit Workset + EntityBonusJellyAnimationPathIndex
-        bmi @AnimationComplete
-        lda Workset + EntityV16
+        bmi @SetupHitDetection
+        ; decrement delay time
+        lda Workset + EntityBonusJellyDelay
         sec
         sbc #$01
-        sta Workset + EntityV16
-        lda Workset + EntityV17
+        sta Workset + EntityBonusJellyDelay
+        lda Workset + EntityBonusJellyDelay+1
         sbc #$00
-        sta Workset + EntityV17
+        sta Workset + EntityBonusJellyDelay+1
+        ; and leave if we're still delaying.
         bpl @Exit
-        lda #$80
+        ; otherwise attempt to continue the next animation.
+        lda #%10000000
         sta Workset + EntityBonusJellyAnimationPathIndex
-        jmp @LD468
-
-; ----------------------------------------------------------------------------
+        jmp @SetupNextAnimation
 @Exit:
-        rts                                     ; D376 60                       `
+        rts
 
 ; ----------------------------------------------------------------------------
-@AnimationComplete:
-        ldx     #$00                            ; D377 A2 00                    ..
-        lda     #$03                            ; D379 A9 03                    ..
-        sta     $47                             ; D37B 85 47                    .G
-@LD37D:
-        lda     $06A0,x                         ; D37D BD A0 06                 ...
-        bpl     @LD3A5                           ; D380 10 23                    .#
-        asl     a                               ; D382 0A                       .
-        bpl     @LD3A5                           ; D383 10 20                    . 
-        lda     $06A2,x                         ; D385 BD A2 06                 ...
-        sec                                     ; D388 38                       8
-        sbc     Workset + EntityX                             ; D389 E5 22                    ."
-        tay                                     ; D38B A8                       .
-        lda     $06A3,x                         ; D38C BD A3 06                 ...
-        sbc     Workset + EntityX  + 1                            ; D38F E5 23                    .#
-        bcs     @LD39F                           ; D391 B0 0C                    ..
-        eor     #$FF                            ; D393 49 FF                    I.
-        pha                                     ; D395 48                       H
-        tya                                     ; D396 98                       .
-        eor     #$FF                            ; D397 49 FF                    I.
-        adc     #$01                            ; D399 69 01                    i.
-        tay                                     ; D39B A8                       .
-        pla                                     ; D39C 68                       h
-        adc     #$00                            ; D39D 69 00                    i.
-@LD39F:
-        bne     @LD3A5                           ; D39F D0 04                    ..
-        cpy     #$08                            ; D3A1 C0 08                    ..
-        bcc     @LD3A8                           ; D3A3 90 03                    ..
-@LD3A5:
-        jmp     @LD432                           ; D3A5 4C 32 D4                 L2.
+@SetupHitDetection:
+        @TestingProjectileIndex = $47
+        ldx #$00
+        lda #MaxProjectiles
+        sta @TestingProjectileIndex
+@ProjectileXDistanceCheck:
+        ; make sure the projectile is active
+        lda PlayerProjectile1Data + EntityHeader,x
+        bpl @DoneWithHitDetection
+        ; and header 7 bit is set
+        asl a
+        bpl @DoneWithHitDetection
+        ; get x distance
+        lda PlayerProjectile1Data + EntityX,x
+        sec
+        sbc Workset + EntityX
+        tay
+        lda PlayerProjectile1Data + EntityX+1,x
+        sbc Workset + EntityX  + 1
+        bcs @GotAbsoluteXDistance
+        ; get absolute distance instead of negative value
+        eor #$FF
+        pha
+        tya
+        eor #$FF
+        adc #$01
+        tay
+        pla
+        adc #$00
+@GotAbsoluteXDistance:
+        bne @DoneWithHitDetection
+        ; check y distance if we are close enough to hit
+        cpy #$08
+        bcc @ProjectileYDistanceCheck
+@DoneWithHitDetection:
+        jmp @HitDetectNext
 
 ; ----------------------------------------------------------------------------
-@LD3A8:
-        lda     $06A4,x                         ; D3A8 BD A4 06                 ...
-        sec                                     ; D3AB 38                       8
-        sbc     Workset + EntityY                             ; D3AC E5 24                    .$
-        tay                                     ; D3AE A8                       .
-        lda     $06A5,x                         ; D3AF BD A5 06                 ...
-        sbc     Workset + EntityY + 1                             ; D3B2 E5 25                    .%
-        bcs     @LD3C2                           ; D3B4 B0 0C                    ..
-        eor     #$FF                            ; D3B6 49 FF                    I.
-        pha                                     ; D3B8 48                       H
-        tya                                     ; D3B9 98                       .
-        eor     #$FF                            ; D3BA 49 FF                    I.
-        adc     #$01                            ; D3BC 69 01                    i.
-        tay                                     ; D3BE A8                       .
-        pla                                     ; D3BF 68                       h
-        adc     #$00                            ; D3C0 69 00                    i.
-@LD3C2:
-        bne     @LD432                           ; D3C2 D0 6E                    .n
-        cpy     #$08                            ; D3C4 C0 08                    ..
-        bcs     @LD432                           ; D3C6 B0 6A                    .j
-        lda     $06BF,x                         ; D3C8 BD BF 06                 ...
-        ora     #$80                            ; D3CB 09 80                    ..
-        sta     $06BF,x                         ; D3CD 9D BF 06                 ...
+@ProjectileYDistanceCheck:
+        ; get y distance
+        lda PlayerProjectile1Data + EntityY,x
+        sec
+        sbc Workset + EntityY
+        tay
+        lda PlayerProjectile1Data + EntityY + 1,x
+        sbc Workset + EntityY + 1
+        bcs @GotAbsoluteYDistance
+        ; get absolute distance instead of negative value
+        eor #$FF
+        pha
+        tya
+        eor #$FF
+        adc #$01
+        tay
+        pla
+        adc #$00
+@GotAbsoluteYDistance:
+        bne @HitDetectNext
+        cpy #$08
+        bcs @HitDetectNext
+        ; a projectile has hit this jelly, mark it as hit!
+        lda PlayerProjectile1Data + EntityHitDetection,x
+        ora #EntityHitDetected
+        sta PlayerProjectile1Data + EntityHitDetection,x
         ; increment the bonus stage hit counter
         inc BonusEnemiesHit
         ; increment wave hit counter
@@ -11203,112 +11225,119 @@ BonusRunSingleJellyfish:
         jsr SoundPlay
         lda #AnimationEncounterJellyfishDeath
         jmp WorksetAnimationPlay
-@LD432:
+@HitDetectNext:
         txa
         clc
         adc #$20
         tax
-        dec $47
-        beq @LD43E
-        jmp @LD37D
-@LD43E:
+        dec @TestingProjectileIndex
+        beq @DoneCheckingProjectiles
+        jmp @ProjectileXDistanceCheck
+@DoneCheckingProjectiles:
         jsr WorksetAnimationAdvance
         jsr WorksetMoveX
         jsr WorksetMoveY
         bit Workset + EntityActiveAnimationIndex
-        bvs @LD458
+        bvs @CheckForHit
         lda #$01
         bit Workset + EntityHitDetection
-        beq @LD463
+        beq @DecrementDelay
         lda #$C0
         sta Workset + EntityActiveAnimationIndex
-        jmp @LD463
+        jmp @DecrementDelay
+@CheckForHit:
+        lda #$01
+        bit Workset + EntityHitDetection
+        bne @DecrementDelay
+        lda #$00
+        sta Workset + EntityHeader
+        rts
+@DecrementDelay:
+        dec Workset + EntityBonusJellyDelay
+        beq @SetupNextAnimation
+        rts
 
 ; ----------------------------------------------------------------------------
-@LD458:
-        lda     #$01                            ; D458 A9 01                    ..
-        bit     Workset + EntityHitDetection                             ; D45A 24 3F                    $?
-        bne     @LD463                           ; D45C D0 05                    ..
-        .byte   $A9,$00,$85,$20,$60             ; D45E A9 00 85 20 60           ... `
-; ----------------------------------------------------------------------------
-@LD463:
-        dec     Workset + EntityV16                            ; D463 C6 36                    .6
-        beq     @LD468                           ; D465 F0 01                    ..
-        rts                                     ; D467 60                       `
-
-; ----------------------------------------------------------------------------
-@LD468:
-        lda     #$00                            ; D468 A9 00                    ..
-        sta     Workset + EntityXSpeed                             ; D46A 85 31                    .1
-        sta     Workset + EntityYSpeed                             ; D46C 85 33                    .3
-        ldy     Workset + EntityV1A                             ; D46E A4 3A                    .:
-        lda     (Workset + EntityBonusJellyPathPointer),y                         ; D470 B1 38                    .8
-        bne     @LD479                           ; D472 D0 05                    ..
-        .byte   $A9,$00,$85,$20,$60             ; D474 A9 00 85 20 60           ... `
-; ----------------------------------------------------------------------------
-@LD479:
-        iny                                     ; D479 C8                       .
-        sta     Workset + EntityV16                            ; D47A 85 36                    .6
-        lda     (Workset + EntityBonusJellyPathPointer),y                         ; D47C B1 38                    .8
-        iny                                     ; D47E C8                       .
-        sty     Workset + EntityV1A                             ; D47F 84 3A                    .:
-        asl     a                               ; D481 0A                       .
-        bcc     @LD486                           ; D482 90 02                    ..
-        .byte   $C6,$31                         ; D484 C6 31                    .1
-; ----------------------------------------------------------------------------
-@LD486:
-        asl     a                               ; D486 0A                       .
-        rol     Workset + EntityXSpeed                             ; D487 26 31                    &1
-        asl     a                               ; D489 0A                       .
-        rol     Workset + EntityXSpeed                             ; D48A 26 31                    &1
-        tay                                     ; D48C A8                       .
-        and     #$80                            ; D48D 29 80                    ).
-        sta     Workset + EntityXSubspeed                             ; D48F 85 30                    .0
-        tya                                     ; D491 98                       .
-        asl     a                               ; D492 0A                       .
-        asl     a                               ; D493 0A                       .
-        bcc     @LD498                           ; D494 90 02                    ..
-        dec     Workset + EntityYSpeed                             ; D496 C6 33                    .3
-@LD498:
-        asl     a                               ; D498 0A                       .
-        rol     Workset + EntityYSpeed                             ; D499 26 33                    &3
-        asl     a                               ; D49B 0A                       .
-        rol     Workset + EntityYSpeed                             ; D49C 26 33                    &3
-        sta     Workset + EntityYSubspeed                            ; D49E 85 32                    .2
-        bit     $34                             ; D4A0 24 34                    $4
-        bpl     @LD4B7                           ; D4A2 10 13                    ..
-        lda     Workset + EntityXSpeed                             ; D4A4 A5 31                    .1
-        eor     #$FF                            ; D4A6 49 FF                    I.
-        tay                                     ; D4A8 A8                       .
-        lda     Workset + EntityXSubspeed                             ; D4A9 A5 30                    .0
-        eor     #$FF                            ; D4AB 49 FF                    I.
-        clc                                     ; D4AD 18                       .
-        adc     #$01                            ; D4AE 69 01                    i.
-        sta     Workset + EntityXSubspeed                             ; D4B0 85 30                    .0
-        tya                                     ; D4B2 98                       .
-        adc     #$00                            ; D4B3 69 00                    i.
-        sta     Workset + EntityXSpeed                             ; D4B5 85 31                    .1
-@LD4B7:
-        rts                                     ; D4B7 60                       `
-
-; ----------------------------------------------------------------------------
-@LD4B8:
-        jsr     WorksetAnimationAdvance
-        jsr     WorksetMoveY
-        bit     Workset + EntityV1D
-        bvs     @LD4CF
-        lda     Workset + EntityAnimTimer
-        bne     @Done
-        lda     #$C0
-        sta     Workset + EntityV1D
-        lda     Workset + EntityV1C
-        jmp     WorksetAnimationPlay
-@LD4CF:
-        lda     Workset + EntityAnimTimer
-        bne     @Done
-        lda     #$00
-        sta     Workset + EntityHeader
-@Done:
+@SetupNextAnimation:
+        ; clear out some values
+        lda #$00
+        sta Workset + EntityXSpeed
+        sta Workset + EntityYSpeed
+        ldy Workset + EntityBonusJellyPathOffset
+        ; load timer for current point
+        lda (Workset + EntityBonusJellyPathPointer),y
+        bne @LoadPathPoint
+        ; if the next point is 0, we've reached the end of the path.
+        lda #$00
+        sta Workset + EntityHeader
+        rts
+@LoadPathPoint:
+        iny
+        sta Workset + EntityBonusJellyDelay
+        ; load speeds for current point in the path
+        lda (Workset + EntityBonusJellyPathPointer),y
+        ; set offset to next point
+        iny
+        sty Workset + EntityBonusJellyPathOffset
+        ; get x speed from speed byte
+        asl a
+        bcc @CheckedNegativeX
+        dec Workset + EntityXSpeed
+@CheckedNegativeX:
+        asl a
+        rol Workset + EntityXSpeed
+        asl a
+        rol Workset + EntityXSpeed
+        tay
+        and #$80
+        sta Workset + EntityXSubspeed
+        ; get y speed from speed byte
+        tya
+        asl a
+        asl a
+        bcc @CheckedNegativeY
+        dec Workset + EntityYSpeed
+@CheckedNegativeY:
+        asl a
+        rol Workset + EntityYSpeed
+        asl a
+        rol Workset + EntityYSpeed
+        sta Workset + EntityYSubspeed
+        ; check if high bit was set on the starting position.
+        ; if it was, we invert the speeds (jelly started on the right)
+        bit Workset + EntityBonusJellyStartingPosition
+        bpl @JellySpeedDone
+        lda Workset + EntityXSpeed
+        eor #$FF
+        tay
+        lda Workset + EntityXSubspeed
+        eor #$FF
+        clc
+        adc #$01
+        sta Workset + EntityXSubspeed
+        tya
+        adc #$00
+        sta Workset + EntityXSpeed
+@JellySpeedDone:
+        rts
+@MoveJellyfish:
+        ; play the animations and move entity
+        jsr WorksetAnimationAdvance
+        jsr WorksetMoveY
+        bit Workset + EntityV1D
+        bvs @Done1
+        lda Workset + EntityAnimTimer
+        bne @Done2
+        lda #$C0
+        sta Workset + EntityV1D
+        lda Workset + EntityV1C
+        jmp WorksetAnimationPlay
+@Done1:
+        lda Workset + EntityAnimTimer
+        bne @Done2
+        lda #$00
+        sta Workset + EntityHeader
+@Done2:
         rts
 
 ; ----------------------------------------------------------------------------
@@ -11335,9 +11364,10 @@ BonusScreenEncounterSettings:
         .byte $1C,$1D,$1C,$1D,$1E,$1F
 
 ; spawn indexes from BonusJellyfishStartingPositions.
-; every wave has one row. first byte is a flag, does something.
-; the rest are indices for "BonusJellyfishStartingPositions", with high bit set to spawn
-; the jellyfish on the right side of the screen.
+; every wave has one row.
+; first byte of each row is the animation path from BonusJellyPathPointers.
+; the rest are offsets into BonusJellyfishStartingPositions for each enemy,
+; with the high bit set to spawn the enemy on the right side of the screen.
 BonusEncounterWaveSpawn:
         .byte $00,@L|$00,@L|$00,@L|$00,@L|$00,@L|$00
         .byte $00,@R|$01,@R|$01,@R|$01,@R|$01,@R|$01
@@ -11419,6 +11449,8 @@ BonusJellyPathPointers:
         .addr BonusJellyPath0F
 
 ; each path has a series of two byte animation points.
+; first byte is how many frames this point will run for.
+; high nybble is X speed, low nybble is Y speed.
 BonusJellyPath00:
         .byte $40,$0C
         .byte $C0,$21
