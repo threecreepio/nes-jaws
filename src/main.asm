@@ -769,7 +769,7 @@ MapScreenMainLoop:
 @TriggerEncounter:
         tax
         dex
-        stx $034B
+        stx EncounterJawsActive
         lda TrackerDistancePrev
         and #$0F
         tax
