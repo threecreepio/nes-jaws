@@ -9,7 +9,7 @@ MEMORY
 SEGMENTS
 {
 	INES:       load = INES,  type = ro;
-	PRG:        load = PRG, type = ro;
+	PRG:        load = PRG, type = ro, align = $8000;
 	VECTORS:    load = VECTORS, type = ro;
 	CHR:        load = CHR, type = ro;
 }

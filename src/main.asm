@@ -13,23 +13,15 @@ PPUMASK_MIRROR        = $030F
 SCROLL_X              = $0320
 SCROLL_Y              = $0322
 
-SND_SQUARE1_TIMER     = $4000
-SND_SQUARE1_LENGTH    = $4001
-SND_SQUARE2_TIMER     = $4004
-SND_SQUARE2_LENGTH    = $4005
-SND_TRIANGLE_TIMER    = $4008
-SND_TRIANGLE_LENGTH   = $4009
-SND_NOISE_TIMER       = $400C
 
 OAMDMA                = $4014
-SND_MASTERCTRL        = $4015
-
 JOYPAD_PORT1          = $4016
 JOYPAD_PORT2          = $4017
 
 TempCoordX            = $16
 TempCoordY            = $18
 
+MusicStatus = $4A
 
 NextBGUpdate          = $0303
 PendingBGUpdates      = $0304
@@ -213,7 +205,6 @@ SpriteAttr            = Sprite + 2
 SpritePosX            = Sprite + 3
 SPR                   = 4
 
-SoundIsPlaying        = $055D
 PPUADDRStatusbarText  = $2B20
 
 ; $20 bytes of working data
@@ -259,8 +250,23 @@ EntityBonusJellyDelay              = $16
 EntityBonusJellyPathPointer        = $18
 EntityBonusJellyPathOffset         = $1A
 
+
+FinaleCurrentAction       = $08
+FinaleBoatAnimationTimer   = $09
+
+FinaleCurrentActionNone   = %00000000
+FinaleCurrentActionJab    = %00000001
+FinaleCurrentActionB7     = %10000000
+FinaleCurrentActionB6     = %01000000
+FinaleCurrentActionB4     = %00010000
+
+FinaleJawsFlags2Reversing = %00000001
+FinaleJawsFlags2B7        = %10000000
+
 ; offset into sprite memory where the finale boat sprites are located
 FinaleBoatSpriteOffset          = SPR*8
+; offset to the jabbing portion of the boat
+FinaleBoatJabberSpriteOffset    = SPR*44
 ; offset into sprite memory where the finale jaws sprites are located
 FinaleJawsSpriteOffset          = SPR*46
 FinaleJawsFlags                 = Workset + EntityHeader
@@ -284,7 +290,6 @@ FinaleJawsV17                   = Workset + EntityV17
 FinaleJawsXDirection            = Workset + EntityV18
 FinaleJawsV1E                   = Workset + EntityV1E
 FinaleJawsHitDetection          = Workset + EntityHitDetection
-FinaleJawsFlags2Reversing       = %00000001
 
 
 EntityHitEnabled        = %00000001
@@ -347,6 +352,7 @@ JOY_RIGHT             = %10000000
 VRAMFlagMultipleBytes = %10000000
 
 .segment "PRG"
+.org $8000
 ; LJN copyright notice at the top of the ROM. Why not.
 .byte "(c)1987 LJN TOYS,INC.",$0D,$0A
 .byte "TM&(c)1987 UNIVERSAL CITY STUDIOS,INC. ALL RIGHTS RESERVED.",$0D,$0A
@@ -362,7 +368,7 @@ CHRFinaleAndOutroScreen      = 3
 CHRBANKS:
 .byte $00,$01,$02,$03
 
-; unknown
+; unused alignment padding
 .byte $FF,$FF,$FF,$FF
 .byte $E0,$00,$00,$00,$A0,$55,$AA,$00
 .byte $FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF
@@ -374,7 +380,7 @@ CHRBANKS:
 .byte $00,$F0,$FE,$FF,$FC,$C0,$00,$FF
 .byte $FF,$0F,$01,$40,$AB,$7F,$FF
 
-; ----------------------------------------------------------------------------
+.align $100
 VBOOT:
         sei
         cld
@@ -734,8 +740,8 @@ MapScreenMainLoop:
         sta ShowStatusBarTextLine         
         lda #$01
         sta NMISpriteHandlingDisabled
-        ; update 4A, not used as far as i can tell.
-        sta $4A
+        ; stop music playback
+        sta MusicStatus
         lda #SFXPause
         jsr SoundPlay
         jsr CopyToVRAMBuffer
@@ -753,8 +759,8 @@ MapScreenMainLoop:
         jmp @WaitForUnpause
 @Unpause:
         lda #$00
-        ; update 4A, not used as far as i can tell.
-        sta $4A
+        ; restart music
+        sta MusicStatus
         lda #$01
         sta ShowStatusBarTextLine         
         bit CheatsEnabled
@@ -854,8 +860,8 @@ RunEncounterScreen:
         sta ShowStatusBarTextLine
         lda #$01
         sta NMISpriteHandlingDisabled
-        ; update 4A, not used as far as i can tell.
-        sta $4A
+        ; stop music
+        sta MusicStatus
         lda #SFXPause
         jsr SoundPlay
         jsr CopyToVRAMBuffer
@@ -872,9 +878,9 @@ RunEncounterScreen:
         jsr WaitForYSpins
         jmp @PauseLoop
 @Unpause:
+        ; reactivate music
         lda #$00
-        ; update 4A, not used as far as i can tell.
-        sta $4A
+        sta MusicStatus
         lda #$01
         sta ShowStatusBarTextLine
         bit CheatsEnabled
@@ -1070,7 +1076,7 @@ RunPlayerDeathAnimation:
         sta WorksetPtr+1
         jsr WorksetLoad
         bit Workset + EntityHeader
-        bvs @L8644
+        bvs @IsActive
         lda #(EntityHeaderActive | EntityHeader7)
         sta Workset + EntityHeader
         lda #$00
@@ -1080,9 +1086,9 @@ RunPlayerDeathAnimation:
         lda #AnimationEncounterPlayerDeath1
         jsr WorksetAnimationPlay
         jmp WorksetSave
-@L8644:
+@IsActive:
         bit Workset + EntityAnimationIndex
-        bmi @L8681
+        bmi @CheckHitDetection
         dec Workset + EntityActiveAnimationIndex
         beq @RemoveOtherEntities
         jmp WorksetSave
@@ -1119,7 +1125,7 @@ RunPlayerDeathAnimation:
         lda #$01
         sta Workset + EntityYSpeed
         jmp WorksetSave
-@L8681:
+@CheckHitDetection:
         lda #EntityHitEnabled
         bit Workset + EntityHitDetection
         bne @KeepAnimating
@@ -1634,7 +1640,7 @@ VNMI:
         ldx ActiveCHR
         lda CHRBANKS,x
         sta CHRBANKS,x
-        lda SoundIsPlaying
+        lda SoundStatus
         bne @Exit
         jsr SoundUpdate
 @Exit:
@@ -2378,7 +2384,7 @@ MapRunPlayer:
 @PlayerIsActive:
         lda #$08
         bit Workset + EntityAnimationIndex
-        beq L8F9F
+        beq @ProcessMapMovement
         jsr MapGetDPadDirection
         cmp #$08
         bcc @PlayerHoldingDPadDirection
@@ -2391,7 +2397,7 @@ MapRunPlayer:
         bcs @NonPassable
         jsr MapRunPlayerAnimation
         jsr MapUpdatePlayerSpeed
-        jmp MapMovePlayer
+        jmp @MapMovePlayer
 @NonPassable:
         ; freeze the player, we can't move in the
         ; direction they are pressing.
@@ -2400,9 +2406,7 @@ MapRunPlayer:
         sta Workset + EntityAnimationIndex
         jsr MapRunPlayerAnimation
         jmp SaveWorksetAndRTS
-
-; ----------------------------------------------------------------------------
-L8F9F:
+@ProcessMapMovement:
         jsr MapGetDPadDirection
         ; branch away if no direction is held.
         cmp #$08
@@ -2417,7 +2421,7 @@ L8F9F:
         jsr MapUpdatePlayerSpeed
 @KeepMoving:
         jsr WorksetAnimationAdvance
-MapMovePlayer:
+@MapMovePlayer:
         jsr WorksetMoveX
         jsr WorksetMoveY
         ; check if we are properly lined up on the X coordinate
@@ -7578,15 +7582,15 @@ AnimationMapJawsS                    = $12
 AnimationMapJawsDN                   = $13
 AnimationMapJawsDS                   = $14
 AnimationMapJawsEmergeEW             = $15
-AnimationMapJawsEmergeNS           = $16
-AnimationBonusJellyfish     = $17
-AnimationMapJawsEmergeDN           = $18
-AnimationMapJawsEmergeDS           = $19
+AnimationMapJawsEmergeNS             = $16
+AnimationBonusJellyfish              = $17
+AnimationMapJawsEmergeDN             = $18
+AnimationMapJawsEmergeDS             = $19
 AnimationMapJawsSubmergeEW           = $1A
-AnimationMapJawsSubmergeNS             = $1B
+AnimationMapJawsSubmergeNS           = $1B
 AnimationUnused1                     = $1C
-AnimationMapJawsSubmergeDN             = $1D
-AnimationMapJawsSubmergeDS             = $1E
+AnimationMapJawsSubmergeDN           = $1D
+AnimationMapJawsSubmergeDS           = $1E
 AnimationEncounterBabyshark          = $1F
 AnimationEncounterBoat               = $20
 AnimationEncounterSubmarine          = $21
@@ -11684,7 +11688,7 @@ EnterFinaleScreen:
         ldx #$1F
         lda #$00
 @InactivateAllEntities:
-        sta $20,x
+        sta Workset,x
         dex
         bpl @InactivateAllEntities
         ; update sprite positions
@@ -11704,14 +11708,15 @@ EnterFinaleScreen:
         inx
         inx
         inx
-        cpx #$90
+        ; loop until the end of the sprite data to write
+        cpx #(FinaleBoatSpritesEnd-FinaleBoatSprites)/3*4
         bcc @PlaceStartingSprites
         ; clear some flags
         ldy #(FinaleBoatNotJabbingAnimation - FinaleBoatAnimations)
         jsr FinaleAnimateBoat
-        lda #$00
-        sta $08
-        sta $09
+        lda #FinaleCurrentActionNone
+        sta FinaleCurrentAction
+        sta FinaleBoatAnimationTimer
         sta EventFlags
         ; clear out background..
         ldx #$5F
@@ -11765,7 +11770,7 @@ EnterFinaleScreen:
         clc
         adc #$06
         sta SpriteTile + (SPR*7)
-        jsr @LD862
+        jsr FinaleDrawJawsOffscreenPointer
         ; if event bit 8 set, jaws is dead.
         bit EventFlags
         bmi @ProcessJawsDeath
@@ -11788,21 +11793,39 @@ EnterFinaleScreen:
         dec @TempDelayTimer
         bne @DelayForJawsDeathAnimation
         jmp EnterOutroScreen
-@LD862:
+
+FinaleDrawJawsOffscreenPointer:
         lda FinaleJawsX + 1
-        bne LD86C
+        bne @JawsIsOffscreen
+        ; jaws is visible, move arrow offscreen
         lda #$F0
-        sta SpritePosY + (SPR * 44)
+        sta SpritePosY + (SPR*44)
         rts
-
-; ----------------------------------------------------------------------------
-LD86C:
-        .byte   $A9,$D8,$8D,$B0,$02,$A9,$29,$8D ; D86C A9 D8 8D B0 02 A9 29 8D  ......).
-        .byte   $B1,$02,$24,$23,$10,$0B,$A9,$40 ; D874 B1 02 24 23 10 0B A9 40  ..$#...@
-        .byte   $8D,$B2,$02,$A9,$20,$8D,$B3,$02 ; D87C 8D B2 02 A9 20 8D B3 02  .... ...
-        .byte   $60,$A9,$00,$8D,$B2,$02,$A9,$D8 ; D884 60 A9 00 8D B2 02 A9 D8  `.......
-        .byte   $8D,$B3,$02,$60                 ; D88C 8D B3 02 60              ...`
-
+@JawsIsOffscreen:
+        ; move arrow onscreen
+        lda #$D8
+        sta SpritePosY + (SPR*44)
+        ; set arrow sprite
+        lda #$29
+        sta SpriteTile + (SPR*44)
+        ; check if jaws is off the the right
+        bit FinaleJawsX + 1
+        bpl @PlaceArrowRight
+        ; jaws is to the left, flip sprite
+        lda #$40
+        sta SpriteAttr + (SPR*44)
+        ; place arrow on left side of screen
+        lda #$20
+        sta SpritePosX + (SPR*44)
+        rts
+@PlaceArrowRight:
+        ; jaws is to the right, dont flip sprite
+        lda #$00
+        sta SpriteAttr + (SPR*44)
+        ; place arrow on right side of screen
+        lda #$D8
+        sta SpritePosX + (SPR*44)
+        rts                      
 
 ; This is the "STROBE" text shown on the Finale,
 ; presumably uses sprites to avoid interaction with Parallax scroll.
@@ -11858,6 +11881,7 @@ FinaleBoatSprites:
         .byte $ED,$40,$88 ; row 7
         .byte $EC,$41,$90 ; row 7
         .byte $EB,$41,$98 ; row 7
+FinaleBoatSpritesEnd:
 
 ; Animation data for the finale boat when player is jabbing.
 ; Table is made up of a list of 2-byte values, terminated by $00
@@ -11915,35 +11939,40 @@ FinaleAnimateBoat:
         bne @MoveNextSprite
         beq @NextSpriteRow
 
-FinaleStrobeFlags = $21
-
 FinaleProcessStrobeAndJab:
-        lda FinaleStrobeFlags
+        ; if the strobe is active, run strobe code!
+        lda FinaleJawsFlags2
         bmi @StrobeIsUsed
+        ; make sure we have a strobe
         lda PlayerStrobeCount
-        beq @LD9AB
-        lda #$01
+        beq @RunBoatJabIfActive
+        ; check if player is trying to strobe
+        lda #JOY_A
         bit Joy1Pressed
-        beq @LD9AB
+        beq @RunBoatJabIfActive
+        ; okay time to use a strobe!
         dec PlayerStrobeCount
-        lda FinaleStrobeFlags
-        and #$01
-        ora #$80
-        sta FinaleStrobeFlags
-        lda $08
-        ora #$10
-        sta $08
+        ; update state to trigger strobe
+        lda FinaleJawsFlags2
+        and #FinaleJawsFlags2Reversing
+        ora #FinaleJawsFlags2B7
+        sta FinaleJawsFlags2
+        lda FinaleCurrentAction
+        ora #FinaleCurrentActionB4
+        sta FinaleCurrentAction
         lda #SFXFinaleStrobe
         jsr SoundPlay
-        jmp @LD9AB
+        jmp @RunBoatJabIfActive
 @StrobeIsUsed:
         ; the strobe has been used, jaws is out of the water.
-        ; check if we're jabbing!
-        bit $08
-        bmi @LD9B0
-        lda #%00010000
-        bit $08
+        ; if we're currently jabbing, run boat jab code
+        bit FinaleCurrentAction
+        bmi @RunBoatJab
+        ; bail if we can't currently jab
+        lda #FinaleCurrentActionB4
+        bit FinaleCurrentAction
         beq @Done
+        ; start jabbing if the player presses B
         lda #JOY_B
         bit Joy1Pressed
         bne @JabBoat
@@ -11951,47 +11980,53 @@ FinaleProcessStrobeAndJab:
         rts
 
 @JabBoat:
-        lda #$80
-        sta $08
+        ; set jabbing state
+        lda #FinaleCurrentActionB7
+        sta FinaleCurrentAction
+        ; set animation state
         lda #$02
-        sta $09
+        sta FinaleBoatAnimationTimer
+        ; and start animation
         ldy #(FinaleBoatJab1Animation - FinaleBoatAnimations)
         jmp FinaleAnimateBoat
 
-
-@LD9AB:
-        bit $08
-        bmi @LD9B0
+@RunBoatJabIfActive:
+        bit FinaleCurrentAction
+        bmi @RunBoatJab
         rts
-
-@LD9B0:
-        bvs @LD9C6
-        dec $09
+@RunBoatJab:
+        bvs @RunBoatJab2
+        ; keep running until the animation has finished
+        dec FinaleBoatAnimationTimer
         bne @Exit
+        ; attempt to strike jaws
         jsr AttemptToStrikeJawsWithBoat
-        lda #$C0
-        sta $08
+        lda #FinaleCurrentActionB7|FinaleCurrentActionB6
+        sta FinaleCurrentAction
+        ; play second part of jabbing animation
         lda #$08
-        sta $09
+        sta FinaleBoatAnimationTimer
         ldy #(FinaleBoatJab2Animation - FinaleBoatAnimations)
         jmp FinaleAnimateBoat
-@LD9C6:
-        lda $08
-        and #$01
-        bne @LUnk
-        dec $09
+@RunBoatJab2:
+        lda FinaleCurrentAction
+        and #FinaleCurrentActionJab
+        bne @ReturnToNormalState
+        dec FinaleBoatAnimationTimer
         bne @Exit
-        lda #$C1
-        sta $08
+        lda #FinaleCurrentActionB7|FinaleCurrentActionB6|FinaleCurrentActionJab
+        sta FinaleCurrentAction
         lda #$02
-        sta $09
+        sta FinaleBoatAnimationTimer
         ldy #(FinaleBoatJab1Animation - FinaleBoatAnimations)
         jmp FinaleAnimateBoat
-@LUnk:
-        dec $09
+@ReturnToNormalState:
+        ; keep running until the animation has finished
+        dec FinaleBoatAnimationTimer
         bne @Exit
-        lda #$00
-        sta $08
+        ; restore back to normal boat state
+        lda #FinaleCurrentActionNone
+        sta FinaleCurrentAction
         ldy #(FinaleBoatNotJabbingAnimation - FinaleBoatAnimations)
         jmp FinaleAnimateBoat
 @Exit:
@@ -11999,6 +12034,7 @@ FinaleProcessStrobeAndJab:
 
 ; ----------------------------------------------------------------------------
 AttemptToStrikeJawsWithBoat:
+        ; check so jaws is in the correct position range to get hit
         lda FinaleJawsX  + 1
         bne @Exit
         lda FinaleJawsX
@@ -12017,7 +12053,7 @@ AttemptToStrikeJawsWithBoat:
         bit FinaleJawsV1E
         beq @Exit
         ; jaws has been struck dead.
-        ; time to place out our strike strikes and delay until the outro.
+        ; time to place out our strike sprites and delay until the outro.
         lda #EventFlagsFinaleJawsDead
         sta EventFlags
         lda #SFXFinaleHit
@@ -12026,9 +12062,9 @@ AttemptToStrikeJawsWithBoat:
         ldy #$00
 @PlaceJawsHitSprites:
         lda @JawsStruckSprites,y
-        sta SpriteTile + (SPR * 8),x
+        sta SpriteTile + (SPR*8),x
         lda @JawsStruckSprites+1,y
-        sta SpriteAttr + (SPR * 8),x
+        sta SpriteAttr + (SPR*8),x
         ; advance to next sprite.
         inx
         inx
@@ -12093,13 +12129,14 @@ FinaleUpdateJawsPosition:
         cmp FinaleJawsV17
         beq @AdjustSpeedForParallax
 @ChangeJawsDirection:
+        @Temp = $12
         sta FinaleJawsV17
         asl a
-        sta $12
+        sta @Temp
         lda FinaleJawsFlags2
         and #FinaleJawsFlags2Reversing
         clc
-        adc $12
+        adc @Temp
         adc #$04
         jsr @UpdateJawsMovementPattern
         jsr RNGAdvance
@@ -12153,7 +12190,7 @@ FinaleUpdateJawsPosition:
         adc #$00
         sta FinaleJawsXSpeed
 @UpdateYSpeed:
-        lda #$01
+        lda #FinaleJawsFlags2Reversing
         bit FinaleJawsFlags2
         beq @CheckInputs
         lda FinaleJawsYSpeed
@@ -12222,7 +12259,7 @@ FinaleUpdateJawsPosition:
 @UpdatePosition:
         sta FinaleJawsX + 1
         jsr WorksetMoveY
-        lda #$01
+        lda #FinaleJawsFlags2Reversing
         bit FinaleJawsFlags2
         bne @CheckIfJawsShouldAdvance
         lda FinaleJawsY
@@ -12232,7 +12269,7 @@ FinaleUpdateJawsPosition:
         ; in that case turn around and move 
         lda #$B8
         sta FinaleJawsY
-        lda #$01
+        lda #FinaleJawsFlags2Reversing
         sta FinaleJawsFlags2
 @ContinueInCurrentDirection:
         jmp @Exit
@@ -12274,7 +12311,7 @@ FinaleUpdateJawsPosition:
         bit FinaleJawsHitDetection
         beq @Exit
         lda FinaleJawsFlags2
-        and #$01
+        and #FinaleJawsFlags2Reversing
         sta FinaleJawsFlags2
 @Exit:
         rts
@@ -13429,6 +13466,7 @@ CopyTextPause:
 .byte $07,$03,$00,$00,$00
 
 ; first byte is top left of the map, descends in Y order, each line is full height of the map.
+.align $100
 WorldMapData:
 .byte $78,$78,$47,$48,$46,$49,$47,$48,$73,$34,$80,$3F,$80,$80,$80,$80,$3C,$1E,$82,$05,$35,$23,$20,$13
 .byte $40,$41,$43,$40,$49,$4A,$60,$78,$73,$1B,$24,$80,$80,$80,$80,$2F,$3D,$1D,$0D,$06,$36,$05,$35,$31
@@ -13464,6 +13502,7 @@ WorldMapData:
 .byte $80,$80,$80,$80,$80,$80,$80,$0E,$80,$80,$80,$80,$80,$80,$06,$81,$81,$81,$81,$81,$81,$81,$81,$81
 
 ; map attributes
+.align $100
 WorldMapDataAttributes:
 .byte $FF,$FF,$FF,$FF,$AF,$AA,$0A,$AA,$AA,$6A,$55,$66,$0A
 .byte $FF,$FF,$FF,$FF,$FF,$AF,$0A,$A6,$AA,$9A,$59,$55,$06
@@ -13482,7 +13521,7 @@ WorldMapDataAttributes:
 .byte $AA,$FA,$AF,$BA,$BB,$BB,$AA,$6A,$56,$55,$55,$55,$05
 .byte $AA,$AA,$AA,$AA,$AA,$AA,$AA,$5A,$55,$55,$55,$55,$05
 
-; unused?
+; unused padding
 .byte $03,$03,$07,$07,$03,$00,$00,$00
 .byte $03,$03,$07,$07,$03,$00,$00,$00
 .byte $80,$80,$C0,$C0,$80,$00,$00,$00
@@ -13492,6 +13531,7 @@ WorldMapDataAttributes:
 
 ; im sure not all of these are the actual metatiles.. but whatever.
 ; a metatile is a block of 4 tiles that are drawn in a 2x2 square.
+.align $100
 Metatiles:
 .byte $01,$01,$01,$58 ; metatile $00
 .byte $FF,$FF,$FF,$FF ; metatile $01
@@ -13678,7 +13718,7 @@ Metatiles:
 .byte $4F,$59,$5F,$02 ; metatile $B5
 .byte $46,$40,$02,$02 ; metatile $B6
 
-; unused
+; unused alignmend padding
 .byte $00,$00,$00,$00
 .byte $00,$00,$00,$00
 .byte $00,$00,$00,$00
@@ -13689,6 +13729,7 @@ Metatiles:
 .byte $00,$00,$00,$00
 .byte $00,$00,$00,$00
 
+.align $100
 WorldMapFlags:
 .byte $66,$66,$66,$66,$66,$66,$40,$00,$00,$00,$00,$00,$00,$00,$00,$00
 .byte $66,$66,$66,$66,$66,$64,$30,$00,$00,$00,$00,$00,$00,$00,$00,$00
@@ -13715,6 +13756,7 @@ WorldMapFlags:
 .byte $46,$66,$64,$30,$00,$00,$00,$00,$04,$66,$66,$66,$66,$66,$66,$66
 .byte $44,$46,$64,$44,$40,$00,$00,$00,$04,$44,$66,$66,$66,$66,$66,$66
 
+.align $80
 AwardPointsTable:
 .byte  $00,$00,$00,$00,$00,$01
 .byte  $00,$00,$00,$00,$00,$02
@@ -13735,7 +13777,7 @@ AwardPointsTable:
 .byte  $00,$00,$00,$05,$00,$00
 .byte  $00,$00,$01,$00,$00,$00
 
-; unused
+; unused padding
 .byte   $70,$FF,$FF,$FF,$3C,$3C
 .byte   $3C,$FC,$FC,$FC,$F8,$E0
 .byte   $DF,$DF

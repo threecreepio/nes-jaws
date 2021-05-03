@@ -5,7 +5,7 @@ LD = ld65
 
 build: jaws.chr main.nes
 
-integritycheck: main.nes
+integritycheck: build
 	radiff2 -x main.nes original.nes | head -n 100
 
 %.o: %.asm
