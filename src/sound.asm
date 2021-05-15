@@ -12,9 +12,9 @@ SoundChannelStatus       = SoundChannel0 + $00
 SoundChannelTimer        = SoundChannel0 + $02
 SoundChannelPeriod       = SoundChannel0 + $03
 SoundChannelDuty         = SoundChannel0 + $04
-SoundChannel_05          = SoundChannel0 + $05
-SoundChannel_06          = SoundChannel0 + $06
-SoundChannel_07          = SoundChannel0 + $07
+SoundChannelDutyAdjust          = SoundChannel0 + $05
+SoundChannelTimer1          = SoundChannel0 + $06
+SoundChannelTimer2          = SoundChannel0 + $07
 SoundChannelDataPtr      = SoundChannel0 + $08
 SoundChannel_0A          = SoundChannel0 + $0A
 SoundChannel_0B          = SoundChannel0 + $0B
@@ -146,11 +146,11 @@ SoundPlay:
         lda #$80
         sta SoundChannelStatus,x
         lda #$00
-        sta SoundChannel_05,x
+        sta SoundChannelDutyAdjust,x
         lda #$01
-        sta SoundChannel_06,x
+        sta SoundChannelTimer1,x
         lda #$0C
-        sta SoundChannel_07,x
+        sta SoundChannelTimer2,x
         ; copy pointer to the data for this sound channel
         lda (SoundDataPtr),y
         iny
@@ -318,7 +318,7 @@ LE417:
 SoundRunChannel0:
         lda     #$30                            ; E424 A9 30                    .0
         sta     NextSND_Sq0Duty                           ; E426 8D 67 05                 .g.
-        dec     SoundChannel_06,x                         ; E429 DE 7A 05                 .z.
+        dec     SoundChannelTimer1,x                         ; E429 DE 7A 05                 .z.
         bne     LE43B                           ; E42C D0 0D                    ..
         lda     #$00                            ; E42E A9 00                    ..
         sta     NextSND_ApuStatus                           ; E430 8D 6B 05                 .k.
@@ -368,7 +368,7 @@ LE451:
 SoundRunChannel1:
         lda     #$30                            ; E479 A9 30                    .0
         sta     NextSND_Sq1Duty                           ; E47B 8D 68 05                 .h.
-        dec     SoundChannel_06,x                         ; E47E DE 7A 05                 .z.
+        dec     SoundChannelTimer1,x                         ; E47E DE 7A 05                 .z.
         bne     LE490                           ; E481 D0 0D                    ..
         lda     #$00                            ; E483 A9 00                    ..
         sta     NextSND_ApuStatus                           ; E485 8D 6B 05                 .k.
@@ -418,7 +418,7 @@ LE4A6:
 SoundRunChannel2:
         lda     #$80                            ; E4CE A9 80                    ..
         sta     NextSND_TrgLinear                           ; E4D0 8D 69 05                 .i.
-        dec     SoundChannel_06,x                         ; E4D3 DE 7A 05                 .z.
+        dec     SoundChannelTimer1,x                         ; E4D3 DE 7A 05                 .z.
         bne     LE4E5                           ; E4D6 D0 0D                    ..
         lda     #$01                            ; E4D8 A9 01                    ..
         sta     NextSND_ApuStatus                           ; E4DA 8D 6B 05                 .k.
@@ -470,7 +470,7 @@ LE523:
 SoundRunChannel3:
         lda     #$30                            ; E524 A9 30                    .0
         sta     NextSND_NoiseVolume                           ; E526 8D 6A 05                 .j.
-        dec     SoundChannel_06,x                         ; E529 DE 7A 05                 .z.
+        dec     SoundChannelTimer1,x                         ; E529 DE 7A 05                 .z.
         bne     LE53B                           ; E52C D0 0D                    ..
         lda     #$02                            ; E52E A9 02                    ..
         sta     NextSND_ApuStatus                           ; E530 8D 6B 05                 .k.
@@ -574,7 +574,7 @@ LE5BB:
         tay                                     ; E5D2 A8                       .
         and     #$0F                            ; E5D3 29 0F                    ).
         sec                                     ; E5D5 38                       8
-        sbc     SoundChannel_05,x                         ; E5D6 FD 79 05                 .y.
+        sbc     SoundChannelDutyAdjust,x                         ; E5D6 FD 79 05                 .y.
         bcs     LE5DD                           ; E5D9 B0 02                    ..
         lda     #$00                            ; E5DB A9 00                    ..
 LE5DD:
@@ -594,8 +594,8 @@ LE5E9:
         sta     SoundDataPtr                             ; E5EC 85 F0                    ..
         lda     SoundChannelDataPtr+1,x                         ; E5EE BD 7D 05                 .}.
         sta     SoundDataPtr+1                             ; E5F1 85 F1                    ..
-        lda     SoundChannel_07,x                         ; E5F3 BD 7B 05                 .{.
-        sta     SoundChannel_06,x                         ; E5F6 9D 7A 05                 .z.
+        lda     SoundChannelTimer2,x                         ; E5F3 BD 7B 05                 .{.
+        sta     SoundChannelTimer1,x                         ; E5F6 9D 7A 05                 .z.
         lda     SoundCurrentChannelStatus                             ; E5F9 A5 F2                    ..
         tay                                     ; E5FB A8                       .
         and     #$B3                            ; E5FC 29 B3                    ).
@@ -610,41 +610,57 @@ LE5E9:
 ; read more data from the current sound channel and excute instructions
 ProcessSoundData:
         jsr ReadSoundData
+        ; if value is lower than 80
         cmp #$80
         bcc LE669
+        ; if value is between C0 and FF 
         cmp #$C0
-        bcs @LE622
+        bcs @RunSoundOpOrLoop
+        ; if value is between 80 and BF, we're setting the channel timer
         and #$7F
         tay
-        lda LE978,y
-        sta SoundChannel_06,x
-        sta SoundChannel_07,x
+        ; find correct timer value and update both
+        lda SoundTimingValues,y
+        sta SoundChannelTimer1,x
+        sta SoundChannelTimer2,x
+        ; then continue reading sound data
         jmp ProcessSoundData
-@LE622:
+@RunSoundOpOrLoop:
+        ; if above E0
         cmp #$E0
-        bcs @LE638
+        bcs @RunSoundOpOrLoop2
+        ; we are between C0 and DF, which means we're setting a loop point
+        ; the number of loops is the value - BE, so, a minimum of 2.
         sbc #$BE
         sta SoundChannelLoopCounter,x
+        ; then store a backup of our current location
         lda SoundDataPtr
         sta SoundDataPtrCopy,x
         lda SoundDataPtr+1
         sta SoundDataPtrCopy+1,x
+        ; and finally continue reading sound data
         jmp ProcessSoundData
-@LE638:
+@RunSoundOpOrLoop2:
+        ; if the value is EC or above, we're calling a soundop
         sbc #$EC
         bcs @RunSoundOp
+        ; otherwise we're doing a call loop, where we run sound code from a data pointer
+        ; first we check how many loops to run
         adc #$0D
         sta SoundChannelLoopCounter,x
+        ; then store a backup of our current location
         lda SoundDataPtr
         sta SoundDataPtrCopy,x
         lda SoundDataPtr+1
         sta SoundDataPtrCopy+1,x
+        ; then read the pointer to the call target
         jsr ReadSoundData
-        pha
+        pha ; pointless...
         jsr ReadSoundData
         sta SoundDataPtr+1
-        pla
+        pla ; so pointless...
         sta SoundDataPtr
+        ; and finally continue reading sound data
         jmp ProcessSoundData
 @RunSoundOp:
         @TempJmpTarget = $F4
@@ -664,7 +680,7 @@ LE669:
         and     #%01000000                            ; E66A 29 40                    )@
         beq     @LE674                           ; E66C F0 06                    ..
         lda     SoundCurrentChannelStatus                             ; E66E A5 F2                    ..
-        ora     #$04                            ; E670 09 04                    ..
+        ora     #%00000100                            ; E670 09 04                    ..
         sta     SoundCurrentChannelStatus                             ; E672 85 F2                    ..
 @LE674:
         tya                                     ; E674 98                       .
@@ -819,7 +835,7 @@ LE669:
         eor     #$01                            ; E77A 49 01                    I.
         and     #$05                            ; E77C 29 05                    ).
         bne     @ChannelDone                           ; E77E D0 2F                    ./
-        lda     SoundChannel_06,x                         ; E780 BD 7A 05                 .z.
+        lda     SoundChannelTimer1,x                         ; E780 BD 7A 05                 .z.
         lsr     a                               ; E783 4A                       J
         sta     $F4                           ; E784 85 F4                    ..
         lda     SoundChannel_0B,x                         ; E786 BD 7F 05                 ...
@@ -846,7 +862,7 @@ LE669:
         bne     @LE7A7                           ; E7A4 D0 01                    ..
         clc                                     ; E7A6 18                       .
 @LE7A7:
-        lda     SoundChannel_06,x                         ; E7A7 BD 7A 05                 .z.
+        lda     SoundChannelTimer1,x                         ; E7A7 BD 7A 05                 .z.
         sbc     $F4                           ; E7AA E5 F4                    ..
         sta     SoundChannel_0A,x                         ; E7AC 9D 7E 05                 .~.
 @ChannelDone:
@@ -861,14 +877,14 @@ LE669:
 SoundOpStartLoop = $C0
 SoundOpCallLoop = $E0
 SoundOpEC = $EC
-SoundOpED = $ED
-SoundOpEE = $EE
-SoundOpEF = $EF
+SoundOpSetDuty2 = $ED
+SoundOpSetDutyAdjust = $EE
+SoundOpAdjustDuty = $EF
 SoundOpF0 = $F0
 SoundOpF1 = $F1
 SoundOpF2 = $F2
 SoundOpF3 = $F3
-SoundOpReadData = $F4
+SoundOpProcessSoundData = $F4
 SoundOpJump = $F8
 SoundOpContinueLoop = $F9
 SoundOpContinueCallLoop = $FA
@@ -878,24 +894,24 @@ SoundActionOp = $EC
 
 SoundOps:
 .addr SoundOpECHandler ; takes 1 arg, sets unkptr
-.addr SoundOpEDHandler ; takes 1 arg
-.addr SoundOpEEHandler ; takes 1 arg
-.addr SoundOpEFHandler ; takes 1 arg
+.addr SoundOpSetDuty2Handler ; takes 1 arg
+.addr SoundOpSetDutyAdjustHandler ; takes 1 arg
+.addr SoundOpAdjustDutyHandler ; takes 1 arg
 .addr SoundOpF0Handler ; takes 1 arg
 .addr SoundOpF1Handler ; takes 1 arg
 .addr SoundOpF2Handler ; takes 1 arg
 .addr SoundOpF3Handler ; takes 0 args
-.addr SoundOpReadDataHandler ; takes 0 args
-.addr SoundOpReadDataHandler ; unused
-.addr SoundOpReadDataHandler ; takes 0 args
-.addr SoundOpReadDataHandler ; takes 0 args
+.addr SoundOpProcessSoundDataHandler ; takes 0 args
+.addr SoundOpProcessSoundDataHandler ; unused
+.addr SoundOpProcessSoundDataHandler ; takes 0 args
+.addr SoundOpProcessSoundDataHandler ; takes 0 args
 .addr SoundOpJumpHandler ; takes 2 args
 .addr SoundOpContinueLoopHandler ; takes 0 args
 .addr SoundOpContinueCallLoopHandler ; takes 0 args
-.addr SoundOpReadDataHandler ; takes 0 args
-.addr SoundOpReadDataHandler ; takes 0 args
-.addr SoundOpReadDataHandler ; takes 0 args
-.addr SoundOpReadDataHandler ; takes 0 args
+.addr SoundOpProcessSoundDataHandler ; takes 0 args
+.addr SoundOpProcessSoundDataHandler ; takes 0 args
+.addr SoundOpProcessSoundDataHandler ; takes 0 args
+.addr SoundOpProcessSoundDataHandler ; takes 0 args
 .addr SoundOpStopChannelHandler ; takes 0 args
 
 SoundOpECHandler:
@@ -908,22 +924,22 @@ SoundOpECHandler:
         sta SoundChannelUnkPtr+1,x
         jmp ProcessSoundData
 
-SoundOpEDHandler:
-        jsr     ReadSoundData                           ; E7F6 20 9B E8                  ..
-        sta     SoundChannelDuty2,x                         ; E7F9 9D 8C 05                 ...
-        jmp     ProcessSoundData                           ; E7FC 4C 08 E6                 L..
+; set duty2 value, which is OR'ed with duty1!
+SoundOpSetDuty2Handler:
+        jsr ReadSoundData
+        sta SoundChannelDuty2,x
+        jmp ProcessSoundData
 
-
-SoundOpEEHandler:
+SoundOpSetDutyAdjustHandler:
         jsr     ReadSoundData                           ; E7FF 20 9B E8                  ..
-        sta     SoundChannel_05,x                         ; E802 9D 79 05                 .y.
+        sta     SoundChannelDutyAdjust,x                         ; E802 9D 79 05                 .y.
         jmp     ProcessSoundData                           ; E805 4C 08 E6                 L..
 
-SoundOpEFHandler:
+SoundOpAdjustDutyHandler:
         jsr     ReadSoundData                           ; E808 20 9B E8                  ..
         clc                                     ; E80B 18                       .
-        adc     SoundChannel_05,x                         ; E80C 7D 79 05                 }y.
-        sta     SoundChannel_05,x                         ; E80F 9D 79 05                 .y.
+        adc     SoundChannelDutyAdjust,x                         ; E80C 7D 79 05                 }y.
+        sta     SoundChannelDutyAdjust,x                         ; E80F 9D 79 05                 .y.
         jmp     ProcessSoundData                           ; E812 4C 08 E6                 L..
 
 SoundOpF0Handler:
@@ -939,40 +955,39 @@ SoundOpF1Handler:
         jmp     ProcessSoundData                           ; E828 4C 08 E6                 L..
 
 SoundOpF2Handler:
-        jsr     ReadSoundData                           ; E82B 20 9B E8                  ..
-        sta     SoundChannel_0B,x                         ; E82E 9D 7F 05                 ...
-        lda     SoundCurrentChannelStatus                             ; E831 A5 F2                    ..
-        ora     #$01                            ; E833 09 01                    ..
-        sta     SoundCurrentChannelStatus                             ; E835 85 F2                    ..
-        jmp     ProcessSoundData                           ; E837 4C 08 E6                 L..
-
+        jsr ReadSoundData
+        sta SoundChannel_0B,x
+        lda SoundCurrentChannelStatus
+        ora #%00000001
+        sta SoundCurrentChannelStatus
+        jmp ProcessSoundData
 
 SoundOpF3Handler:
-        lda     SoundCurrentChannelStatus                             ; E83A A5 F2                    ..
-        and     #$FE                            ; E83C 29 FE                    ).
-        sta     SoundCurrentChannelStatus                             ; E83E 85 F2                    ..
-        jmp     ProcessSoundData                           ; E840 4C 08 E6                 L..
+        lda SoundCurrentChannelStatus
+        and #%11111110
+        sta SoundCurrentChannelStatus
+        jmp ProcessSoundData
 
-
+; moves sound data pointer to a new location
 SoundOpJumpHandler:
-        jsr     ReadSoundData                           ; E843 20 9B E8                  ..
-        pha                                     ; E846 48                       H
-        jsr     ReadSoundData                           ; E847 20 9B E8                  ..
-        sta     SoundDataPtr+1                             ; E84A 85 F1                    ..
-        pla                                     ; E84C 68                       h
-        sta     SoundDataPtr                             ; E84D 85 F0                    ..
-        jmp     ProcessSoundData                           ; E84F 4C 08 E6                 L..
+        jsr ReadSoundData
+        pha
+        jsr ReadSoundData
+        sta SoundDataPtr+1
+        pla
+        sta SoundDataPtr
+        jmp ProcessSoundData
 
-
+; decrements the loop counter, and returns to loop point unless finished
 SoundOpContinueLoopHandler:
-        dec     SoundChannelLoopCounter,x                         ; E852 DE 8D 05                 ...
-        beq     LE861                           ; E855 F0 0A                    ..
-        lda     SoundDataPtrCopy,x                         ; E857 BD 8E 05                 ...
-        sta     SoundDataPtr                             ; E85A 85 F0                    ..
-        lda     SoundDataPtrCopy+1,x                         ; E85C BD 8F 05                 ...
-        sta     SoundDataPtr+1                             ; E85F 85 F1                    ..
-LE861:
-        jmp     ProcessSoundData                           ; E861 4C 08 E6                 L..
+        dec SoundChannelLoopCounter,x
+        beq @LoopFinished
+        lda SoundDataPtrCopy,x
+        sta SoundDataPtr
+        lda SoundDataPtrCopy+1,x
+        sta SoundDataPtr+1
+@LoopFinished:
+        jmp ProcessSoundData
 
 
 SoundOpContinueCallLoopHandler: ; return to loop point
@@ -1002,14 +1017,16 @@ SoundOpContinueCallLoopHandler: ; return to loop point
         adc #$00
         sta SoundDataPtr+1
 
-SoundOpReadDataHandler:
-        jmp     ProcessSoundData                           ; E890 4C 08 E6                 L..
+; go back to reading sound data
+SoundOpProcessSoundDataHandler:
+        jmp ProcessSoundData
 
+; disable the current channel
 SoundOpStopChannelHandler:
-        lda     #$00                            ; E893 A9 00                    ..
-        sta     SoundCurrentChannelStatus                             ; E895 85 F2                    ..
-        sta     SoundChannelStatus,x                         ; E897 9D 74 05                 .t.
-        rts                                     ; E89A 60                       `
+        lda #$00
+        sta SoundCurrentChannelStatus
+        sta SoundChannelStatus,x
+        rts
 
 ; read next byte of sound data and advance data pointer
 ReadSoundData:
@@ -1107,50 +1124,50 @@ SFXSilentData:
         .byte $FF
 
 UnknownSoundDataPointers:
-        .addr UnknownSoundData01Data
-        .addr UnknownSoundData02Data
-        .addr UnknownSoundData03Data
-        .addr UnknownSoundData04Data
-        .addr UnknownSoundData05Data
-        .addr UnknownSoundData06Data
-        .addr UnknownSoundData07Data
-        .addr UnknownSoundData08Data
-        .addr UnknownSoundData09Data
-        .addr UnknownSoundData10Data
+        .addr UnknownSoundData0Data
+        .addr UnknownSoundData1Data
+        .addr UnknownSoundData2Data
+        .addr UnknownSoundData3Data
+        .addr UnknownSoundData4Data
+        .addr UnknownSoundData5Data
+        .addr UnknownSoundData6Data
+        .addr UnknownSoundData7Data
+        .addr UnknownSoundData8Data
+        .addr UnknownSoundData9Data
 
-UnknownSoundData01Data:
+UnknownSoundData0Data:
         .byte $13,$17,$1B,$7F,$3E,$3D,$3C,$3B,$3A,$39,$38,$37,$46,$45,$54,$53,$52,$51,$00
         
-UnknownSoundData02Data:
+UnknownSoundData1Data:
         .byte $18,$0F
 
-UnknownSoundData03Data:
+UnknownSoundData2Data:
         .byte $18,$2F,$1B,$17,$13,$00
         
-UnknownSoundData04Data:
+UnknownSoundData3Data:
         .byte $1C,$1D,$1E,$FF,$8E,$8D,$7C,$7B,$8A,$89,$88,$87,$86,$85,$04
         
-UnknownSoundData05Data:
+UnknownSoundData4Data:
         .byte $0F
 
-UnknownSoundData06Data:
+UnknownSoundData5Data:
         .byte $7F,$4E,$4D,$4C,$8B,$8A,$C9,$C8,$C7,$C6,$05
         
-UnknownSoundData07Data:
+UnknownSoundData6Data:
         .byte $8F,$4E,$3D,$2C,$1B,$1A,$19,$18,$17,$16,$15,$14,$03
         
-UnknownSoundData08Data:
+UnknownSoundData7Data:
         .byte $FA,$4B,$4C,$3D,$3E,$FF,$FE,$8D,$8C,$8B,$0A
 
-UnknownSoundData09Data:
+UnknownSoundData8Data:
         .byte $2F,$2E,$3D,$4C,$4B,$8A,$F9,$F8,$F7,$06
         
-UnknownSoundData10Data:
+UnknownSoundData9Data:
         .byte $1F,$1D,$1B,$1A,$1C,$1A,$18,$00,$1A,$17,$14,$18,$14,$16,$04
 
 
 
-LE978:
+SoundTimingValues:
 .byte   $04,$06,$08,$0C,$10,$18,$20,$30
 .byte   $40,$60,$80,$0A,$14,$03,$02,$01
 .byte   $03,$04,$06,$09,$0C,$12,$18,$24
@@ -1168,34 +1185,34 @@ MusicMapScreenData:
 .byte $FF
 @Channel0:
 .byte SoundOpEC,$08
-.byte SoundOpED,$00
-.byte SoundOpEE,$0D
+.byte SoundOpSetDuty2,$00
+.byte SoundOpSetDutyAdjust,$0D
 .byte SoundOpF0,$00
 .byte SoundOpF2,$C2
 .byte SoundOpCallLoop
 .addr @Channel0LoopData
-.byte SoundOpEF,$FE
+.byte SoundOpAdjustDuty,$FE
 .byte SoundOpCallLoop
 .addr @Channel0LoopData
-.byte SoundOpEF,$FE
+.byte SoundOpAdjustDuty,$FE
 .byte SoundOpCallLoop
 .addr @Channel0LoopData
-.byte SoundOpEF,$FE
+.byte SoundOpAdjustDuty,$FE
 .byte SoundOpCallLoop
 .addr @Channel0LoopData
-.byte SoundOpEF,$FE
+.byte SoundOpAdjustDuty,$FE
 .byte SoundOpCallLoop
 .addr @Channel0LoopData
-.byte SoundOpEF,$02
+.byte SoundOpAdjustDuty,$02
 .byte SoundOpCallLoop
 .addr @Channel0LoopData
-.byte SoundOpEF,$02
+.byte SoundOpAdjustDuty,$02
 .byte SoundOpCallLoop
 .addr @Channel0LoopData
-.byte SoundOpEF,$02
+.byte SoundOpAdjustDuty,$02
 .byte SoundOpCallLoop
 .addr @Channel0LoopData
-.byte SoundOpEF,$02
+.byte SoundOpAdjustDuty,$02
 .byte SoundOpCallLoop
 .addr @Channel0LoopData
 .byte SoundOpJump
@@ -1223,8 +1240,8 @@ MusicEncounterScreenData:
 .byte $FF
 @Channel0:
 .byte SoundOpEC,$07
-.byte SoundOpED,$00
-.byte SoundOpEE,$07
+.byte SoundOpSetDuty2,$00
+.byte SoundOpSetDutyAdjust,$07
 .byte SoundOpF0,$09
 .byte SoundOpF2,$CA
 .byte SoundOpStartLoop+1
@@ -1233,31 +1250,31 @@ MusicEncounterScreenData:
 .byte SoundOpEC,$05
 .byte SoundOpF2,$48
 .byte $82,$1A,$19,$18,$17,$16,$85,$3F,$88,$3F,$86,$3F,$84
-.byte SoundOpEF,$04
+.byte SoundOpAdjustDuty,$04
 .byte $18,$18
-.byte SoundOpEF,$FB
+.byte SoundOpAdjustDuty,$FB
 .byte $18,$18
-.byte SoundOpEF,$FA
+.byte SoundOpAdjustDuty,$FA
 .byte $18,$18
-.byte SoundOpEF,$07
+.byte SoundOpAdjustDuty,$07
 .byte $82,$13,$84,$18,$82,$1A
-.byte SoundOpEF,$FA
+.byte SoundOpAdjustDuty,$FA
 .byte $23
-.byte SoundOpEF,$06
+.byte SoundOpAdjustDuty,$06
 .byte $85,$3F,$84,$3F,$82,$23,$22,$21,$22,$18,$3F,$86,$3F,$84
-.byte SoundOpEF,$04
+.byte SoundOpAdjustDuty,$04
 .byte $18,$18
-.byte SoundOpEF,$FB
+.byte SoundOpAdjustDuty,$FB
 .byte $18,$18
-.byte SoundOpEF,$FA
+.byte SoundOpAdjustDuty,$FA
 .byte $18,$18
-.byte SoundOpEF,$07
+.byte SoundOpAdjustDuty,$07
 .byte SoundOpJump
 .addr @Channel0
 @Channel1:
 .byte SoundOpEC,$07
-.byte SoundOpED,$40
-.byte SoundOpEE,$07
+.byte SoundOpSetDuty2,$40
+.byte SoundOpSetDutyAdjust,$07
 .byte SoundOpF0,$09
 .byte SoundOpF2,$CA
 .byte SoundOpStartLoop+1
@@ -1266,25 +1283,25 @@ MusicEncounterScreenData:
 .byte SoundOpEC,$05
 .byte SoundOpF2,$48
 .byte $82,$23,$3F,$3F,$3F,$23,$85,$3F,$84,$3F,$1A,$18,$82,$13,$3F,$86,$3F,$84
-.byte SoundOpEF,$04
+.byte SoundOpAdjustDuty,$04
 .byte $21,$21
-.byte SoundOpEF,$FB
+.byte SoundOpAdjustDuty,$FB
 .byte $21,$21
-.byte SoundOpEF,$FA
+.byte SoundOpAdjustDuty,$FA
 .byte $21,$21
-.byte SoundOpEF,$07
+.byte SoundOpAdjustDuty,$07
 .byte $82,$18,$84,$21,$82,$23
-.byte SoundOpEF,$FA
+.byte SoundOpAdjustDuty,$FA
 .byte $28
-.byte SoundOpEF,$06
+.byte SoundOpAdjustDuty,$06
 .byte $85,$3F,$84,$3F,$1A,$18,$82,$13,$3F,$86,$3F,$84
-.byte SoundOpEF,$04
+.byte SoundOpAdjustDuty,$04
 .byte $21,$21
-.byte SoundOpEF,$FB
+.byte SoundOpAdjustDuty,$FB
 .byte $21,$21
-.byte SoundOpEF,$FA
+.byte SoundOpAdjustDuty,$FA
 .byte $21,$21
-.byte SoundOpEF,$07
+.byte SoundOpAdjustDuty,$07
 .byte SoundOpJump
 .addr @Channel1
 @Channel2:
@@ -1310,16 +1327,16 @@ MusicGameOverScreenData:
 .byte $FF
 @Channel0:
 .byte SoundOpEC,$06
-.byte SoundOpED,$00
-.byte SoundOpEE,$05
+.byte SoundOpSetDuty2,$00
+.byte SoundOpSetDutyAdjust,$05
 .byte SoundOpF0,$0C
 .byte SoundOpF2,$C3
 .byte $94,$12,$22,$15,$25,$96,$17,$94,$19,$62,$22,$32,$25,$35,$96,$27,$94,$29,$3F,$92,$32,$30,$3F,$27,$25,$3F,$27,$25,$27,$25,$94,$24,$20,$20,$22
 .byte SoundOpStopChannel
 @Channel1:
 .byte SoundOpEC,$06
-.byte SoundOpED,$00
-.byte SoundOpEE,$05
+.byte SoundOpSetDuty2,$00
+.byte SoundOpSetDutyAdjust,$05
 .byte SoundOpF0,$0C
 .byte SoundOpF2,$C3
 .byte $94,$09,$19,$12,$22,$96,$14,$94,$15,$19,$19,$29,$22,$32,$96,$24,$94,$25,$3F,$92,$2B,$29,$3F,$24,$22,$3F,$22,$22,$22,$22,$94,$20,$17,$17,$19
@@ -1344,8 +1361,8 @@ SFXPlayerDeathData:
 .byte $82,$3F
 @Channel0:
 .byte SoundOpEC,$04
-.byte SoundOpED,$00
-.byte SoundOpEE,$02
+.byte SoundOpSetDuty2,$00
+.byte SoundOpSetDutyAdjust,$02
 .byte SoundOpF0,$20
 .byte SoundOpStartLoop+15
 .byte $8F,$60,$5E,$5C,$5A,$58,$56,$54,$52,$50,$48,$46,$44,$02
@@ -1355,7 +1372,7 @@ SFXPlayerDeathData:
 .byte SoundOpStopChannel
 @Channel3:
 .byte SoundOpEC,$05
-.byte SoundOpEE,$02
+.byte SoundOpSetDutyAdjust,$02
 .byte $81,$49,$4A,$4B,$4C,$4D,$0E
 .byte SoundOpStopChannel
 
@@ -1369,16 +1386,16 @@ MusicPortPowerupData:
 .byte $FF
 @Channel0:
 .byte SoundOpEC,$07
-.byte SoundOpED,$80
-.byte SoundOpEE,$02
+.byte SoundOpSetDuty2,$80
+.byte SoundOpSetDutyAdjust,$02
 .byte SoundOpF0,$00
 .byte SoundOpF2,$F2
 .byte $94,$25,$24,$23,$22,$20,$1B,$20,$22,$25,$24,$27,$26,$29,$28,$29,$2B,$98,$30
 .byte SoundOpStopChannel
 @Channel1:
 .byte SoundOpEC,$07
-.byte SoundOpED,$80
-.byte SoundOpEE,$02
+.byte SoundOpSetDuty2,$80
+.byte SoundOpSetDutyAdjust,$02
 .byte SoundOpF0,$00
 .byte SoundOpF2,$F2
 .byte $94,$20,$20,$1A,$1A,$17,$17,$17,$1B,$20,$20,$22,$22,$24,$24,$25,$27,$98,$27
@@ -1401,11 +1418,11 @@ SFXPortNeedMoreConchShellsData:
 .byte SoundOpF0,$01
 @Channel0:
 .byte SoundOpEC,$04
-.byte SoundOpED,$00
+.byte SoundOpSetDuty2,$00
 .byte SoundOpStartLoop+3
 .byte $82,$15,$80,$3F
 .byte SoundOpContinueLoop
-.byte SoundOpEE,$0F
+.byte SoundOpSetDutyAdjust,$0F
 .byte SoundOpStopChannel
 
 MusicBonusScreenEndData:
@@ -1418,16 +1435,16 @@ MusicBonusScreenEndData:
 .byte $FF
 @Channel0:
 .byte SoundOpEC,$05
-.byte SoundOpED,$00
-.byte SoundOpEE,$04
+.byte SoundOpSetDuty2,$00
+.byte SoundOpSetDutyAdjust,$04
 .byte SoundOpF0,$0C
 .byte SoundOpF2,$C1
 .byte $94,$19,$1B,$19,$15,$19,$1B,$20,$22,$20,$1B,$3F,$20
 .byte SoundOpStopChannel
 @Channel1:
 .byte SoundOpEC,$05
-.byte SoundOpED,$00
-.byte SoundOpEE,$04
+.byte SoundOpSetDuty2,$00
+.byte SoundOpSetDutyAdjust,$04
 .byte SoundOpF0,$0C
 .byte SoundOpF2,$C1
 .byte $94,$15,$17,$15,$12,$15,$17,$19,$1B,$17,$17,$3F,$17
@@ -1445,27 +1462,27 @@ SFXExtraLifeData:
 .byte $FF
 @Channel1:
 .byte SoundOpEC,$06
-.byte SoundOpED,$80
+.byte SoundOpSetDuty2,$80
 .byte SoundOpF0,$18
-.byte SoundOpEE,$00
+.byte SoundOpSetDutyAdjust,$00
 .byte SoundOpStartLoop+3
 .byte $8F,$10,$20
-.byte SoundOpEF,$03
+.byte SoundOpAdjustDuty,$03
 .byte SoundOpContinueLoop
-.byte SoundOpEE,$00
+.byte SoundOpSetDutyAdjust,$00
 .byte SoundOpStartLoop+3
 .byte $8F,$14,$24
-.byte SoundOpEF,$03
+.byte SoundOpAdjustDuty,$03
 .byte SoundOpContinueLoop
-.byte SoundOpEE,$00
+.byte SoundOpSetDutyAdjust,$00
 .byte SoundOpStartLoop+3
 .byte $8F,$17,$27
-.byte SoundOpEF,$03
+.byte SoundOpAdjustDuty,$03
 .byte SoundOpContinueLoop
-.byte SoundOpEE,$00
+.byte SoundOpSetDutyAdjust,$00
 .byte SoundOpStartLoop+3
 .byte $8F,$20,$30
-.byte SoundOpEF,$03
+.byte SoundOpAdjustDuty,$03
 .byte SoundOpContinueLoop
 .byte SoundOpStopChannel
 
@@ -1479,10 +1496,10 @@ MusicIntroScreenData:
 .byte $FF
 @Channel0:
 .byte SoundOpEC,$05
-.byte SoundOpED,$C0
+.byte SoundOpSetDuty2,$C0
 .byte SoundOpF0,$0C
 .byte SoundOpF2,$C1
-.byte SoundOpEE,$03
+.byte SoundOpSetDutyAdjust,$03
 .byte SoundOpStartLoop+1
 .byte $84,$17,$9B,$19,$84,$3F,$9B,$19,$84,$3F,$9B,$19,$96,$22
 .byte SoundOpContinueLoop
@@ -1490,10 +1507,10 @@ MusicIntroScreenData:
 .byte SoundOpStopChannel
 @Channel1:
 .byte SoundOpEC,$05
-.byte SoundOpED,$C0
+.byte SoundOpSetDuty2,$C0
 .byte SoundOpF0,$0C
 .byte SoundOpF2,$C1
-.byte SoundOpEE,$03
+.byte SoundOpSetDutyAdjust,$03
 .byte SoundOpStartLoop+1
 .byte $84,$14,$9B,$14,$84,$3F,$9B,$14,$84,$3F,$9B,$14,$96,$19
 .byte SoundOpContinueLoop
@@ -1515,12 +1532,12 @@ SFXEncounterEnemyDeathData:
 .byte $FF
 @Channel1:
 .byte SoundOpEC,$06
-.byte SoundOpED,$C0
-.byte SoundOpEE,$00
+.byte SoundOpSetDuty2,$C0
+.byte SoundOpSetDutyAdjust,$00
 .byte SoundOpF0,$0C
 .byte $8F,$C5,$60,$30,$02
 .byte SoundOpF1,$03
-.byte SoundOpEF,$01
+.byte SoundOpAdjustDuty,$01
 .byte SoundOpContinueLoop
 .byte SoundOpStopChannel
 
@@ -1534,8 +1551,8 @@ MusicBonusScreenStartData:
 .byte $FF
 @Channel0:
 .byte SoundOpEC,$08
-.byte SoundOpED,$00
-.byte SoundOpEE,$05
+.byte SoundOpSetDuty2,$00
+.byte SoundOpSetDutyAdjust,$05
 .byte SoundOpF0,$0C
 .byte SoundOpF2,$C2
 .byte $82,$12,$14
@@ -1550,15 +1567,15 @@ MusicBonusScreenStartData:
 .addr @Channel0Loop1
 @Channel0Loop2:
 .byte $84,$17,$17,$82,$12,$84,$14,$82,$12,$87,$20,$84,$5B,$88,$5B,$84,$1B,$82,$1B,$22,$1B,$19,$17,$3F,$22,$32,$32,$22,$32,$32,$84,$3F,$87,$17,$84,$57,$88,$57,$84,$17,$3F
-.byte SoundOpEF,$FC
+.byte SoundOpAdjustDuty,$FC
 .byte $22,$62,$22
-.byte SoundOpEF,$04
+.byte SoundOpAdjustDuty,$04
 .byte $17,$86,$17,$3F,$84,$22,$62
 .byte SoundOpContinueCallLoop
 @Channel1:
 .byte SoundOpEC,$08
-.byte SoundOpED,$C0
-.byte SoundOpEE,$05
+.byte SoundOpSetDuty2,$C0
+.byte SoundOpSetDutyAdjust,$05
 .byte SoundOpF0,$0C
 .byte SoundOpF2,$C2
 .byte $84,$3F
@@ -1573,9 +1590,9 @@ MusicBonusScreenStartData:
 .addr @Channel1Loop
 @Channel1LoopData:
 .byte $82,$22,$32,$32,$22,$32,$32,$84,$3F,$87,$17,$84,$57,$88,$57,$84,$17,$86,$3F,$82,$12,$14,$84,$17,$17,$82,$12,$84,$14,$82,$12,$87,$20,$84,$5B,$88,$5B,$84,$1B,$3F
-.byte SoundOpEF,$FC
+.byte SoundOpAdjustDuty,$FC
 .byte $17,$57,$17
-.byte SoundOpEF,$04
+.byte SoundOpAdjustDuty,$04
 .byte $12,$86,$12,$3F,$84,$17,$55
 .byte SoundOpContinueCallLoop
 @Channel2:
@@ -1603,8 +1620,8 @@ MusicOutroScreenData:
 .byte $FF
 @Channel0:
 .byte SoundOpEC,$07
-.byte SoundOpED,$C0
-.byte SoundOpEE,$05
+.byte SoundOpSetDuty2,$C0
+.byte SoundOpSetDutyAdjust,$05
 .byte SoundOpF0,$0C
 .byte SoundOpF2,$C2
 .byte $8A,$3F,$3F,$3F,$89,$3F,$84,$3F,$82,$16,$17
@@ -1614,7 +1631,7 @@ MusicOutroScreenData:
 .byte SoundOpCallLoop
 .addr @Channel0LoopData
 .byte $86,$12,$84,$10,$14,$3F,$86,$17,$84,$17,$19,$17,$1B,$20,$1B,$86,$17,$84,$14,$86,$17,$84,$16,$86,$17,$19,$84,$1B,$86,$20,$84,$1B,$19,$17,$87,$24,$86,$22,$82,$10,$12,$14,$16,$17,$84,$19,$82,$1B,$86,$20,$22,$24,$84,$22,$86,$1B,$84,$19,$82,$1B,$19,$17,$14,$84,$14,$17,$87,$3F,$84,$14,$17,$1B,$88,$62,$84,$22,$17,$86,$19
-.byte SoundOpED,$80
+.byte SoundOpSetDuty2,$80
 .byte $8A,$62,$88,$22,$8C,$20,$1B,$85,$20,$87,$1B,$84,$17,$86,$19,$84,$1B,$54,$14,$12,$87,$12,$82,$12,$14,$16,$17,$84,$19,$86,$17,$84,$14,$86,$17,$82,$53,$14,$84,$17,$14,$86,$19,$84,$1B,$86,$14,$84,$12,$86,$22,$20,$84,$1B,$87,$19,$82,$23,$85,$24,$88,$22,$84,$3F,$82,$12,$14,$16,$17,$84,$19,$8A,$62,$88,$22,$8C,$27,$26,$85,$27,$86,$24,$84,$20,$87,$22,$84,$24,$5B,$1B,$19,$88,$19,$86,$1B,$89,$17,$86,$22,$89,$1B,$84,$24,$22,$86,$27,$84,$24,$22,$86,$27,$64,$24,$27,$84,$27,$87,$29,$8A,$67,$86,$27,$84,$16,$82,$16,$16,$84,$17
 .byte SoundOpStopChannel
 @Channel0LoopData:
@@ -1635,10 +1652,10 @@ MusicOutroScreenData:
 .addr @Channel1LoopData
 .byte SoundOpCallLoop
 .addr @Channel1LoopData2
-.byte SoundOpED,$80
-.byte SoundOpEE,$06
+.byte SoundOpSetDuty2,$80
+.byte SoundOpSetDutyAdjust,$06
 .byte $84,$12,$82,$22,$22,$84,$20,$1B,$82,$19,$12,$17,$19
-.byte SoundOpEE,$00
+.byte SoundOpSetDutyAdjust,$00
 .byte $02,$04,$06,$07
 .byte SoundOpCallLoop
 .addr @Channel1LoopData
@@ -1646,53 +1663,53 @@ MusicOutroScreenData:
 .addr @Channel1LoopData
 .byte SoundOpCallLoop
 .addr @Channel1LoopData2
-.byte SoundOpED,$40
-.byte SoundOpEE,$06
+.byte SoundOpSetDuty2,$40
+.byte SoundOpSetDutyAdjust,$06
 .byte SoundOpEC,$08
 .byte $84,$12,$22,$12,$20,$12,$1B,$12,$19
-.byte SoundOpED,$80
+.byte SoundOpSetDuty2,$80
 .byte SoundOpF2,$B5
 .byte $82,$20,$20,$27,$27,$30,$30,$37,$37,$30,$32,$30,$32,$30,$32,$30,$32,$1B,$1B,$27,$27,$2B,$2B,$37,$37,$2B,$30,$2B,$30,$2B,$30,$2B,$30,$19,$19,$26,$26,$32,$32,$36,$36,$30,$32,$30,$32,$30,$32,$30,$32
-.byte SoundOpED,$40
+.byte SoundOpSetDuty2,$40
 .byte SoundOpF2,$C1
 .byte SoundOpEC,$07
 .byte $84,$27,$26,$24,$87,$30,$86,$2B,$82,$19,$1B,$20,$22,$24,$84,$26
-.byte SoundOpED,$80
+.byte SoundOpSetDuty2,$80
 .byte SoundOpF2,$B5
 .byte $82,$27,$36,$37,$36,$34,$32,$37,$36,$37
-.byte SoundOpED,$40
+.byte SoundOpSetDuty2,$40
 .byte SoundOpF2,$C1
 .byte $86,$30,$84,$2B,$27
-.byte SoundOpED,$80
+.byte SoundOpSetDuty2,$80
 .byte SoundOpF2,$B5
 .byte $82,$36,$37,$36,$37,$36,$37,$36,$37,$84,$20,$24,$82,$34,$34,$37,$37,$34,$34,$37,$37,$84,$34,$37
 .byte SoundOpEC,$07
-.byte SoundOpED,$40
+.byte SoundOpSetDuty2,$40
 .byte SoundOpF2,$C1
 .byte $88,$6B,$84,$2B,$24,$86,$26
 .byte SoundOpF0,$0C
-.byte SoundOpED,$80
+.byte SoundOpSetDuty2,$80
 .byte SoundOpEC,$09
 .byte SoundOpStartLoop+5
 .byte $82,$32,$30,$2B,$29,$30,$2B,$29,$27,$2B,$29,$27,$24,$29,$27,$24,$22
 .byte SoundOpContinueLoop
 .byte SoundOpEC,$08
-.byte SoundOpED,$80
+.byte SoundOpSetDuty2,$80
 .byte $86,$19,$84,$17,$87,$16,$82,$16,$85,$17,$88,$19,$84,$3F,$82,$0B,$10,$12,$14,$84,$16
 .byte SoundOpEC,$09
-.byte SoundOpED,$80
+.byte SoundOpSetDuty2,$80
 .byte SoundOpStartLoop+2
 .byte $82,$32,$30,$2B,$29,$30,$2B,$29,$27,$2B,$29,$27,$24,$29,$27,$24,$22
 .byte SoundOpContinueLoop
 .byte $32,$30,$2B,$29,$30,$2B,$29,$27,$2B,$29,$27,$24
 .byte SoundOpEC,$07
-.byte SoundOpED,$00
+.byte SoundOpSetDuty2,$00
 .byte $86,$19,$89,$14,$86,$1B,$89,$17,$84,$20,$1B,$86,$24,$84,$20,$1B,$86,$24,$60,$20,$24,$84,$24,$87,$24,$8A,$62,$86,$22,$84,$10,$82,$10,$10,$84,$12
 .byte SoundOpStopChannel
 @Channel1LoopData:
 .byte SoundOpEC,$09
-.byte SoundOpED,$00
-.byte SoundOpEE,$02
+.byte SoundOpSetDuty2,$00
+.byte SoundOpSetDutyAdjust,$02
 .byte SoundOpF0,$00
 .byte SoundOpF3
 .byte $82,$07,$06,$04,$02,$07,$06,$04,$02,$07,$06,$04,$02,$04,$06,$07,$09
@@ -1751,8 +1768,8 @@ MusicFinaleScreenData:
 .byte $FF
 @Channel0:
 .byte SoundOpEC,$07
-.byte SoundOpED,$C0
-.byte SoundOpEE,$03
+.byte SoundOpSetDuty2,$C0
+.byte SoundOpSetDutyAdjust,$03
 .byte SoundOpF0,$0C
 .byte SoundOpCallLoop
 .addr @Channel0Loop
@@ -1762,8 +1779,8 @@ MusicFinaleScreenData:
 .byte $99,$16,$94,$15,$14
 .byte SoundOpEC,$05
 .byte SoundOpF2,$B5
-.byte SoundOpED,$90
-.byte SoundOpEE,$05
+.byte SoundOpSetDuty2,$90
+.byte SoundOpSetDutyAdjust,$05
 .byte SoundOpStartLoop+1
 .byte $92,$18,$18,$18,$18,$18,$3F,$18,$18,$18,$18,$18,$3F,$96,$22
 .byte SoundOpContinueLoop
@@ -1777,8 +1794,8 @@ MusicFinaleScreenData:
 @Channel1:
 .byte SoundOpEC,$05
 .byte SoundOpF2,$35
-.byte SoundOpED,$90
-.byte SoundOpEE,$07
+.byte SoundOpSetDuty2,$90
+.byte SoundOpSetDutyAdjust,$07
 .byte SoundOpF0,$18
 .byte SoundOpStartLoop+3
 .byte $94,$23,$33,$3F,$23,$33,$3F,$23,$33
@@ -1786,7 +1803,7 @@ MusicFinaleScreenData:
 .byte SoundOpF0,$0C
 .byte SoundOpF2,$B5
 .byte SoundOpEC,$05
-.byte SoundOpEE,$05
+.byte SoundOpSetDutyAdjust,$05
 .byte SoundOpStartLoop+1
 .byte $92,$17,$17,$17,$17,$17,$3F,$17,$17,$17,$17,$17,$3F,$96,$21
 .byte SoundOpContinueLoop
@@ -1815,10 +1832,10 @@ SFXFinaleStrobeData:
 .byte $FF
 @Channel3:
 .byte SoundOpEC,$01
-.byte SoundOpEE,$00
+.byte SoundOpSetDutyAdjust,$00
 .byte SoundOpF2,$44
 .byte $80,$04
-.byte SoundOpReadData
+.byte SoundOpProcessSoundData
 .byte $18,$85,$0F
 .byte SoundOpStopChannel
 
@@ -1828,7 +1845,7 @@ SFXUnusedData:
 .byte $FF
 @Channel3:
 .byte SoundOpEC,$07
-.byte SoundOpEE,$01
+.byte SoundOpSetDutyAdjust,$01
 .byte $8E,$0F,$0D,$4B,$49,$47,$45,$03
 .byte SoundOpStopChannel
 
@@ -1841,8 +1858,8 @@ SFXEncounterHarpoonFireData:
 .byte $FF
 @Channel1:
 .byte SoundOpEC,$06
-.byte SoundOpED,$40
-.byte SoundOpEE,$04
+.byte SoundOpSetDuty2,$40
+.byte SoundOpSetDutyAdjust,$04
 .byte SoundOpF0,$1C
 .byte $8F,$1A,$2A,$3A,$C2,$69,$59
 .byte SoundOpF1,$F5
@@ -1851,7 +1868,7 @@ SFXEncounterHarpoonFireData:
 .byte SoundOpStopChannel
 @Channel3:
 .byte SoundOpEC,$06
-.byte SoundOpEE,$02
+.byte SoundOpSetDutyAdjust,$02
 .byte $8F,$4F,$4D,$4B,$49,$47,$45,$43,$01
 .byte SoundOpStopChannel
 
@@ -1864,18 +1881,18 @@ SFXBonusPlaneFireData:
 .byte $FF
 @Channel1:
 .byte SoundOpEC,$06
-.byte SoundOpED,$80
-.byte SoundOpEE,$00
+.byte SoundOpSetDuty2,$80
+.byte SoundOpSetDutyAdjust,$00
 .byte SoundOpF0,$04
 .byte SoundOpF3
 .byte $8F,$C2,$78,$70,$68,$60,$58,$50,$08
-.byte SoundOpEE,$02
+.byte SoundOpSetDutyAdjust,$02
 .byte SoundOpF1,$07
 .byte SoundOpContinueLoop
 .byte SoundOpStopChannel
 @Channel3:
 .byte SoundOpEC,$06
-.byte SoundOpEE,$00
+.byte SoundOpSetDutyAdjust,$00
 .byte $8D,$45,$03
 .byte SoundOpStopChannel
 
@@ -1908,7 +1925,7 @@ SFXEncounterSubmarineFireData:
 .byte $FF
 @Channel3:
 .byte SoundOpEC,$00
-.byte SoundOpEE,$00
+.byte SoundOpSetDutyAdjust,$00
 .byte $8E,$4F,$4D,$4B,$48,$06
 .byte SoundOpStopChannel
 
@@ -1922,16 +1939,16 @@ MusicStartEncounterData:
 .byte $FF
 @Channel0:
 .byte SoundOpEC,$01
-.byte SoundOpED,$00
-.byte SoundOpEE,$00
+.byte SoundOpSetDuty2,$00
+.byte SoundOpSetDutyAdjust,$00
 .byte SoundOpF0,$F7
 .byte SoundOpF2,$01
 .byte $81,$24,$23,$22,$21,$81,$13,$14,$13,$14,$13,$14
 .byte SoundOpStopChannel
 @Channel1:
 .byte SoundOpEC,$01
-.byte SoundOpED,$00
-.byte SoundOpEE,$00
+.byte SoundOpSetDuty2,$00
+.byte SoundOpSetDutyAdjust,$00
 .byte SoundOpF0,$F7
 .byte SoundOpF2,$01
 @Channel2Continue:
@@ -1957,11 +1974,11 @@ SFXEncounterJawsHarpoonHitChannel1:
 .byte SoundOpF0,$00
 SFXEncounterJawsHitChannel1Continue:
 .byte SoundOpEC,$06
-.byte SoundOpED,$80
-.byte SoundOpEE,$00
+.byte SoundOpSetDuty2,$80
+.byte SoundOpSetDutyAdjust,$00
 .byte SoundOpF2,$C2
 .byte $8F,$06,$10,$16,$20,$C2,$20,$24,$27,$30
-.byte SoundOpEF,$03
+.byte SoundOpAdjustDuty,$03
 .byte SoundOpContinueLoop
 .byte SoundOpStopChannel
 
@@ -1974,7 +1991,7 @@ SFXEncounterJawsHitData:
 .byte $FF
 @Channel3:
 .byte SoundOpEC,$06
-.byte SoundOpEE,$00
+.byte SoundOpSetDutyAdjust,$00
 .byte $8D,$44,$02
 .byte SoundOpStopChannel
 
@@ -1988,18 +2005,18 @@ SFXEncounterBoatDespawnData:
 SFXEncounterBoatDespawnChannel1:
 SFXFinaleHitChannel1:
 .byte SoundOpEC,$06
-.byte SoundOpEE,$00
+.byte SoundOpSetDutyAdjust,$00
 .byte SoundOpF0,$00
 .byte SoundOpF3
 .byte $8F,$C5,$20,$21
-.byte SoundOpEE,$01
+.byte SoundOpSetDutyAdjust,$01
 .byte SoundOpF0,$FF
 .byte SoundOpContinueLoop
 .byte SoundOpStopChannel
 SFXEncounterBoatDespawnChannel3:
 SFXFinaleHitChannel3:
 .byte SoundOpEC,$06
-.byte SoundOpEE,$00
+.byte SoundOpSetDutyAdjust,$00
 .byte SoundOpF3
 .byte SoundOpStartLoop+2
 .byte $8F,$0E,$0D
@@ -2019,11 +2036,11 @@ SFXFinaleHitData:
 .byte $FF
 @Channel0:
 .byte SoundOpEC,$06
-.byte SoundOpED,$00
-.byte SoundOpEE,$00
+.byte SoundOpSetDuty2,$00
+.byte SoundOpSetDutyAdjust,$00
 .byte SoundOpF0,$20
 .byte $8E,$C4,$10,$20,$14,$24,$17,$27
-.byte SoundOpEF,$03
+.byte SoundOpAdjustDuty,$03
 .byte SoundOpContinueLoop
 .byte SoundOpStopChannel
 @Channel2:
@@ -2039,27 +2056,27 @@ SFXMapTrackerPulseData:
 .byte $FF
 @Channel1:
 .byte SoundOpEC,$04
-.byte SoundOpED,$40
+.byte SoundOpSetDuty2,$40
 .byte SoundOpF0,$0E
-.byte SoundOpEE,$00
+.byte SoundOpSetDutyAdjust,$00
 .byte $8F,$0A,$1A,$10,$20,$14,$24,$82,$3F,$8F,$C4,$13,$19,$23,$29
-.byte SoundOpEF,$04
+.byte SoundOpAdjustDuty,$04
 .byte SoundOpContinueLoop
 .byte SoundOpStopChannel
 .byte $04,$02,$90
-.byte SoundOpReadData
+.byte SoundOpProcessSoundData
 .byte $03,$A7
-.byte SoundOpReadData
+.byte SoundOpProcessSoundData
 .byte SoundOpStopChannel
 .byte SoundOpEC,$04
 .byte SoundOpF0,$04
 .byte $8F,$06,$0A,$12,$14,$17,$19,$22,$25,$82,$3F,$8E,$27,$25,$23,$21,$1B,$18
 .byte SoundOpStopChannel
 .byte SoundOpEC,$08
-.byte SoundOpEE,$05
+.byte SoundOpSetDutyAdjust,$05
 .byte SoundOpF2,$F1
 .byte $8F,$4A,$48,$47,$46,$45,$43,$02,$82,$3F,$8F,$46,$47,$49,$0D,$3F,$C2
-.byte SoundOpEF,$05
+.byte SoundOpAdjustDuty,$05
 .byte $8F,$47,$49,$0D,$3F
 .byte SoundOpContinueLoop
 .byte SoundOpStopChannel
@@ -2071,13 +2088,13 @@ SFXEncounterPickupData:
 .byte $FF
 @Channel1:
 .byte SoundOpEC,$06
-.byte SoundOpED,$80
-.byte SoundOpEE,$01
+.byte SoundOpSetDuty2,$80
+.byte SoundOpSetDutyAdjust,$01
 .byte SoundOpF0,$0C
 .byte SoundOpStartLoop+3
 .byte $8E,$25,$35,$27,$37,$29,$39,$2B,$3B
 .byte SoundOpF1,$00
-.byte SoundOpEF,$04
+.byte SoundOpAdjustDuty,$04
 .byte SoundOpContinueLoop
 .byte SoundOpStopChannel
 
@@ -2088,8 +2105,8 @@ SFXPauseData:
 .byte $FF
 @Channel1:
 .byte SoundOpEC,$06
-.byte SoundOpED,$80
-.byte SoundOpEE,$01
+.byte SoundOpSetDuty2,$80
+.byte SoundOpSetDutyAdjust,$01
 .byte SoundOpF0,$0C
 .byte SoundOpStartLoop+3
 .byte $8E,$27,$37
@@ -2104,24 +2121,24 @@ MusicTitleScreenData:
 .byte $FF
 @Channel0:
 .byte SoundOpEC,$05
-.byte SoundOpED,$00
+.byte SoundOpSetDuty2,$00
 .byte SoundOpF2,$C1
 .byte SoundOpF0,$F4
 .byte SoundOpStartLoop+3
-.byte SoundOpEE,$09
+.byte SoundOpSetDutyAdjust,$09
 .byte $94,$17,$18
-.byte SoundOpEE,$07
+.byte SoundOpSetDutyAdjust,$07
 .byte $94,$17,$18
-.byte SoundOpEE,$06
+.byte SoundOpSetDutyAdjust,$06
 .byte $94,$17,$18
-.byte SoundOpEE,$03
+.byte SoundOpSetDutyAdjust,$03
 .byte $94,$17,$18
-.byte SoundOpEE,$03
+.byte SoundOpSetDutyAdjust,$03
 .byte $17,$18,$15,$18,$17,$18,$15,$18
 .byte SoundOpContinueLoop
 .byte SoundOpStartLoop+7
 .byte $94,$17,$18
-.byte SoundOpEF,$02
+.byte SoundOpAdjustDuty,$02
 .byte SoundOpContinueLoop
 .byte SoundOpStartLoop+29
 .byte $9A,$3F
@@ -2130,8 +2147,8 @@ MusicTitleScreenData:
 .addr @Channel0
 @Channel1:
 .byte SoundOpEC,$07
-.byte SoundOpED,$C0
-.byte SoundOpEE,$02
+.byte SoundOpSetDuty2,$C0
+.byte SoundOpSetDutyAdjust,$02
 .byte SoundOpF0,$0C
 .byte $9A,$3F,$3F,$3F,$3F,$92,$18,$22,$9A,$68,$99,$68,$94,$28,$92,$18,$22,$99,$68,$94,$28,$92,$18,$22,$94,$28,$92,$22,$28,$94,$32,$98,$3F,$DF,$9A,$3F
 .byte SoundOpContinueLoop
@@ -2143,4 +2160,3 @@ SoundCommonSetup:
 .byte SoundOpF0,$0C
 .byte SoundOpF2,$C1
 .byte SoundOpContinueCallLoop
-.byte $00,$00,$00,$00,$00,$00,$00,$00,$00,$01,$00,$00,$00,$00,$00,$3F,$1F,$1F,$0F,$0F,$07

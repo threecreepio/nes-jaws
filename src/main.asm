@@ -1048,10 +1048,17 @@ TransitionToFinaleScreen:
         bne @Wait
         ; now we can finally go to the finale!
         jsr EnterFinaleScreen
-        ; seemingly unused code
-        .byte   $A9,$00,$8D,$88,$03,$A9,$14,$8D
-        .byte   $89,$03,$A9,$03,$8D,$93,$03,$4C
-        .byte   $ED,$82       
+        ; we failed the finale, oh no!
+        ; reset jaws hp
+        lda #<JawsMaxHP
+        sta JawsHP
+        lda #>JawsMaxHP
+        sta JawsHP+1
+        ; give the player back some strobes
+        lda #3
+        sta PlayerStrobeCount
+        ; and back to the map we go
+        jmp RunMapScreen
                  
 ; ----------------------------------------------------------------------------
 
@@ -13260,6 +13267,12 @@ FinaleJawsMovementPattern:
 
 .include "sound.asm"
 
+; unused alignment padding
+.byte $00,$00,$00,$00,$00,$00,$00,$00
+.byte $00,$01,$00,$00,$00,$00,$00,$3F
+.byte $1F,$1F,$0F,$0F,$07
+
+.align $80
 ParallaxBackgroundOffset:
         .byte $08,$00
         .byte $10,$00
@@ -13455,7 +13468,7 @@ CopyTextPause:
         .byte $20 ; length
         .byte "             PAUSE              "
 
-; unused
+; unused alignment padding
 .byte $00,$00,$00,$00,$00,$FF,$FF,$FF
 .byte $FF,$FC,$F8,$F0,$E3,$00,$00,$00
 .byte $00,$00,$00,$00,$00,$87,$E1,$C0
@@ -13521,7 +13534,7 @@ WorldMapDataAttributes:
 .byte $AA,$FA,$AF,$BA,$BB,$BB,$AA,$6A,$56,$55,$55,$55,$05
 .byte $AA,$AA,$AA,$AA,$AA,$AA,$AA,$5A,$55,$55,$55,$55,$05
 
-; unused padding
+; unused alignment padding
 .byte $03,$03,$07,$07,$03,$00,$00,$00
 .byte $03,$03,$07,$07,$03,$00,$00,$00
 .byte $80,$80,$C0,$C0,$80,$00,$00,$00
@@ -13718,7 +13731,7 @@ Metatiles:
 .byte $4F,$59,$5F,$02 ; metatile $B5
 .byte $46,$40,$02,$02 ; metatile $B6
 
-; unused alignmend padding
+; unused alignment padding
 .byte $00,$00,$00,$00
 .byte $00,$00,$00,$00
 .byte $00,$00,$00,$00
@@ -13777,7 +13790,7 @@ AwardPointsTable:
 .byte  $00,$00,$00,$05,$00,$00
 .byte  $00,$00,$01,$00,$00,$00
 
-; unused padding
+; unused alignment padding
 .byte   $70,$FF,$FF,$FF,$3C,$3C
 .byte   $3C,$FC,$FC,$FC,$F8,$E0
 .byte   $DF,$DF
