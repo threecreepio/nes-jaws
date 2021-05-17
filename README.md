@@ -13,14 +13,7 @@ Then run `make`, if everything works you can then play `main.nes`.
 Left to document
 ----------------
 
-Much of the game has been documented, the main remaining areas are:
-
- - Sound system
- - Finale screen needs cleaning up
-
-On top of this it would be nice to provide aliases for things like flags used differently by different enemy types.
-
-Also could use a little style cleanup once the rest of the code is properly documented.
+Much of the game has been documented, there are some missing bits specifically in the sound system and some more cleaning up to do.
 
 Hope you find this interesting!
 
