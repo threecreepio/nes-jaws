@@ -1,267 +1,206 @@
-PPUCTRL               = $2000
-PPUMASK               = $2001
-PPUSTATUS             = $2002
-OAMADDR               = $2003
-OAMDATA               = $2004
-PPUSCROLL             = $2005
-PPUADDR               = $2006
-PPUDATA               = $2007
+; Disassembly of NES Jaws by threecreepio.
+;
 
-ActiveCHR             = $0307
-PPUCTRL_MIRROR        = $030E
-PPUMASK_MIRROR        = $030F
-SCROLL_X              = $0320
-SCROLL_Y              = $0322
+PPUCTRL                        = $2000
+PPUMASK                        = $2001
+PPUSTATUS                      = $2002
+OAMADDR                        = $2003
+OAMDATA                        = $2004
+PPUSCROLL                      = $2005
+PPUADDR                        = $2006
+PPUDATA                        = $2007
+OAMDMA                         = $4014
+JOYPAD_PORT1                   = $4016
+JOYPAD_PORT2                   = $4017
 
+Sprite                         = $0200
+SpritePosY                     = Sprite + 0
+SpriteTile                     = Sprite + 1
+SpriteAttr                     = Sprite + 2
+SpritePosX                     = Sprite + 3
+SPR                            = 4
 
-OAMDMA                = $4014
-JOYPAD_PORT1          = $4016
-JOYPAD_PORT2          = $4017
-
-TempCoordX            = $16
-TempCoordY            = $18
-
-MusicStatus = $4A
-
-NextBGUpdate          = $0303
-PendingBGUpdates      = $0304
-CheatsEnabled         = $0308
-SoundtestSelected     = $00
-
-
-BonusEncounterPtr = $50
-BonusEncounterOffset = $52
-BonusCurrentWave = $53
-BonusEnemiesHit = $54
-BonusEnemiesHitInWave = $55
-
-; this flag is raised during NMI.
-; it's used in the main loops of each screen
-; to delay until NMI has been raised.
-NMIRaisedFlag         = $0301
-
-UseHighPPUNametables  = $0323
-RNG0                  = $0324
-RNG1                  = $0325
-Joy1Inputs            = $0330
-Joy1Pressed           = $0332
-Joy2Inputs            = $0331
-Joy2Pressed           = $0333
-
-SpriteUpdateDirection = $0336
-
-CurrentMapPositionFlags     = $0340
-
-
-; these previous x/y positions are used when jaws or the player is unloaded.
-; that way we can restore them to roughly the correct location when needed.
-JawsStashedX          = $0348 ; 8 bit approximation of jaws last X coord
-JawsStashedY          = $0349 ; 8 bit approximation of jaws last Y coord
-PlayerStashedX        = $038C ; 8 bit approximation of jaws last X coord
-PlayerStashedY        = $038D ; 8 bit approximation of jaws last Y coord
-
-ShowStatusBarTextLine = $0305
-EventFlags            = $0306
-
-
-
-EventFlagsMapTouchedJaws         = %00000001
-EventFlagsMapPortPurchasing      = %00000010
-EventFlagsMapTriggerEncounter    = %00000100
-EventFlagsPortNotEnoughShells    = %00001000
-
-EventFlagsEncounterNoEnemies     = %00000001
-EventFlagsEncounterNoSpawns      = %00000010
-EventFlagsEncounterEnding        = %00000100
-EventFlagsEncounterJawsDead      = %00100000
-EventFlagsEncounterFinished      = %01000000
-EventFlagsEncounterPlayerDead    = %10000000
-
-EventFlagsFinaleJawsDead         = %10000000
-
-HighScore             = $0350
-CurrentScore          = $0380
-
-EncounterEnemiesOnScreen= $0480
-EncounterSpawnsIndex      = $0481
-EncounterPatternsPtr      = $0482
-EncounterSpawnTimer       = $0484
-EncounterNextSpawnTimer  = $0486
-EncounterNextSpawnTimer2 = $0487
-
-EncounterMaxDepth          = $033E ; 16 bit
-WaterHeight                = $033C ; 16 bit
-HitDetectionProjectileType = $034A
-WaterAnimationFrame        = $031B
-WaterAnimationTimer        = $031A
-
-; stores how many enounters the player has completed, maxout at $20.
-TotalEncountersPlayed          = $038E
-; how many encounters remain until the next bonus screen
-BonusScreenEncounterCountdown  = $038F
-; how many bonus screens we have had so far
+; memory map
+FinaleCurrentAction            = $08
+FinaleBoatAnimationTimer       = $09
+HitDetectYDirection            = $15
+HitDetectXDistance             = $1A
+HitDetectYDistance             = $1C
+TempCoordX                     = $16
+TempCoordY                     = $18
+Workset                        = $20 ; $20 bytes of working data
+WorksetPtr                     = $40
+StatusbarPPULocation           = $48 ; 16 bit
+MusicStatus                    = $4A
+BonusEncounterPtr              = $50
+BonusEncounterOffset           = $52
+BonusCurrentWave               = $53
+BonusEnemiesHit                = $54
+BonusEnemiesHitInWave          = $55
+VRAMBufferActive               = $0100
+VRAMBufferOffset               = $0101
+VRAMBuffer                     = $0102
+PaletteLoadPending             = $0300
+NMIRaisedFlag                  = $0301
+NMISpriteHandlingDisabled      = $0302
+NextBGUpdate                   = $0303
+PendingBGUpdates               = $0304
+ShowStatusBarTextLine          = $0305
+EventFlags                     = $0306
+ActiveCHR                      = $0307
+CheatsEnabled                  = $0308
+PPUCTRL_MIRROR                 = $030E
+PPUMASK_MIRROR                 = $030F
+WaterAnimationTimer            = $031A
+WaterAnimationFrame            = $031B
+SCROLL_X                       = $0320
+SCROLL_Y                       = $0322
+UseHighPPUNametables           = $0323
+RNG0                           = $0324
+RNG1                           = $0325
+MapScrollX                     = $0328 ; 16 bit
+MapScrollY                     = $032A ; 16 bit
+MapScrollCurrentX              = $032C
+Joy1Inputs                     = $0330
+Joy2Inputs                     = $0331
+Joy1Pressed                    = $0332
+Joy2Pressed                    = $0333
+SpriteUpdateDirection          = $0336
+CameraX                        = $0338 ; 16 bit
+CameraY                        = $033A ; 16 bit
+EncounterMaxDepth              = $033E ; 16 bit
+WaterHeight                    = $033C ; 16 bit
+CurrentMapPositionFlags        = $0340
+PlayerHasTracker               = $0341
+TrackerAnimationIndex          = $0342
+TrackerAnimationTimer          = $0343
+TrackerDistancePrev            = $0344
+TrackerTimer                   = $0345
+TrackerDistanceNext            = $0346
+JawsStashedX                   = $0348 ; 8 bit approximation of jaws last X coord
+JawsStashedY                   = $0349 ; 8 bit approximation of jaws last Y coord
+HitDetectionProjectileType     = $034A
+EncounterJawsActive            = $034B
+PortPowerupPrice               = $034C
+PlayerNextActivePort           = $034D
+MapSubmarineX                  = $034E
+MapSubmarineY                  = $034F
+HighScore                      = $0350
+CurrentScore                   = $0380
+PlayerNumberOfLives            = $0387
+JawsHP                         = $0388 ; 16 bit
+PlayerHasSubmarine             = $038A
 BonusScreensPlayed             = $038B
-
-; score requirement for the next submarine to appear on the map.
-; has top 3 bytes of the score, so 1m / 100k / 10k score levels
-ScoreForNextSubmarine = $0394 ; 394-396
-MapSubmarineVisible   = $0397
-MapSubmarineX         = $034E
-MapSubmarineY         = $034F
-MapScrollX            = $0328
-MapScrollY            = $032A
-; current scroll position, if this is different from mapscrollx it
-; will trigger loading in new tiles from the worldmap.
-MapScrollCurrentX     = $032C
-
-
-ActivePalette         = $046F
-
-VRAMBufferActive      = $0100
-VRAMBufferOffset      = $0101
-VRAMBuffer            = $0102
-
-
-; updated by hit detection
-HitDetectYDirection   = $15
-HitDetectXDistance    = $1A
-HitDetectYDistance    = $1C
-
-
-
-EntityData            = $0680 ; 680 - 87F
-PlayerData            = EntityData
-FirstNonPlayerEntity  = EntityData + ( 1 * $20)
-PlayerProjectile1Data  = FirstNonPlayerEntity
-MapSubmarineEntityData = FirstNonPlayerEntity
-PlayerProjectile2Data = EntityData + ( 2 * $20)
-PlayerProjectile3Data = EntityData + ( 3 * $20)
-JawsData              = EntityData + ( 4 * $20)
-Enemy1Data            = JawsData
-Enemy2Data            = EntityData + ( 5 * $20)
-EntityDataSize        = $20
-MaxEnemies            = 5
-MaxProjectiles        = 3
-MaxEntities           = 12
-
-
-
-JawsHP                = $0388 ; 16 bit
-JawsMaxHP             = $1400
-JawsType              = JawsData + EntityType
-JawsX                 = JawsData + EntityX ; 16 bit
-JawsY                 = JawsData + EntityY ; 16 bit
-
-CameraX               = $0338 ; 16 bit
-CameraY               = $033A ; 16 bit
-
-PaletteLoadPending        = $0300
-NMISpriteHandlingDisabled = $0302
-
-EncounterJawsActive       = $034B
-
-TrackerTimer          = $0345
-TrackerAnimationIndex = $0342
-TrackerAnimationTimer = $0343
-TrackerDistancePrev   = $0344
-TrackerDistanceNext   = $0346
-
-
-PlayerNumberOfLives   = $0387
-PlayerHasSubmarine    = $038A
-PlayerHasTracker      = $0341
-PlayerNextActivePort  = $034D
-PlayerShellCount      = $0390
-PlayerPowerLevel      = $0391
-PlayerCrabLevel       = $0392
-PlayerStrobeCount     = $0393
-
-PortPowerupPrice   = $034C
-
-
-VisibleMapStripe1           = $0400
-VisibleMapStripe2           = $0430
+PlayerStashedX                 = $038C ; 8 bit approximation of jaws last X coord
+PlayerStashedY                 = $038D ; 8 bit approximation of jaws last Y coord
+TotalEncountersPlayed          = $038E
+BonusScreenEncounterCountdown  = $038F
+PlayerShellCount               = $0390
+PlayerPowerLevel               = $0391
+PlayerCrabLevel                = $0392
+PlayerStrobeCount              = $0393
+ScoreForNextSubmarine          = $0394 ; 3 bytes
+MapSubmarineVisible            = $0397
+VisibleMapStripe1              = $0400
+FinaleParallax1                = $0400
+VisibleMapStripe2              = $0430
 VisibleMapAttributes           = $0460
-DrawVisibleMapDataPPUPosition      = $046D
-DrawVisibleMapAttrPPUPosition      = $046E
+FinalePlayerPosition           = $0460
+DrawVisibleMapDataPPUPosition  = $046D
+DrawVisibleMapAttrPPUPosition  = $046E
+ActivePalette                  = $046F
+BGLoadedSlices                 = $0470 ; list of which slice of map is loaded into ppu
+EncounterEnemiesOnScreen       = $0480
+EncounterSpawnsIndex           = $0481
+EncounterPatternsPtr           = $0482
+EncounterSpawnTimer            = $0484
+EncounterNextSpawnTimer        = $0486
+EncounterNextSpawnTimer2       = $0487
+EntityData                     = $0680 ; 680 - 87F
 
-; BGLoadedSlices has a list of 16 indices of loaded map data.
-; Each number will be the X position of the map that is loaded into BGData at that offset.
-BGLoadedSlices        = $0470
+; used by EventFlags value
+EventFlagsMapTouchedJaws       = %00000001
+EventFlagsMapPortPurchasing    = %00000010
+EventFlagsMapTriggerEncounter  = %00000100
+EventFlagsPortNotEnoughShells  = %00001000
+EventFlagsEncounterNoEnemies   = %00000001
+EventFlagsEncounterNoSpawns    = %00000010
+EventFlagsEncounterEnding      = %00000100
+EventFlagsEncounterJawsDead    = %00100000
+EventFlagsEncounterFinished    = %01000000
+EventFlagsEncounterPlayerDead  = %10000000
+EventFlagsFinaleJawsDead       = %10000000
 
+; a lot of entity data
+PlayerData                         = EntityData
+FirstNonPlayerEntity               = EntityData + ( 1 * $20)
+PlayerProjectile1Data              = FirstNonPlayerEntity
+MapSubmarineEntityData             = FirstNonPlayerEntity
+PlayerProjectile2Data              = EntityData + ( 2 * $20)
+PlayerProjectile3Data              = EntityData + ( 3 * $20)
+JawsData                           = EntityData + ( 4 * $20)
+Enemy1Data                         = JawsData
+Enemy2Data                         = EntityData + ( 5 * $20)
+EntityDataSize                     = $20
+MaxEnemies                         = 5
+MaxProjectiles                     = 3
+MaxEntities                        = 12
+JawsMaxHP                          = $1400
+JawsType                           = JawsData + EntityType
+JawsX                              = JawsData + EntityX ; 16 bit
+JawsY                              = JawsData + EntityY ; 16 bit
+EntityHeader                       = $00
+EntityType                         = $01
+EntityX                            = $02 ; 16 bit
+EntityY                            = $04 ; 16 bit
+EntitySpritesetPtr                 = $06 ; 16 bit
+EntityAnimPtr                      = $08 ; 16 bit
+EntityAnimOffset                   = $0A
+EntityAnimTimer                    = $0B
+EntityBBoxW                        = $0E
+EntityBBoxH                        = $0F
+EntityXSubpixel                    = $0C
+EntityYSubpixel                    = $0D
+EntityXSubspeed                    = $10
+EntityXSpeed                       = $11
+EntityYSubspeed                    = $12
+EntityYSpeed                       = $13
+EntityAnimationIndex               = $14
+EntityActiveAnimationIndex         = $15
+EntityV16                          = $16
+EntityIFrames                      = $1D
+EntityHitDetection                 = $1F
 
-
-
-FinaleParallax1       = $0400
-UnusedParallaxOffset  = $0460
-FinalePlayerPosition  = $0460
-
-StatusbarPPULocation  = $48 ; 16 bit
-
-Sprite                = $0200
-SpritePosY            = Sprite + 0
-SpriteTile            = Sprite + 1
-SpriteAttr            = Sprite + 2
-SpritePosX            = Sprite + 3
-SPR                   = 4
-
-PPUADDRStatusbarText  = $2B20
-
-; $20 bytes of working data
-WorksetPtr                  = $40
-Workset                     = $20
-
-EntityHeader                = $00
-EntityType                  = $01
-EntityX                     = $02 ; 16 bit
-EntityY                     = $04 ; 16 bit
-EntitySpritesetPtr          = $06 ; 16 bit
-EntityAnimPtr               = $08 ; 16 bit
-EntityAnimOffset            = $0A
-EntityAnimTimer             = $0B
-EntityBBoxW                 = $0E
-EntityBBoxH                 = $0F
-EntityXSubpixel             = $0C
-EntityYSubpixel             = $0D
-EntityXSubspeed             = $10
-EntityXSpeed                = $11
-EntityYSubspeed             = $12
-EntityYSpeed                = $13
-EntityAnimationIndex        = $14
-EntityActiveAnimationIndex  = $15
-EntityV16                   = $16
-EntityV17                   = $17
-EntityV18                   = $18
-EntityV19                   = $19
-EntityV1A                   = $1A
-EntityV1C                   = $1C
-EntityV1D                   = $1D
-EntityV1E                   = $1E
-EntityHitDetection          = $1F
-
-
-EntityMapJawsHeading             = $14
-EntityMapPrevJawsHeading         = $15
-EntityEncounterJawsSpawnTimer    = $14
-
+EntityIsSinking                    = $18
+EntityPickupTimer                  = $19
+EntityStunTimer                    = $19
+EntityBabysharkStunTimer           = $18
+EntityMapJawsHeading               = $14
+EntityMapPrevJawsHeading           = $15
+EntityMapJawsTimer                 = $16
+EntityMapJawsVisibility            = $17
+EntityEncounterJawsSpawnTimer      = $14
+EntityEncounterJawsIFrames         = $18
+EntityStingraySpeed                = $17
+EntityStingrayHP                   = $18
+EntityStingrayDying                = $1A
+EntityBabysharkHP                  = $17
 EntityBonusJellyStartingPosition   = $14
 EntityBonusJellyAnimationPathIndex = $15
 EntityBonusJellyDelay              = $16
 EntityBonusJellyPathPointer        = $18
 EntityBonusJellyPathOffset         = $1A
+EntityBonusJellyScore              = $1C
+EntityBonusJellyAnimValue          = $1D
+EntityOutroPlaneDelay              = $16
 
-
-FinaleCurrentAction       = $08
-FinaleBoatAnimationTimer   = $09
-
-FinaleCurrentActionNone   = %00000000
-FinaleCurrentActionJab    = %00000001
-FinaleCurrentActionB7     = %10000000
-FinaleCurrentActionB6     = %01000000
-FinaleCurrentActionB4     = %00010000
-
-FinaleJawsFlags2Reversing = %00000001
-FinaleJawsFlags2B7        = %10000000
+FinaleCurrentActionNone            = %00000000
+FinaleCurrentActionJab             = %00000001
+FinaleCurrentActionB7              = %10000000
+FinaleCurrentActionB6              = %01000000
+FinaleCurrentActionB4              = %00010000
+FinaleJawsFlags2Reversing          = %00000001
+FinaleJawsFlags2B7                 = %10000000
 
 ; offset into sprite memory where the finale boat sprites are located
 FinaleBoatSpriteOffset          = SPR*8
@@ -286,60 +225,58 @@ FinaleJawsYSpeed                = Workset + EntityYSpeed
 FinaleJawsAnimationIndex        = Workset + EntityAnimationIndex
 FinaleJawsActiveAnimationIndex  = Workset + EntityActiveAnimationIndex
 FinaleJawsV16                   = Workset + EntityV16
-FinaleJawsV17                   = Workset + EntityV17
-FinaleJawsXDirection            = Workset + EntityV18
-FinaleJawsV1E                   = Workset + EntityV1E
+FinaleJawsV17                   = Workset + $17
+FinaleJawsXDirection            = Workset + $18
+FinaleJawsSpriteAttrib          = Workset + $1E
 FinaleJawsHitDetection          = Workset + EntityHitDetection
 
+EntityHitEnabled                      = %00000001
+EntityFlag1FBit2                      = %00000010
+EntityHitProjectile                   = %01000000
+EntityHitDetected                     = %10000000
 
-EntityHitEnabled        = %00000001
-EntityFlag1FBit2        = %00000010
-EntityHitProjectile     = %01000000
-EntityHitDetected       = %10000000
+EntityMovementStill                   = %00001000
+EntityMovementNorth                   = %00000110
+EntityMovementSouth                   = %00000010
+EntityMovementWest                    = %00000100
+EntityMovementEast                    = %00000000
 
-EntityMovementStill = %00001000
-EntityMovementNorth = %00000110
-EntityMovementSouth = %00000010
-EntityMovementWest  = %00000100
-EntityMovementEast  = %00000000
-
-EntityTypePlayerBoat        = $00
-EntityTypePlayerSubmarine   = $01
-EntityTypePlayerSwim        = $02
-EntityTypeParachuteBomb     = $04
+EntityTypePlayerBoat                  = $00
+EntityTypePlayerSubmarine             = $01
+EntityTypePlayerSwim                  = $02
+EntityTypeParachuteBomb               = $04
 
 EntityTypeProjectileSubmarineBomb     = $01
 EntityTypeProjectileSubmarineBullet   = $02
 EntityTypeProjectileHarpoon           = $03
 
-EncounterEntityJellyfish        = $0
-EncounterEntityStingray         = $1
-EncounterEntityHomingJellyfish  = $2
-EncounterEntityBabyshark        = $3
-EncounterEntityStingray2        = $4
-EncounterEntityCrab             = $8
-EncounterEntityStar             = $9
-EncounterEntityShell            = $A
+EncounterEntityJellyfish              = $0
+EncounterEntityStingray               = $1
+EncounterEntityHomingJellyfish        = $2
+EncounterEntityBabyshark              = $3
+EncounterEntityStingray2              = $4
+EncounterEntityCrab                   = $8
+EncounterEntityStar                   = $9
+EncounterEntityShell                  = $A
 
-EntityHeaderActive          = %10000000
+EntityHeaderActive                    = %10000000
 ; all i can find using this flag is if it blocks projectiles
-EntityHeader7               = %01000000
+EntityHeader7                         = %01000000
 ; cant find actual usages of this
-EntityHeader6               = %00100000
-EntityHeaderFacingLeft      = %00010000
-EntityHeaderInvincible      = %00000010
+EntityHeader6                         = %00100000
+EntityHeaderFacingLeft                = %00010000
+EntityHeaderInvincible                = %00000010
 ; i think this is if jaws is on the surface on the map screen
-EntityHeader1               = %00000001
+EntityHeader1                         = %00000001
 
+; statusbar display flags
+DrawStatusbarScoreFlag                = %10000000
+DrawStatusbarJawsPowerFlag            = %01000000
+DrawBGEncounterWater                  = %00100000
+DrawVRAMBufferFlag                    = %00010000
+DrawStatusbarShellsFlag               = %00001000
 
-DrawStatusbarScoreFlag          = %10000000
-DrawStatusbarJawsPowerFlag      = %01000000
-DrawBGEncounterWater            = %00100000
-DrawVRAMBufferFlag              = %00010000
-DrawStatusbarShellsFlag         = %00001000
-
-; ---
-
+; joypad buttons
 JOY_A                 = %00000001
 JOY_B                 = %00000010
 JOY_SELECT            = %00000100
@@ -349,7 +286,11 @@ JOY_DOWN              = %00100000
 JOY_LEFT              = %01000000
 JOY_RIGHT             = %10000000
 
+; vram flag
 VRAMFlagMultipleBytes = %10000000
+
+; location used by status bar texts (like YOUVE HIT JAWS) to display in the PPU
+PPUADDRStatusbarText               = $2B20
 
 .segment "PRG"
 .org $8000
@@ -492,6 +433,7 @@ RunTitleScreen:
 
 ; ----------------------------------------------------------------------------
 Soundtest:
+        SoundtestSelected = $00
         bit CheatsEnabled
         bpl @Done
         lda #JOY_B
@@ -805,7 +747,8 @@ RunEncounterScreen:
         jsr SetNextPendingBGUpdate
         ldy #$02
         jsr WaitForYSpins
-        lda $0574
+        ; wait until sound channel 0 has stopped
+        lda SoundChannel0
         bmi @DelayUntilSoundStops
         ; run encounter
         lda #$01
@@ -1012,7 +955,8 @@ RunGameOverScreen:
         ldy #$02
         jsr WaitForYSpins
         jsr RefreshPPUState
-        bit $05AC
+        ; if sound channel 2 is still active, keep waiting
+        bit SoundChannel2
         bmi @DelayUntilSoundFinished
         ; go back to the startup code to show the title screen
         jmp GameStartup
@@ -1047,7 +991,7 @@ TransitionToFinaleScreen:
         dec @TempDelayTime
         bne @Wait
         ; now we can finally go to the finale!
-        jsr EnterFinaleScreen
+        jsr RunFinaleScreen
         ; we failed the finale, oh no!
         ; reset jaws hp
         lda #<JawsMaxHP
@@ -2848,7 +2792,7 @@ EncounterRunPlayerBoat:
         sta Workset + EntityY + 1
         ; set iframes to prevent immediate boat despawn.
         lda #$20
-        sta Workset + EntityV1D
+        sta Workset + EntityIFrames
         ; and play our boat animation!
         lda #AnimationEncounterBoat
         jsr WorksetAnimationPlay
@@ -2860,7 +2804,7 @@ EncounterRunPlayerBoat:
         beq @JawsIsActive
         ; if jaws is not active, we want to wait until iframes
         ; run out and then despawn the boat.
-        dec Workset + EntityV1D
+        dec Workset + EntityIFrames
         beq RemovePlayerVehicle
         jmp WorksetSave
 ; -------------------------------------------
@@ -2993,6 +2937,8 @@ EncounterPlayerBoatSpeedsByCrabLevel:
 
 ; ----------------------------------------------------------------------------
 EncounterRunPlayerSubmarine:
+        @TempAccel = $16
+        @TempSpeed = $18
         bit Workset + EntityHeader
         bvs @SubmarineActive
         ; mark as active, and facing right
@@ -3007,12 +2953,12 @@ EncounterRunPlayerSubmarine:
         sta Workset + EntityHitDetection
         ; give some iframes after spawning
         lda #$B4
-        sta Workset + EntityV1D
+        sta Workset + EntityIFrames
         jmp WorksetSave
 @SubmarineActive:
-        lda Workset + EntityV1D
+        lda Workset + EntityIFrames
         beq @CheckForDamage
-        dec Workset + EntityV1D
+        dec Workset + EntityIFrames
         bne @HandleSubmarineInputs
         lda Workset + EntityHeader
         and #($FF ^ EntityHeaderInvincible)
@@ -3039,18 +2985,18 @@ EncounterRunPlayerSubmarine:
         ; player is holding right
         ; set acceleration temp values
         lda #$20
-        sta $16
+        sta @TempAccel
         lda #$00
-        sta $17
+        sta @TempAccel+1
         ; get max speed for a given crab level
         lda PlayerCrabLevel
         asl a
         tax
         ; store speed in temp values used by ApproachSpeed2
         lda EncounterPlayerSubmarineSpeedsByCrabLevel,x
-        sta $18
+        sta @TempSpeed
         lda EncounterPlayerSubmarineSpeedsByCrabLevel+1,x
-        sta $19
+        sta @TempSpeed+1
         ldx #EntityXSubspeed
         jsr ApproachSpeed2
         ; make sure the player is facing right
@@ -3069,18 +3015,18 @@ EncounterRunPlayerSubmarine:
         ; player is holding left
         ; set acceleration temp values
         lda #$E0
-        sta $16
+        sta @TempAccel
         lda #$FF
-        sta $17
+        sta @TempAccel+1
         ; get max speed for a given crab level
         lda PlayerCrabLevel
         asl a
         tax
         ; store speed in temp values used by ApproachSpeed2
         lda EncounterPlayerSubmarineNegativeSpeedsByCrabLevel,x
-        sta $18
+        sta @TempSpeed
         lda EncounterPlayerSubmarineNegativeSpeedsByCrabLevel+1,x
-        sta $19
+        sta @TempSpeed+1
         ldx #EntityXSubspeed
         jsr ApproachSpeed2
         ; make sure the player is facing left
@@ -3094,18 +3040,18 @@ EncounterRunPlayerSubmarine:
         ; player is holding down
         ; set acceleration temp values
         lda #$20
-        sta $16
+        sta @TempAccel
         lda #$00
-        sta $17
+        sta @TempAccel+1
         ; get max speed for a given crab level
         lda PlayerCrabLevel
         asl a
         tax
         ; store speed in temp values used by ApproachSpeed2
         lda EncounterPlayerSubmarineSpeedsByCrabLevel,x
-        sta $18
+        sta @TempSpeed
         lda EncounterPlayerSubmarineSpeedsByCrabLevel+1,x
-        sta $19
+        sta @TempSpeed+1
         ldx #EntityYSubspeed
         jsr ApproachSpeed2
         jmp @MoveSubmarinePlayer
@@ -3120,18 +3066,18 @@ EncounterRunPlayerSubmarine:
         ; player is holding up
         ; set acceleration temp values
         lda #$E0
-        sta $16
+        sta @TempAccel
         lda #$FF
-        sta $17
+        sta @TempAccel+1
         ; get max speed for a given crab level
         lda PlayerCrabLevel
         asl a
         tax
         ; store speed in temp values used by ApproachSpeed2
         lda EncounterPlayerSubmarineNegativeSpeedsByCrabLevel,x
-        sta $18
+        sta @TempSpeed
         lda EncounterPlayerSubmarineNegativeSpeedsByCrabLevel+1,x
-        sta $19
+        sta @TempSpeed+1
         ldx #EntityYSubspeed
         jsr ApproachSpeed2
 @MoveSubmarinePlayer:
@@ -3209,6 +3155,8 @@ EncounterPlayerSubmarineNegativeSpeedsByCrabLevel:
 
 ; ----------------------------------------------------------------------------
 EncounterRunPlayerSwim:
+        @TempAccel = $16
+        @TempSpeed = $18
         bit Workset + EntityHeader
         bvs @SwimmerActive
         ; mark as active, and facing right
@@ -3223,12 +3171,12 @@ EncounterRunPlayerSwim:
         sta Workset + EntityHitDetection
         ; give some iframes after spawning
         lda #$B4
-        sta Workset + EntityV1D
+        sta Workset + EntityIFrames
         jmp WorksetSave
 @SwimmerActive:
-        lda Workset + EntityV1D
+        lda Workset + EntityIFrames
         beq @CheckForDamage
-        dec Workset + EntityV1D
+        dec Workset + EntityIFrames
         bne @HandleSwimmerInputs
         lda Workset + EntityHeader
         and #($FF ^ EntityHeaderInvincible)
@@ -3254,18 +3202,18 @@ EncounterRunPlayerSwim:
         ldy #$80
 @HandleRightInput:
         ; set acceleration temp values
-        sty $16
+        sty @TempAccel
         lda #$00
-        sta $17
+        sta @TempAccel+1
         ; get max speed for a given crab level
         lda PlayerCrabLevel
         asl a
         tax
         ; store speed in temp values used by ApproachSpeed2
         lda EncounterPlayerSwimSpeedsByCrabLevel,x
-        sta $18
+        sta @TempSpeed
         lda EncounterPlayerSwimSpeedsByCrabLevel+1,x
-        sta $19
+        sta @TempSpeed+1
         ldx #EntityXSubspeed
         jsr ApproachSpeed2
         ; make sure the player is facing right
@@ -3297,18 +3245,18 @@ EncounterRunPlayerSwim:
         ; holding A reduces speed
         ldy #$80
 @NotHoldingALeft:
-        sty $16
+        sty @TempAccel
         lda #$FF
-        sta $17
+        sta @TempAccel+1
         ; get max speed for a given crab level
         lda PlayerCrabLevel
         asl a
         tax
         ; store speed in temp values used by ApproachSpeed2
         lda EncounterPlayerSwimNegativeSpeedsByCrabLevel,x
-        sta $18
+        sta @TempSpeed
         lda EncounterPlayerSwimNegativeSpeedsByCrabLevel+1,x
-        sta $19
+        sta @TempSpeed+1
         ldx #EntityXSubspeed
         jsr ApproachSpeed2
         ; make sure the player is facing left
@@ -3328,18 +3276,18 @@ EncounterRunPlayerSwim:
         ; holding A reduces speed
         ldy #$80
 @NotHoldingADown:
-        sty $16
+        sty @TempAccel
         lda #$00
-        sta $17
+        sta @TempAccel+1
         ; get max speed for a given crab level
         lda PlayerCrabLevel
         asl a
         tax
         ; store speed in temp values used by ApproachSpeed2
         lda EncounterPlayerSwimSpeedsByCrabLevel,x
-        sta $18
+        sta @TempSpeed
         lda EncounterPlayerSwimSpeedsByCrabLevel+1,x
-        sta $19
+        sta @TempSpeed+1
         ldx #EntityYSubspeed
         jsr ApproachSpeed2
         jmp @MovementComplete
@@ -3365,9 +3313,9 @@ EncounterRunPlayerSwim:
         beq @HoldingUp2
         ldy #$80
 @HoldingUp2:
-        sty $16
+        sty @TempAccel
         lda #$FF
-        sta $17
+        sta @TempAccel+1
         ; get max speed for a given crab level
         lda PlayerCrabLevel
         asl a
@@ -4611,7 +4559,7 @@ EncounterBoatProjectile:
         and #EntityHitEnabled
         beq @Despawn
         ; check if sinking flag is set
-        lda Workset + EntityV18
+        lda Workset + EntityIsSinking
         bmi @AlreadyInitialized
         ; wait until projectile hits water
         lda Workset + EntityY
@@ -4625,8 +4573,8 @@ EncounterBoatProjectile:
         sta Workset + EntityXSpeed
         ; mark sinking flag
         lda #%10000000
-        ora Workset + EntityV18
-        sta Workset + EntityV18
+        ora Workset + EntityIsSinking
+        sta Workset + EntityIsSinking
         ; set falling speed
         lsr Workset + EntityYSpeed
         ror Workset + EntityYSubspeed
@@ -4758,7 +4706,7 @@ EncounterPlaneProjectile:
         beq @Despawn
         ; drop projectile toward water
         jsr WorksetMoveY
-        lda Workset + EntityV18
+        lda Workset + EntityIsSinking
         bne @AlreadyRunning
         ; wait until projectile hits water
         lda Workset + EntityY
@@ -4767,7 +4715,7 @@ EncounterPlaneProjectile:
         sbc WaterHeight+1
         bcc @Done
         ; and set a flag
-        inc Workset + EntityV18
+        inc Workset + EntityIsSinking
         ; and set drop speed
         lda #$00
         sta Workset + EntityYSubspeed
@@ -4927,17 +4875,17 @@ MapRunJaws:
         sta Workset + EntityY + 1
         jsr @TurnTowardPlayer
         lda #$00
-        sta Workset + EntityV17
+        sta Workset + EntityMapJawsVisibility
         ; and set up his starting flags
         lda #(EntityHeaderActive | EntityHeader7 | EntityHeader1)
         sta Workset + EntityHeader
         ; jaws can't interact with player right after spawning
         lda #$80
-        sta Workset + EntityV1D
+        sta Workset + EntityIFrames
         jmp WorksetSave
 @JawsIsActive:
         jsr WorksetAnimationAdvance
-        lda Workset + EntityV1D
+        lda Workset + EntityIFrames
         bne @StartupTimer
         jsr CheckFlagsAndHitDetectAgainstPlayer
         lda Workset + EntityHitDetection
@@ -4949,7 +4897,7 @@ MapRunJaws:
         sta EventFlags
         jmp WorksetSave
 @StartupTimer:
-        dec Workset + EntityV1D
+        dec Workset + EntityIFrames
         jmp @JawsMovement
 
 ; convert jaws distance from player to a single number
@@ -4982,15 +4930,15 @@ MapRunJaws:
         sta TrackerDistancePrev
 @JawsMovement:
         ; finish if we are still waiting on our timer.
-        dec Workset + EntityV16
+        dec Workset + EntityMapJawsTimer
         bne @FinishJawsAction
-        bit Workset + EntityV17
+        bit Workset + EntityMapJawsVisibility
         bpl @Activated
         ; mark jaws as active
         lda #(EntityHeaderActive | EntityHeader7 | EntityHeader1)
         sta Workset + EntityHeader
         lda #$00
-        sta Workset + EntityV17
+        sta Workset + EntityMapJawsVisibility
 @Activated:
         jsr @TurnTowardPlayer
         ; check our distance to the player
@@ -5001,7 +4949,7 @@ MapRunJaws:
         bit Workset + EntityHeader
         bne @PlayEmergeAnimations
         bcs @PlaySubmergeAnimation
-        bit Workset + EntityV17
+        bit Workset + EntityMapJawsVisibility
         bvs @PlaySurfaceAnimation
         ; check if our desired animation is equal to our current animation
         lda Workset + EntityMapPrevJawsHeading
@@ -5011,20 +4959,20 @@ MapRunJaws:
 @PlaySurfaceAnimation:
         ; remain on surface
         lda #$00
-        sta Workset + EntityV17
+        sta Workset + EntityMapJawsVisibility
         ldx #$08
         bne @UpdateJawsAnimation
 @PlaySubmergeAnimation:
         ; play submerge animation
         lda #%10000000
-        sta Workset + EntityV17
+        sta Workset + EntityMapJawsVisibility
         ldx #$10
         bne @UpdateJawsAnimation
 @PlayEmergeAnimations:
         bcs @FinishJawsAction
         ; emerge from the depths!
         lda #%01000000
-        sta Workset + EntityV17
+        sta Workset + EntityMapJawsVisibility
         ldx #$00
 @UpdateJawsAnimation:
         jsr @ChangeJawsAnimation
@@ -5165,7 +5113,7 @@ MapRunJaws:
 @ContinueInCurrentDirection:
         jsr @UpdateSpeed
         lda #$20
-        sta Workset + EntityV16
+        sta Workset + EntityMapJawsTimer
         rts
 
 ; ----------------------------------------------------------------------------
@@ -5219,6 +5167,7 @@ MapRunJaws:
 
 ; ----------------------------------------------------------------------------
 EncounterRunJaws:
+        @IFrames = Workset + $18
         lda EncounterJawsActive
         cmp #$02
         bne @Activate
@@ -5282,8 +5231,8 @@ EncounterRunJaws:
         ; clear out some flags
         lda #$00
         sta Workset + EntityV16
-        sta Workset + EntityV18
-        sta Workset + EntityV19
+        sta Workset + EntityEncounterJawsIFrames
+        sta Workset + EntityStunTimer
         ; then play the jaws animation!
         lda #AnimationEncounterJaws
         jsr WorksetAnimationPlay
@@ -5302,7 +5251,7 @@ EncounterRunJaws:
         sta Workset + EntityEncounterJawsSpawnTimer+1
         jmp WorksetSave
 @JawsSpawn:
-        lda Workset + EntityV18
+        lda Workset + EntityEncounterJawsIFrames
         beq @NormalSpeed
         clc
         lda Workset + EntityXSpeed
@@ -5371,7 +5320,7 @@ EncounterRunJaws:
         jsr WorksetDetectProjectileHit
         jsr CheckFlagsAndHitDetectAgainstPlayer
         ; if jaws is within iframes, we can ignore damage
-        lda Workset + EntityV18
+        lda Workset + EntityEncounterJawsIFrames
         bne @StillWithinIFrames
         ; otherwise check if we hit something
         bit Workset + EntityHitDetection
@@ -5417,7 +5366,7 @@ EncounterRunJaws:
         jsr SoundPlay
         ; assign $18 frames worth of iframes.
         lda #$18
-        sta Workset + EntityV18
+        sta Workset + EntityEncounterJawsIFrames
         ; and then update jaws health bar
         lda PendingBGUpdates
         ora #DrawStatusbarJawsPowerFlag
@@ -5430,7 +5379,7 @@ EncounterRunJaws:
         jsr WorksetAnimationAdvance
         jsr WorksetAnimationAdvance
         jsr WorksetAnimationAdvance
-        dec Workset + EntityV18
+        dec Workset + EntityEncounterJawsIFrames
 @HitDetectionComplete:
         ; clear out our y speed
         lda #$00
@@ -5878,11 +5827,11 @@ RunEntityStingray:
         ; clear out a bunch of flags
         lda #$00
         sta Workset + EntityHitDetection
-        sta Workset + EntityV19
-        sta Workset + EntityV1A
+        sta Workset + EntityStunTimer
+        sta Workset + EntityStingrayDying
         lda #%00000010
-        sta Workset + EntityV18
-        ; place outselves a little offset from player height
+        sta Workset + EntityStingrayHP
+        ; place ourselves a little offset from player height
         lda PlayerData+EntityY
         clc
         adc #$10
@@ -5901,7 +5850,7 @@ RunEntityStingray:
         bne @ContinueSpawn
         ldx #$04
 @ContinueSpawn:
-        stx Workset + EntityV17
+        stx Workset + EntityStingraySpeed
         ; check which side of screen the player is on, we want to start
         ; on the opposite end of the screen.
         lda PlayerData+EntityX
@@ -5932,13 +5881,13 @@ RunEntityStingray:
         rts
 @Main:
         jsr WorksetAnimationAdvance
-        lda Workset + EntityV1A
+        lda Workset + EntityStingrayDying
         beq @StillAlive
         jmp @ProcessDeath
 @StillAlive:
-        lda Workset + EntityV19
+        lda Workset + EntityStunTimer
         beq @RunStandardEnemyLogic
-        dec Workset + EntityV19
+        dec Workset + EntityStunTimer
         rts
 @RunStandardEnemyLogic:
         ; run hit detection
@@ -5963,7 +5912,7 @@ RunEntityStingray:
 @ReEnterFromRight:
         lda #(EntityHeaderActive | EntityHeader7 | EntityHeaderFacingLeft)
         sta Workset + EntityHeader
-        ldx Workset + EntityV17
+        ldx Workset + EntityStingraySpeed
         lda @StingraySpeeds+2,x
         sta Workset + EntityXSubspeed
         lda @StingraySpeeds+3,x
@@ -5978,7 +5927,7 @@ RunEntityStingray:
         bcs @Exit
         lda #(EntityHeaderActive | EntityHeader7)
         sta Workset + EntityHeader
-        ldx Workset + EntityV17
+        ldx Workset + EntityStingraySpeed
         lda @StingraySpeeds,x
         sta Workset + EntityXSubspeed
         lda @StingraySpeeds+1,x
@@ -5997,14 +5946,14 @@ RunEntityStingray:
         bcc @Exit
         bcs @Disable
 @ProcessHit:
-        dec Workset + EntityV18
+        dec Workset + EntityStingrayHP
         beq @RunDeathAnimation
         ; hit but still alive.
         ; set iframes and give the player some points
         lda #$00
         jsr AwardPoints
         lda #$08
-        sta Workset + EntityV19
+        sta Workset + EntityStunTimer
         jmp @Exit
 @RunDeathAnimation:
         ; we're out of hitpoints, give some more points
@@ -6015,7 +5964,7 @@ RunEntityStingray:
         jsr SoundPlay
         ; mark death and play death animation
         lda #$80
-        sta Workset + EntityV1A
+        sta Workset + EntityStingrayDying
         lda #AnimationEncounterStingrayDeath
         jmp WorksetAnimationPlay
 @ProcessDeath:
@@ -6039,14 +5988,10 @@ RunEntityStingray:
 @Exit:
         rts
 @RewardRNG:
-        .byte 0
-        .byte EncounterEntityCrab
-        .byte 0
-        .byte EncounterEntityStar
-        .byte 0
-        .byte EncounterEntityShell
-        .byte 0
-        .byte EncounterEntityStar
+        .dbyt EncounterEntityCrab
+        .dbyt EncounterEntityStar
+        .dbyt EncounterEntityShell
+        .dbyt EncounterEntityStar
 @StingraySpeeds:
         .byte $00,$01 ; slow stingray heading right
         .byte $00,$FF ; slow stingray heading left
@@ -6067,12 +6012,12 @@ RunEntityBabyshark:
         sta Workset + EntityActiveAnimationIndex
         lda #$00
         sta Workset + EntityV16
-        sta Workset + EntityV18
-        sta Workset + EntityV19
+        sta Workset + EntityBabysharkStunTimer
+        sta Workset + EntityStunTimer
         jsr RNGAdvance
         and #$07
         adc #$07
-        sta Workset + EntityV17
+        sta Workset + EntityBabysharkHP
         ; play animation
         lda #AnimationEncounterBabyshark
         jsr WorksetAnimationPlay
@@ -6110,11 +6055,11 @@ RunEntityBabyshark:
         sta Workset + EntityXSpeed
         rts
 @Main:
-        lda Workset + EntityV19
+        lda Workset + EntityStunTimer
         beq @StillAlive
         jmp @DelayUntilDeathAnimationComplete
 @StillAlive:
-        lda Workset + EntityV18
+        lda Workset + EntityBabysharkStunTimer
         beq @FastMovement
         ; if V18 is set we are taking damage.
         ; we want to slow down movement speed.
@@ -6131,7 +6076,7 @@ RunEntityBabyshark:
         jsr WorksetAnimationAdvance
         jsr WorksetAnimationAdvance
         jsr WorksetAnimationAdvance
-        dec Workset + EntityV18
+        dec Workset + EntityBabysharkStunTimer
         jmp @MoveY
 @FastMovement:
         jsr WorksetMoveX
@@ -6147,7 +6092,7 @@ RunEntityBabyshark:
         bne @SetV16
         rts
 @SetV16:
-        lda #$80
+        lda #%10000000
         sta Workset + EntityV16
         rts
 @KeepRunning:
@@ -6184,13 +6129,13 @@ RunEntityBabyshark:
         ; we seem to have been shot, play a sound effect and lower hp
         lda #SFXEncounterEnemyDeath
         jsr SoundPlay
-        dec Workset + EntityV17
+        dec Workset + EntityBabysharkHP
         bne @ProcessHit
         ; babyshark is dead, give points, mark for removal and play animation
         lda #$0A
         jsr AwardPoints
         lda #$80
-        sta Workset + EntityV19
+        sta Workset + EntityStunTimer
         lda #AnimationEncounterBabysharkDeath
         jmp WorksetAnimationPlay
 @ProcessHit:
@@ -6198,7 +6143,7 @@ RunEntityBabyshark:
         lda #$00
         jsr AwardPoints
         lda #$08
-        sta Workset + EntityV18
+        sta Workset + EntityBabysharkStunTimer
 @UpdateSpeeds:
         ; chase after player
         lda HitDetectYDistance+1
@@ -6256,7 +6201,7 @@ RunEntityCrab:
         ; clear some settings
         jsr WorksetClearSpeed
         lda #$00
-        sta Workset + EntityV18
+        sta Workset + EntityIsSinking
         sta Workset + EntityHitDetection
         ; and play the crab animation
         lda #AnimationEncounterCrab
@@ -6285,7 +6230,7 @@ RunEntityCrab:
         sta Workset + EntityHeader
         rts
 @CrabMovement:
-        lda Workset + EntityV18
+        lda Workset + EntityIsSinking
         bne @OnWaterFloor
         ; accelerate toward the bottom of the map
         lda #$08
@@ -6296,7 +6241,7 @@ RunEntityCrab:
         jsr EncounterClampWorksetMaximumY
         bcc @Exit
         ; increment V18, we've reached the bottom of the map.
-        inc Workset + EntityV18
+        inc Workset + EntityIsSinking
         ; set crab speed to 1
         ldy #$01
         ; compare crab position to player x
@@ -6341,7 +6286,7 @@ RunEntityShell:
         sta Workset + EntityHeader
         jsr WorksetClearSpeed
         lda #$00
-        sta Workset + EntityV18
+        sta Workset + EntityIsSinking
         ; play shell animation
         lda #AnimationEncounterShell
         jmp WorksetAnimationPlay
@@ -6372,10 +6317,10 @@ RunEntityShell:
         rts
 @KeepRunning:
         ; keep falling to the ground until landed
-        bit Workset + EntityV18
+        bit Workset + EntityIsSinking
         bpl @FallingToGround
         ; despawn if timer has expired, otherwise wait
-        dec Workset + EntityV19
+        dec Workset + EntityPickupTimer
         bne @Exit
         beq @Despawn
 @FallingToGround:
@@ -6390,10 +6335,10 @@ RunEntityShell:
         bcc @Exit
         ; mark that we have hit the ground
         lda #$80
-        sta Workset + EntityV18
+        sta Workset + EntityIsSinking
         ; set timer to despawn unless picked up.
         lda #$80
-        sta Workset + EntityV19
+        sta Workset + EntityPickupTimer
 @Exit:
         rts
 
@@ -6406,7 +6351,7 @@ RunEntityStar:
         sta Workset + EntityHeader
         jsr WorksetClearSpeed
         lda #$00
-        sta Workset + EntityV18
+        sta Workset + EntityIsSinking
         sta Workset + EntityAnimationIndex
         lda #AnimationEncounterStar
         jmp WorksetAnimationPlay
@@ -6451,10 +6396,10 @@ RunEntityStar:
 @NotPickedUp:
         jsr WorksetAnimationAdvance
         ; keep falling to the ground until landed
-        bit Workset + EntityV18
+        bit Workset + EntityIsSinking
         bpl @FallingToGround
         ; despawn if timer has expired, otherwise wait
-        dec Workset + EntityV19
+        dec Workset + EntityPickupTimer
         bne @Exit
         beq @Despawn
 @FallingToGround:
@@ -6468,10 +6413,10 @@ RunEntityStar:
         bcc @Exit
         ; mark that we have hit the ground
         lda #$80
-        sta Workset + EntityV18
+        sta Workset + EntityIsSinking
         ; set timer to despawn unless picked up.
         lda #$80
-        sta Workset + EntityV19
+        sta Workset + EntityPickupTimer
 @Exit:
         rts
 
@@ -8176,8 +8121,8 @@ AnimationPointers:
 ;   - u8 bounding box width
 ;   - u8 bounding box height
 ;   - one or more sprites:
-;     - u8 x offset from entity location
-;     - u8 y offset from entity location
+;     - s8 x offset from entity location
+;     - s8 y offset from entity location
 ;     - u8 sprite tile to render
 ;     - u8 sprite attributes
 ;   - u8 $80 end of spriteset marker
@@ -11111,12 +11056,12 @@ BonusRunSingleJellyfish:
         lda #$00
         sta Workset + EntityBonusJellyAnimationPathIndex
         sta Workset + EntityBonusJellyPathOffset
-        sta Workset + EntityV1D
+        sta Workset + EntityBonusJellyAnimValue
         ; and play our animation
         lda #AnimationBonusJellyfish
         jmp WorksetAnimationPlay
 @Initialized:
-        bit Workset + EntityV1D
+        bit Workset + EntityBonusJellyAnimValue
         bpl @DelayUntilNextAnimation
         jmp @MoveJellyfish
 @DelayUntilNextAnimation:
@@ -11212,13 +11157,13 @@ BonusRunSingleJellyfish:
         inc BonusEnemiesHitInWave
         ; get animation for points to award
         lda @PointAnimations,x
-        sta Workset + EntityV1C
+        sta Workset + EntityBonusJellyScore
         ; and award points to the player
         lda @PointAmounts,x
         jsr AwardPoints
         ; clear some settings
         lda #$80
-        sta Workset + EntityV1D
+        sta Workset + EntityBonusJellyAnimValue
         lda #$00
         sta Workset + EntityYSubspeed
         ; move upward during death sequence
@@ -11361,13 +11306,13 @@ BonusRunSingleJellyfish:
         ; play the animations and move entity
         jsr WorksetAnimationAdvance
         jsr WorksetMoveY
-        bit Workset + EntityV1D
+        bit Workset + EntityBonusJellyAnimValue
         bvs @Done1
         lda Workset + EntityAnimTimer
         bne @Done2
         lda #$C0
-        sta Workset + EntityV1D
-        lda Workset + EntityV1C
+        sta Workset + EntityBonusJellyAnimValue
+        lda Workset + EntityBonusJellyScore
         jmp WorksetAnimationPlay
 @Done1:
         lda Workset + EntityAnimTimer
@@ -11663,7 +11608,7 @@ BonusJellyPath0F:
         .byte $18,$40
         .byte $00
 
-EnterFinaleScreen:
+RunFinaleScreen:
         ; this is where we give up and just hardcode the crap out of everything.
         ; clear screen and sound
         lda #SFXSTOP
@@ -11753,21 +11698,21 @@ EnterFinaleScreen:
         and #(JOY_LEFT | JOY_RIGHT)
         beq @DrawStrobeCount
         bpl @MoveLeft
-        ; player is holding right, update some values that appear not to get used.
-        lda UnusedParallaxOffset
+        ; player is holding right
+        lda FinalePlayerPosition
         clc
         adc #$04
-        sta UnusedParallaxOffset
+        sta FinalePlayerPosition
         lda SCROLL_X
         adc #$00
         sta SCROLL_X
         jmp @DrawStrobeCount
 @MoveLeft:
-        ; player is holding left, update some values that appear not to get used.
-        lda UnusedParallaxOffset
+        ; player is holding left
+        lda FinalePlayerPosition
         sec
         sbc #$08
-        sta UnusedParallaxOffset
+        sta FinalePlayerPosition
         lda SCROLL_X
         sbc #$00
         sta SCROLL_X
@@ -11799,7 +11744,7 @@ EnterFinaleScreen:
         jsr FinaleUpdateParallax
         dec @TempDelayTimer
         bne @DelayForJawsDeathAnimation
-        jmp EnterOutroScreen
+        jmp RunOutroScreen
 
 FinaleDrawJawsOffscreenPointer:
         lda FinaleJawsX + 1
@@ -12057,7 +12002,7 @@ AttemptToStrikeJawsWithBoat:
         cmp #$B0
         bcs @Exit
         lda #$20
-        bit FinaleJawsV1E
+        bit FinaleJawsSpriteAttrib
         beq @Exit
         ; jaws has been struck dead.
         ; time to place out our strike sprites and delay until the outro.
@@ -12361,12 +12306,12 @@ FinaleUpdateJawsPosition:
 @UpdateJawsMovementPattern:
         asl a
         tax
-        lda FinaleJawsMovementPattern,x
+        lda FinaleJawsAnimationPointers,x
         sta FinaleJawsAnimPtr
-        lda FinaleJawsMovementPattern+1,x
-        sta $29
+        lda FinaleJawsAnimationPointers+1,x
+        sta FinaleJawsAnimPtr+1
         lda #$00
-        sta $2A
+        sta FinaleJawsAnimPtr+2
         lda #$01
         sta FinaleJawsAnimTimer
         rts
@@ -12406,31 +12351,35 @@ FinaleUpdateJawsSprites:
         iny
         sta FinaleJawsAnimPtr1+1
         txa
-        ; update animation timer
-        and #$1F
+        ; low 5 bits are the number of frames to show this animation
+        and #%00011111
         sta FinaleJawsAnimTimer
         sty FinaleJawsAnimOffset
+        ; bits 6+7 are sprite attribute modifiers
         txa
-        and #$60
-        sta FinaleJawsV1E
+        and #%01100000
+        sta FinaleJawsSpriteAttrib
 @UpdateJawsSprites:
+        @RemainingSprites = $00
+        @SpriteAttributes = $01
         ldy #$00
         ldx #$00
         lda #$12
-        sta $00
+        sta @RemainingSprites
         lda FinaleJawsFlags
         asl a
         asl a
-        eor FinaleJawsV1E
-        and #$40
-        ora #$01
-        sta $01
+        eor FinaleJawsSpriteAttrib
+        and #%01000000
+        ora #%00000001
+        sta @SpriteAttributes
 @UpdateNextSprite:
         lda (FinaleJawsAnimPtr1),y
+        ; 80 marks the end of this spriteset
         cmp #$80
         beq @MoveSpritesOffScreen
         iny
-        bit $01
+        bit @SpriteAttributes
         bvc @UpdateNextSprite2
         ; invert
         eor #$FF
@@ -12438,7 +12387,7 @@ FinaleUpdateJawsSprites:
         adc #$F8
 @UpdateNextSprite2:
         clc
-        and #$FF
+        and #%11111111 ; sure..
         bmi @NegativeOffset
         adc FinaleJawsX
         sta SpritePosX + FinaleJawsSpriteOffset,x
@@ -12470,20 +12419,20 @@ FinaleUpdateJawsSprites:
         lda (FinaleJawsAnimPtr1),y
         iny
         sta SpriteTile + FinaleJawsSpriteOffset,x
-        lda $01
+        lda @SpriteAttributes
         sta SpriteAttr + FinaleJawsSpriteOffset,x
         inx
         inx
         inx
         inx
-        dec $00
+        dec @RemainingSprites
         jmp @UpdateNextSprite
 @SkipSprite:
         iny
         iny
         jmp @UpdateNextSprite
 @MoveSpritesOffScreen:
-        ldy $00
+        ldy @RemainingSprites
         beq @Done
         lda #$F0
 @MoveSpriteOffScreen:
@@ -12501,7 +12450,7 @@ FinaleUpdateJawsSprites:
 
 
 ; ----------------------------------------------------------------------------
-EnterOutroScreen:
+RunOutroScreen:
         jsr PPUDisableNMI
         jsr ClearScreenAndSprites
         jsr DrawStatusLine
@@ -12690,7 +12639,7 @@ OutroRunPlaneAnimation:
         lda #$00
         sta Workset + EntityActiveAnimationIndex
         lda #$10
-        sta Workset + EntityV16
+        sta Workset + EntityOutroPlaneDelay
         ; then start the second animation
         lda #AnimationOutroPlane2
         jsr WorksetAnimationPlay
@@ -12698,9 +12647,9 @@ OutroRunPlaneAnimation:
 @RunningAnimation2:
         cmp #$01
         bne @DelayUntilAnimationEnd
-        lda Workset + EntityV16
+        lda Workset + EntityOutroPlaneDelay
         beq @PrepNextAnimation
-        dec Workset + EntityV16
+        dec Workset + EntityOutroPlaneDelay
         jmp WorksetSave
 @PrepNextAnimation:
         jsr WorksetMoveX
@@ -12780,490 +12729,534 @@ OutroRunJawsDeath:
         rts
 
 ; ----------------------------------------------------------------------------
-FinaleJawsMovementPattern:
-        .byte $EB,$DE
-        .byte $0D,$DF
-        .byte $2F,$DF
-        .byte $51,$DF
-        .byte $79,$DF
-        .byte $80,$DF
-        .byte $84,$DF
-        .byte $8B,$DF
-        .byte $8F,$DF
-        .byte $99,$DF
-        .byte $9D,$DF
-        .byte $A7,$DF
-        .byte $08,$AB
-        .byte $DF,$08
-        .byte $B2,$DF
-        .byte $08,$B9
-        .byte $DF,$0C
-        .byte $C6,$DF
-        .byte $0C,$D3
-        .byte $DF,$0C
-        .byte $E0,$DF
-        .byte $4C,$D3
-        .byte $DF,$4C
-        .byte $C6,$DF
-        .byte $48,$B9
-        .byte $DF,$48
-        .byte $B2,$DF
-        .byte $48,$AB
-        .byte $DF,$00
-        .byte $08,$ED
-        .byte $DF,$08
-        .byte $F7,$DF
-        .byte $08,$04
-        .byte $E0,$0C
-        .byte $17,$E0
-        .byte $0C,$33
-        .byte $E0,$0C
-        .byte $4C,$E0
-        .byte $4C,$33
-        .byte $E0,$4C
-        .byte $17,$E0
-        .byte $48,$04
-        .byte $E0,$48
-        .byte $F7,$DF
-        .byte $48,$ED
-        .byte $DF,$00
-        .byte $08,$03
-        .byte $E1,$08
-        .byte $F0,$E0
-        .byte $08,$D4
-        .byte $E0,$0C
-        .byte $65,$E0
-        .byte $0C,$B2
-        .byte $E0,$0C
-        .byte $87,$E0
-        .byte $4C,$B2
-        .byte $E0,$4C
-        .byte $65,$E0
-        .byte $48,$D4
-        .byte $E0,$48
-        .byte $F0,$E0
-        .byte $48,$03
-        .byte $E1,$00
-        .byte $06,$FA
-        .byte $E1,$06
-        .byte $E7,$E1
-        .byte $06,$CB
-        .byte $E1,$06
-        .byte $A0,$E1
-        .byte $0A,$0D
-        .byte $E1,$2A
-        .byte $3B,$E1
-        .byte $2A,$6C
-        .byte $E1,$6A
-        .byte $3B,$E1
-        .byte $4A,$0D
-        .byte $E1,$46
-        .byte $A0,$E1
-        .byte $46,$CB
-        .byte $E1,$46
-        .byte $E7,$E1
-        .byte $46,$FA
-        .byte $E1,$00
-        .byte $08,$04
-        .byte $E2,$08
-        .byte $08,$E2
-        .byte $FF,$01
-        .byte $0C,$E2
-        .byte $00,$08
-        .byte $10,$E2
-        .byte $08,$1D
-        .byte $E2,$FF
-        .byte $01,$2A
-        .byte $E2,$00
-        .byte $06,$31
-        .byte $E2,$06
-        .byte $3E,$E2
-        .byte $06,$4B
-        .byte $E2,$FF
-        .byte $01,$58
-        .byte $E2,$00
-        .byte $06,$5F
-        .byte $E2,$06
-        .byte $6F,$E2
-        .byte $06,$7F
-        .byte $E2,$FF
-        .byte $01,$8F
-        .byte $E2,$00
-        .byte $F8,$F8
-        .byte $AF,$00
-        .byte $F8,$9F
-        .byte $80,$F8
-        .byte $F8,$AD
-        .byte $00,$F8
-        .byte $AE,$80
-        .byte $F8,$F0
-        .byte $AB,$00
-        .byte $F0,$AC
-        .byte $F8,$F8
-        .byte $BB,$00
-        .byte $F8,$BC
-        .byte $80,$F8
-        .byte $F0,$A5
-        .byte $00,$F0
-        .byte $A6,$F8
-        .byte $F8,$B5
-        .byte $00,$F8
-        .byte $B6,$80
-        .byte $F8,$F0
-        .byte $A9,$00
-        .byte $F0,$AA
-        .byte $F8,$F8
-        .byte $B9,$00
-        .byte $F8,$BA
-        .byte $80,$F8
-        .byte $F0,$A7
-        .byte $00,$F0
-        .byte $A8,$F8
-        .byte $F8,$B7
-        .byte $00,$F8
-        .byte $B8,$80
-        .byte $F0,$F8
-        .byte $E3,$F8
-        .byte $F8,$E4
-        .byte $00,$F8
-        .byte $F4,$80
-        .byte $F0,$F8
-        .byte $C3,$F8
-        .byte $F8,$C4
-        .byte $00,$F8
-        .byte $D3,$08
-        .byte $F8,$D4
-        .byte $80,$F8
-        .byte $F0,$91
-        .byte $00,$F0
-        .byte $92,$F0
-        .byte $F8,$F0
-        .byte $F8,$F8
-        .byte $F1,$00
-        .byte $F8,$F2
-        .byte $08,$F8
-        .byte $F3,$80
-        .byte $F8,$E8
-        .byte $91,$00
-        .byte $E8,$92
-        .byte $F0,$F0
-        .byte $A0,$F8
-        .byte $F0,$A1
-        .byte $00,$F0
-        .byte $A2,$F0
-        .byte $F8,$B0
-        .byte $F8,$F8
-        .byte $B1,$00
-        .byte $F8,$B2
-        .byte $08,$F8
-        .byte $9E,$80
-        .byte $F8,$E8
-        .byte $93,$00
-        .byte $E8,$94
-        .byte $F8,$F0
-        .byte $A3,$00
-        .byte $F0,$A4
-        .byte $F0,$F8
-        .byte $90,$F8
-        .byte $F8,$B3
-        .byte $00,$F8
-        .byte $B4,$08
-        .byte $F8,$C0
-        .byte $80,$F8
-        .byte $E8,$C1
-        .byte $00,$E8
-        .byte $C2,$F8
-        .byte $F0,$D1
-        .byte $00,$F0
-        .byte $D2,$F0
-        .byte $F8,$E0
-        .byte $F8,$F8
-        .byte $E1,$00
-        .byte $F8,$E2
-        .byte $08,$F8
-        .byte $D0,$80
-        .byte $F9,$E0
-        .byte $04,$01
-        .byte $E0,$05
-        .byte $F9,$E8
-        .byte $14,$01
-        .byte $E8,$15
-        .byte $F1,$F0
-        .byte $23,$F9
-        .byte $F0,$24
-        .byte $01,$F0
-        .byte $25,$F1
-        .byte $F8,$33
-        .byte $F9,$F8
-        .byte $34,$01
-        .byte $F8,$35
-        .byte $09,$F8
-        .byte $36,$80
-        .byte $F7,$E0
-        .byte $16,$FF
-        .byte $E0,$50
-        .byte $F7,$E8
-        .byte $26,$FF
-        .byte $E8,$60
-        .byte $F7,$F0
-        .byte $17,$FF
-        .byte $F0,$70
-        .byte $E7,$F8
-        .byte $19,$EF
-        .byte $F8,$28
-        .byte $F7,$F8
-        .byte $27,$FF
-        .byte $F8,$80
-        .byte $07,$F8
-        .byte $81,$0F
-        .byte $F8,$82
-        .byte $EF,$F0
-        .byte $18,$07
-        .byte $F0,$71
-        .byte $80,$F8
-        .byte $E0,$53
-        .byte $00,$E0
-        .byte $54,$F8
-        .byte $E8,$63
-        .byte $00,$E8
-        .byte $64,$F0
-        .byte $F0,$51
-        .byte $F8,$F0
-        .byte $73,$00
-        .byte $F0,$74
-        .byte $F0,$F8
-        .byte $61,$F8
-        .byte $F8,$83
-        .byte $00,$F8
-        .byte $84,$08
-        .byte $F8,$52
-        .byte $80,$F8
-        .byte $E8,$04
-        .byte $00,$E8
-        .byte $05,$F0
-        .byte $F0,$37
-        .byte $F8,$F0
-        .byte $14,$00
-        .byte $F0,$47
-        .byte $F0,$F8
-        .byte $43,$F8
-        .byte $F8,$44
-        .byte $00,$F8
-        .byte $45,$08
-        .byte $F8,$46
-        .byte $80,$F7
-        .byte $F0,$04
-        .byte $FF,$F0
-        .byte $05,$EF
-        .byte $F8,$38
-        .byte $F7,$F8
-        .byte $39,$FF
-        .byte $F8,$3A
-        .byte $07,$F8
-        .byte $3B,$80
-        .byte $EE,$F8
-        .byte $48,$F6
-        .byte $F8,$49
-        .byte $FE,$F8
-        .byte $4A,$80
-        .byte $F4,$D8
-        .byte $55,$FC
-        .byte $D8,$56
-        .byte $F4,$E0
-        .byte $65,$FC
-        .byte $E0,$66
-        .byte $04,$E0
-        .byte $67,$F4
-        .byte $E8,$75
-        .byte $FC,$E8
-        .byte $76,$04
-        .byte $E8,$77
-        .byte $F4,$F0
-        .byte $85,$FC
-        .byte $F0,$86
-        .byte $04,$F0
-        .byte $87,$EC
-        .byte $F8,$57
-        .byte $F4,$F8
-        .byte $95,$FC
-        .byte $F8,$96
-        .byte $04,$F8
-        .byte $97,$80
-        .byte $F4,$D8
-        .byte $58,$FC
-        .byte $D8,$59
-        .byte $04,$D8
-        .byte $5A,$F4
-        .byte $E0,$68
-        .byte $FC,$E0
-        .byte $69,$04
-        .byte $E0,$6A
-        .byte $F4,$E8
-        .byte $78,$FC
-        .byte $E8,$79
-        .byte $04,$E8
-        .byte $7A,$F4
-        .byte $F0,$88
-        .byte $FC,$F0
-        .byte $89,$04
-        .byte $F0,$8A
-        .byte $EC,$F8
-        .byte $4B,$F4
-        .byte $F8,$98
-        .byte $FC,$F8
-        .byte $99,$04
-        .byte $F8,$9A
-        .byte $80,$F4
-        .byte $D8,$5B
-        .byte $FC,$D8
-        .byte $5C,$04
-        .byte $D8,$5D
-        .byte $F4,$E0
-        .byte $6B,$FC
-        .byte $E0,$6C
-        .byte $04,$E0
-        .byte $6D,$F4
-        .byte $E8,$7B
-        .byte $FC,$E8
-        .byte $7C,$04
-        .byte $E8,$7D
-        .byte $F4,$F0
-        .byte $8B,$FC
-        .byte $F0,$8C
-        .byte $04,$F0
-        .byte $8D,$EC
-        .byte $F8,$3C
-        .byte $F4,$F8
-        .byte $9B,$FC
-        .byte $F8,$9C
-        .byte $04,$F8
-        .byte $9D,$0C
-        .byte $F8,$4C
-        .byte $80,$F4
-        .byte $E0,$55
-        .byte $FC,$E0
-        .byte $56,$F4
-        .byte $E8,$65
-        .byte $FC,$E8
-        .byte $66,$04
-        .byte $E8,$67
-        .byte $F4,$F0
-        .byte $2E,$FC
-        .byte $F0,$76
-        .byte $04,$F0
-        .byte $77,$0C
-        .byte $F0,$2F
-        .byte $EC,$F8
-        .byte $3D,$F4
-        .byte $F8,$3E
-        .byte $FC,$F8
-        .byte $3F,$04
-        .byte $F8,$1E
-        .byte $0C,$F8
-        .byte $1F,$80
-        .byte $F4,$E8
-        .byte $55,$FC
-        .byte $E8,$56
-        .byte $F4,$F0
-        .byte $65,$FC
-        .byte $F0,$66
-        .byte $04,$F0
-        .byte $67,$F4
-        .byte $F8,$4D
-        .byte $FC,$F8
-        .byte $4E,$04
-        .byte $F8,$4F
-        .byte $0C,$F8
-        .byte $5E,$80
-        .byte $F4,$F0
-        .byte $55,$FC
-        .byte $F0,$56
-        .byte $F4,$F8
-        .byte $6E,$FC
-        .byte $F8,$6F
-        .byte $04,$F8
-        .byte $7E,$0C
-        .byte $F8,$7F
-        .byte $80,$F4
-        .byte $F8,$8E
-        .byte $FC,$F8
-        .byte $8F,$04
-        .byte $F8,$5F
-        .byte $80,$FC
-        .byte $F8,$C7
-        .byte $80,$FC
-        .byte $F8,$D7
-        .byte $80,$FC
-        .byte $F8,$CF
-        .byte $80,$FC
-        .byte $F0,$D5
-        .byte $F4,$F8
-        .byte $C8,$FC
-        .byte $F8,$C9
-        .byte $04,$F8
-        .byte $CA,$80
-        .byte $FC,$F0
-        .byte $D5,$F4
-        .byte $F8,$D8
-        .byte $FC,$F8
-        .byte $D9,$04
-        .byte $F8,$DA
-        .byte $80,$FC
-        .byte $F0,$D5
-        .byte $FC,$F8
-        .byte $DF,$80
-        .byte $FC,$F0
-        .byte $CB,$F4
-        .byte $F8,$E8
-        .byte $FC,$F8
-        .byte $E9,$04
-        .byte $F8,$EA
-        .byte $80,$FC
-        .byte $F0,$CB
-        .byte $F4,$F8
-        .byte $F8,$FC
-        .byte $F8,$F9
-        .byte $04,$F8
-        .byte $FA,$80
-        .byte $FC,$F0
-        .byte $CB,$F4
-        .byte $F8,$CC
-        .byte $FC,$F8
-        .byte $CD,$04
-        .byte $F8,$CE
-        .byte $80,$FC
-        .byte $F0,$CB
-        .byte $FC,$F8
-        .byte $EF,$80
-        .byte $FC,$E8
-        .byte $C6,$FC
-        .byte $F0,$D6
-        .byte $F4,$F8
-        .byte $F5,$FC
-        .byte $F8,$F6
-        .byte $04,$F8
-        .byte $F7,$80
-        .byte $FC,$E8
-        .byte $C6,$FC
-        .byte $F0,$D6
-        .byte $F4,$F8
-        .byte $BD,$FC
-        .byte $F8,$BE
-        .byte $04,$F8
-        .byte $BF,$80
-        .byte $FC,$E8
-        .byte $C6,$FC
-        .byte $F0,$D6
-        .byte $F4,$F8
-        .byte $E5,$FC
-        .byte $F8,$E6
-        .byte $04,$F8
-        .byte $E7,$80
-        .byte $FC,$E8
-        .byte $C6,$FC
-        .byte $F0,$D6
-        .byte $FC,$F8
-        .byte $C5,$80            
+; these are sprite animations specific for jaws in the finale
+;
+; AnimationExample1:
+;   .byte %0AATTTTT               ; bits 6+7 are sprite attribute modifiers, 1-5 are frame duration
+;   .addr SpritesetExample1       ; pointer to a set of sprites to show
+;
+FinaleJawsAnimationPointers:
+        .addr @AnimJawsStrobeSize0
+        .addr @AnimJawsStrobeSize1
+        .addr @AnimJawsStrobeSize2
+        .addr @AnimJawsStrobeSize3
+        .addr @AnimJawsAdvanceSize0
+        .addr @AnimJawsRetreatSize0
+        .addr @AnimJawsAdvanceSize1
+        .addr @AnimJawsRetreatSize1
+        .addr @AnimJawsAdvanceSize2
+        .addr @AnimJawsRetreatSize2
+        .addr @AnimJawsAdvanceSize3
+        .addr @AnimJawsRetreatSize3
+
+@AnimJawsStrobeSize0:
+        .byte $08
+        .addr @SprJawsStrobeSize0Frame0
+        .byte $08
+        .addr @SprJawsStrobeSize0Frame1
+        .byte $08
+        .addr @SprJawsStrobeSize0Frame2
+        .byte $0C
+        .addr @SprJawsStrobeSize0Frame3
+        .byte $0C
+        .addr @SprJawsStrobeSize0Frame4
+        .byte $0C
+        .addr @SprJawsStrobeSize0Frame5
+        .byte $0C | %01000000
+        .addr @SprJawsStrobeSize0Frame4
+        .byte $0C | %01000000
+        .addr @SprJawsStrobeSize0Frame3
+        .byte $08 | %01000000
+        .addr @SprJawsStrobeSize0Frame2
+        .byte $08 | %01000000
+        .addr @SprJawsStrobeSize0Frame1
+        .byte $08 | %01000000
+        .addr @SprJawsStrobeSize0Frame0
+        .byte $00
+        
+@AnimJawsStrobeSize1:
+        .byte $08
+        .addr @SprJawsStrobeSize1Frame0
+        .byte $08
+        .addr @SprJawsStrobeSize1Frame1
+        .byte $08
+        .addr @SprJawsStrobeSize1Frame2
+        .byte $0C
+        .addr @SprJawsStrobeSize1Frame3
+        .byte $0C
+        .addr @SprJawsStrobeSize1Frame4
+        .byte $0C
+        .addr @SprJawsStrobeSize1Frame5
+        .byte $0C | %01000000
+        .addr @SprJawsStrobeSize1Frame4
+        .byte $0C | %01000000
+        .addr @SprJawsStrobeSize1Frame3
+        .byte $08 | %01000000
+        .addr @SprJawsStrobeSize1Frame2
+        .byte $08 | %01000000
+        .addr @SprJawsStrobeSize1Frame1
+        .byte $08 | %01000000
+        .addr @SprJawsStrobeSize1Frame0
+        .byte $00
+
+@AnimJawsStrobeSize2:
+        .byte $08
+        .addr @SprJawsStrobeSize2Frame0
+        .byte $08
+        .addr @SprJawsStrobeSize2Frame1
+        .byte $08
+        .addr @SprJawsStrobeSize2Frame2
+        .byte $0C
+        .addr @SprJawsStrobeSize2Frame3
+        .byte $0C
+        .addr @SprJawsStrobeSize2Frame4
+        .byte $0C
+        .addr @SprJawsStrobeSize2Frame5
+        .byte $0C | %01000000
+        .addr @SprJawsStrobeSize2Frame4
+        .byte $0C | %01000000
+        .addr @SprJawsStrobeSize2Frame3
+        .byte $08 | %01000000
+        .addr @SprJawsStrobeSize2Frame2
+        .byte $08 | %01000000
+        .addr @SprJawsStrobeSize2Frame1
+        .byte $08 | %01000000
+        .addr @SprJawsStrobeSize2Frame0
+        .byte $00
+
+@AnimJawsStrobeSize3:
+        .byte $06
+        .addr @SprJawsStrobeSize3Frame0
+        .byte $06
+        .addr @SprJawsStrobeSize3Frame1
+        .byte $06
+        .addr @SprJawsStrobeSize3Frame2
+        .byte $06
+        .addr @SprJawsStrobeSize3Frame3
+        .byte $0A
+        .addr @SprJawsStrobeSize3Frame4
+        .byte $0A | %00100000
+        .addr @SprJawsStrobeSize3Frame5
+        .byte $0A | %00100000
+        .addr @SprJawsStrobeSize3Frame6
+        .byte $0A | %01100000
+        .addr @SprJawsStrobeSize3Frame5
+        .byte $0A | %01000000
+        .addr @SprJawsStrobeSize3Frame4
+        .byte $06 | %01000000
+        .addr @SprJawsStrobeSize3Frame3
+        .byte $06 | %01000000
+        .addr @SprJawsStrobeSize3Frame2
+        .byte $06 | %01000000
+        .addr @SprJawsStrobeSize3Frame1
+        .byte $06 | %01000000
+        .addr @SprJawsStrobeSize3Frame0
+        .byte $00
+
+@AnimJawsAdvanceSize0:
+        .byte $08
+        .addr @SprJawsAdvanceSize0Frame0
+        .byte $08
+        .addr @SprJawsAdvanceSize0Frame1
+        .byte $FF
+
+@AnimJawsRetreatSize0:
+        .byte $01
+        .addr @SprJawsRetreatSize0Frame0
+        .byte $00
+
+@AnimJawsAdvanceSize1:
+        .byte $08
+        .addr @SprJawsAdvanceSize1Frame0
+        .byte $08
+        .addr @SprJawsAdvanceSize1Frame1
+        .byte $FF
+
+@AnimJawsRetreatSize1:
+        .byte $01
+        .addr @SprJawsRetreatSize1Frame0
+        .byte $00
+
+@AnimJawsAdvanceSize2:
+        .byte $06
+        .addr @SprJawsAdvanceSize2Frame0
+        .byte $06
+        .addr @SprJawsAdvanceSize2Frame1
+        .byte $06
+        .addr @SprJawsAdvanceSize2Frame2
+        .byte $FF
+
+@AnimJawsRetreatSize2:
+        .byte $01
+        .addr @SprJawsRetreatSize2Frame0
+        .byte $00
+
+@AnimJawsAdvanceSize3:
+        .byte $06
+        .addr @SprJawsAdvanceSize3Frame0
+        .byte $06
+        .addr @SprJawsAdvanceSize3Frame1
+        .byte $06
+        .addr @SprJawsAdvanceSize3Frame2
+        .byte $FF
+
+@AnimJawsRetreatSize3:
+        .byte $01
+        .addr @SprJawsRetreatSize3Frame0
+        .byte $00
+
+
+; Sprite sets used for finale animations
+;
+; struct:
+;   - one or more sprites:
+;     - s8 x offset from entity location
+;     - s8 y offset from entity location
+;     - u8 sprite tile to render
+;   - u8 $80 end of spriteset marker
+@SprJawsStrobeSize0Frame0:
+        .byte $F8,$F8,$AF
+        .byte $00,$F8,$9F
+        .byte $80
+@SprJawsStrobeSize0Frame1:
+        .byte $F8,$F8,$AD
+        .byte $00,$F8,$AE
+        .byte $80
+@SprJawsStrobeSize0Frame2:
+        .byte $F8,$F0,$AB
+        .byte $00,$F0,$AC
+        .byte $F8,$F8,$BB
+        .byte $00,$F8,$BC
+        .byte $80
+@SprJawsStrobeSize0Frame3:
+        .byte $F8,$F0,$A5
+        .byte $00,$F0,$A6
+        .byte $F8,$F8,$B5
+        .byte $00,$F8,$B6
+        .byte $80
+@SprJawsStrobeSize0Frame4:
+        .byte $F8,$F0,$A9
+        .byte $00,$F0,$AA
+        .byte $F8,$F8,$B9
+        .byte $00,$F8,$BA
+        .byte $80
+@SprJawsStrobeSize0Frame5:
+        .byte $F8,$F0,$A7
+        .byte $00,$F0,$A8
+        .byte $F8,$F8,$B7
+        .byte $00,$F8,$B8
+        .byte $80
+
+
+@SprJawsStrobeSize1Frame0:
+        .byte $F0,$F8,$E3
+        .byte $F8,$F8,$E4
+        .byte $00,$F8,$F4
+        .byte $80
+@SprJawsStrobeSize1Frame1:
+        .byte $F0,$F8,$C3
+        .byte $F8,$F8,$C4
+        .byte $00,$F8,$D3
+        .byte $08,$F8,$D4
+        .byte $80
+@SprJawsStrobeSize1Frame2:
+        .byte $F8,$F0,$91
+        .byte $00,$F0,$92
+        .byte $F0,$F8,$F0
+        .byte $F8,$F8,$F1
+        .byte $00,$F8,$F2
+        .byte $08,$F8,$F3
+        .byte $80
+@SprJawsStrobeSize1Frame3:
+        .byte $F8,$E8,$91
+        .byte $00,$E8,$92
+        .byte $F0,$F0,$A0
+        .byte $F8,$F0,$A1
+        .byte $00,$F0,$A2
+        .byte $F0,$F8,$B0
+        .byte $F8,$F8,$B1
+        .byte $00,$F8,$B2
+        .byte $08,$F8,$9E
+        .byte $80
+@SprJawsStrobeSize1Frame4:
+        .byte $F8,$E8,$93
+        .byte $00,$E8,$94
+        .byte $F8,$F0,$A3
+        .byte $00,$F0,$A4
+        .byte $F0,$F8,$90
+        .byte $F8,$F8,$B3
+        .byte $00,$F8,$B4
+        .byte $08,$F8,$C0
+        .byte $80
+@SprJawsStrobeSize1Frame5:
+        .byte $F8,$E8,$C1
+        .byte $00,$E8,$C2
+        .byte $F8,$F0,$D1
+        .byte $00,$F0,$D2
+        .byte $F0,$F8,$E0
+        .byte $F8,$F8,$E1
+        .byte $00,$F8,$E2
+        .byte $08,$F8,$D0
+        .byte $80
+
+
+@SprJawsStrobeSize2Frame3:
+        .byte $F9,$E0,$04
+        .byte $01,$E0,$05
+        .byte $F9,$E8,$14
+        .byte $01,$E8,$15
+        .byte $F1,$F0,$23
+        .byte $F9,$F0,$24
+        .byte $01,$F0,$25
+        .byte $F1,$F8,$33
+        .byte $F9,$F8,$34
+        .byte $01,$F8,$35
+        .byte $09,$F8,$36
+        .byte $80
+
+@SprJawsStrobeSize2Frame5:
+        .byte $F7,$E0,$16
+        .byte $FF,$E0,$50
+        .byte $F7,$E8,$26
+        .byte $FF,$E8,$60
+        .byte $F7,$F0,$17
+        .byte $FF,$F0,$70
+        .byte $E7,$F8,$19
+        .byte $EF,$F8,$28
+        .byte $F7,$F8,$27
+        .byte $FF,$F8,$80
+        .byte $07,$F8,$81
+        .byte $0F,$F8,$82
+        .byte $EF,$F0,$18
+        .byte $07,$F0,$71
+        .byte $80
+
+@SprJawsStrobeSize2Frame4:
+        .byte $F8,$E0,$53
+        .byte $00,$E0,$54
+        .byte $F8,$E8,$63
+        .byte $00,$E8,$64
+        .byte $F0,$F0,$51
+        .byte $F8,$F0,$73
+        .byte $00,$F0,$74
+        .byte $F0,$F8,$61
+        .byte $F8,$F8,$83
+        .byte $00,$F8,$84
+        .byte $08,$F8,$52
+        .byte $80
+
+@SprJawsStrobeSize2Frame2:
+        .byte $F8,$E8,$04
+        .byte $00,$E8,$05
+        .byte $F0,$F0,$37
+        .byte $F8,$F0,$14
+        .byte $00,$F0,$47
+        .byte $F0,$F8,$43
+        .byte $F8,$F8,$44
+        .byte $00,$F8,$45
+        .byte $08,$F8,$46
+        .byte $80
+
+@SprJawsStrobeSize2Frame1:
+        .byte $F7,$F0,$04
+        .byte $FF,$F0,$05
+        .byte $EF,$F8,$38
+        .byte $F7,$F8,$39
+        .byte $FF,$F8,$3A
+        .byte $07,$F8,$3B
+        .byte $80
+
+@SprJawsStrobeSize2Frame0:
+        .byte $EE,$F8,$48
+        .byte $F6,$F8,$49
+        .byte $FE,$F8,$4A
+        .byte $80
+
+
+@SprJawsStrobeSize3Frame4:
+        .byte $F4,$D8,$55
+        .byte $FC,$D8,$56
+        .byte $F4,$E0,$65
+        .byte $FC,$E0,$66
+        .byte $04,$E0,$67
+        .byte $F4,$E8,$75
+        .byte $FC,$E8,$76
+        .byte $04,$E8,$77
+        .byte $F4,$F0,$85
+        .byte $FC,$F0,$86
+        .byte $04,$F0,$87
+        .byte $EC,$F8,$57
+        .byte $F4,$F8,$95
+        .byte $FC,$F8,$96
+        .byte $04,$F8,$97
+        .byte $80
+@SprJawsStrobeSize3Frame5:
+        .byte $F4,$D8,$58
+        .byte $FC,$D8,$59
+        .byte $04,$D8,$5A
+        .byte $F4,$E0,$68
+        .byte $FC,$E0,$69
+        .byte $04,$E0,$6A
+        .byte $F4,$E8,$78
+        .byte $FC,$E8,$79
+        .byte $04,$E8,$7A
+        .byte $F4,$F0,$88
+        .byte $FC,$F0,$89
+        .byte $04,$F0,$8A
+        .byte $EC,$F8,$4B
+        .byte $F4,$F8,$98
+        .byte $FC,$F8,$99
+        .byte $04,$F8,$9A
+        .byte $80
+@SprJawsStrobeSize3Frame6:
+        .byte $F4,$D8,$5B
+        .byte $FC,$D8,$5C
+        .byte $04,$D8,$5D
+        .byte $F4,$E0,$6B
+        .byte $FC,$E0,$6C
+        .byte $04,$E0,$6D
+        .byte $F4,$E8,$7B
+        .byte $FC,$E8,$7C
+        .byte $04,$E8,$7D
+        .byte $F4,$F0,$8B
+        .byte $FC,$F0,$8C
+        .byte $04,$F0,$8D
+        .byte $EC,$F8,$3C
+        .byte $F4,$F8,$9B
+        .byte $FC,$F8,$9C
+        .byte $04,$F8,$9D
+        .byte $0C,$F8,$4C
+        .byte $80
+@SprJawsStrobeSize3Frame3:
+        .byte $F4,$E0,$55
+        .byte $FC,$E0,$56
+        .byte $F4,$E8,$65
+        .byte $FC,$E8,$66
+        .byte $04,$E8,$67
+        .byte $F4,$F0,$2E
+        .byte $FC,$F0,$76
+        .byte $04,$F0,$77
+        .byte $0C,$F0,$2F
+        .byte $EC,$F8,$3D
+        .byte $F4,$F8,$3E
+        .byte $FC,$F8,$3F
+        .byte $04,$F8,$1E
+        .byte $0C,$F8,$1F
+        .byte $80
+@SprJawsStrobeSize3Frame2:
+        .byte $F4,$E8,$55
+        .byte $FC,$E8,$56
+        .byte $F4,$F0,$65
+        .byte $FC,$F0,$66
+        .byte $04,$F0,$67
+        .byte $F4,$F8,$4D
+        .byte $FC,$F8,$4E
+        .byte $04,$F8,$4F
+        .byte $0C,$F8,$5E
+        .byte $80
+@SprJawsStrobeSize3Frame1:
+        .byte $F4,$F0,$55
+        .byte $FC,$F0,$56
+        .byte $F4,$F8,$6E
+        .byte $FC,$F8,$6F
+        .byte $04,$F8,$7E
+        .byte $0C,$F8,$7F
+        .byte $80
+@SprJawsStrobeSize3Frame0:
+        .byte $F4,$F8,$8E
+        .byte $FC,$F8,$8F
+        .byte $04,$F8,$5F
+        .byte $80
+
+
+@SprJawsAdvanceSize0Frame0:
+        .byte $FC,$F8,$C7
+        .byte $80
+@SprJawsAdvanceSize0Frame1:
+        .byte $FC,$F8,$D7
+        .byte $80
+        
+
+@SprJawsRetreatSize0Frame0:
+        .byte $FC,$F8,$CF
+        .byte $80
+
+
+@SprJawsAdvanceSize1Frame0:
+        .byte $FC,$F0,$D5
+        .byte $F4,$F8,$C8
+        .byte $FC,$F8,$C9
+        .byte $04,$F8,$CA
+        .byte $80
+
+@SprJawsAdvanceSize1Frame1:
+        .byte $FC,$F0,$D5
+        .byte $F4,$F8,$D8
+        .byte $FC,$F8,$D9
+        .byte $04,$F8,$DA
+        .byte $80
+
+
+@SprJawsRetreatSize1Frame0:
+        .byte $FC,$F0,$D5
+        .byte $FC,$F8,$DF
+        .byte $80
+
+
+@SprJawsAdvanceSize2Frame0:
+        .byte $FC,$F0,$CB
+        .byte $F4,$F8,$E8
+        .byte $FC,$F8,$E9
+        .byte $04,$F8,$EA
+        .byte $80
+@SprJawsAdvanceSize2Frame1:
+        .byte $FC,$F0,$CB
+        .byte $F4,$F8,$F8
+        .byte $FC,$F8,$F9
+        .byte $04,$F8,$FA
+        .byte $80
+@SprJawsAdvanceSize2Frame2:
+        .byte $FC,$F0,$CB
+        .byte $F4,$F8,$CC
+        .byte $FC,$F8,$CD
+        .byte $04,$F8,$CE
+        .byte $80
+
+
+@SprJawsRetreatSize2Frame0:
+        .byte $FC,$F0,$CB
+        .byte $FC,$F8,$EF
+        .byte $80
+
+
+@SprJawsAdvanceSize3Frame0:
+        .byte $FC,$E8,$C6
+        .byte $FC,$F0,$D6
+        .byte $F4,$F8,$F5
+        .byte $FC,$F8,$F6
+        .byte $04,$F8,$F7
+        .byte $80
+@SprJawsAdvanceSize3Frame1:
+        .byte $FC,$E8,$C6
+        .byte $FC,$F0,$D6
+        .byte $F4,$F8,$BD
+        .byte $FC,$F8,$BE
+        .byte $04,$F8,$BF
+        .byte $80
+@SprJawsAdvanceSize3Frame2:
+        .byte $FC,$E8,$C6
+        .byte $FC,$F0,$D6
+        .byte $F4,$F8,$E5
+        .byte $FC,$F8,$E6
+        .byte $04,$F8,$E7
+        .byte $80
+
+
+@SprJawsRetreatSize3Frame0:
+        .byte $FC,$E8,$C6
+        .byte $FC,$F0,$D6
+        .byte $FC,$F8,$C5
+        .byte $80
 
 .include "sound.asm"
 
@@ -13305,7 +13298,6 @@ ParallaxBackgroundOffset:
         .byte $E8,$00
         .byte $F0,$00
         .byte $F8,$00
-        ; uses first byte of FinaleParallaxNextSectionDelay as secondary offset..
         .byte $00
 
 ; table of cycle counts that need to be burned in order to position the ppu where
@@ -13415,10 +13407,10 @@ FinaleUpdateParallax:
         lda FinaleParallax1,x
         clc
         adc ParallaxBackgroundOffset,x
-        sta UnusedParallaxOffset,y
+        sta FinalePlayerPosition,y
         lda FinaleParallax1+1,x
         adc ParallaxBackgroundOffset+1,x
-        sta UnusedParallaxOffset,y
+        sta FinalePlayerPosition,y
         jmp @FinaleParallaxDelayForExactCycles
 
 ; ----------------------------------------------------------------------------
