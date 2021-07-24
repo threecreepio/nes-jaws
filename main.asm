@@ -338,8 +338,8 @@ EncounterEntityHomingJellyfish      = $2
 EncounterEntityBabyshark            = $3
 EncounterEntityStingray2            = $4
 EncounterEntityCrab                 = $8
-EncounterEntityStar                 = $9
-EncounterEntityShell                = $A
+EncounterEntityShell                = $9
+EncounterEntityStar                 = $A
 
 EntityHeaderActive                  = %10000000
 ; not quite sure what this is used for outside of projectiles
@@ -5745,7 +5745,7 @@ CrabOrStarRNG:
         .byte 0
         .byte 0
         .byte 0
-        .byte EncounterEntityStar
+        .byte EncounterEntityShell
 
 ; pretty near duplicate of jellyfish code, except it moves towards the player.
 RunEntityHomingJellyfish:
@@ -6068,10 +6068,14 @@ RunEntityStingray:
 @Exit:
         rts
 @RewardRNG:
-        .dbyt EncounterEntityCrab
-        .dbyt EncounterEntityStar
-        .dbyt EncounterEntityShell
-        .dbyt EncounterEntityStar
+        .byte 0
+        .byte EncounterEntityCrab
+        .byte 0
+        .byte EncounterEntityShell
+        .byte 0
+        .byte EncounterEntityStar
+        .byte 0
+        .byte EncounterEntityShell
 @StingraySpeeds:
         .byte $00,$01 ; slow stingray heading right
         .byte $00,$FF ; slow stingray heading left
@@ -6259,7 +6263,7 @@ RunEntityBabyshark:
 @ProcessDeath:
         lda #EntityHeaderActive
         sta Workset + EntityHeader
-        lda #EncounterEntityStar ; spawn a star on death
+        lda #EncounterEntityShell ; spawn a star on death
         sta Workset + EntityType
         jmp RunEntity
 
