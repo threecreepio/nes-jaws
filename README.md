@@ -13,7 +13,9 @@ Then run `make`, if everything works you can then play `main.nes`.
 Left to document
 ----------------
 
-Much of the game has been documented, there are some missing bits specifically in the sound system and some more cleaning up to do.
+Mostly complete at this point, some parts of the entities could be named better.
+
+And probably more commenting is in order and cleaning up the formatting.
 
 Hope you find this interesting!
 
